@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/         
+.env
+.DS_Store
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.cursor/
+
+# 离线数据
+top_300_metrics/

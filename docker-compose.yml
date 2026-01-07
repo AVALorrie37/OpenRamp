@@ -1,0 +1,28 @@
+version: '2.1' # Docker Compose 文件版本 [[1]]
+
+services:
+  dataease:
+    image: registry.cn-qingdao.aliyuncs.com/dataease/dataease:v2.3-rc1 # 使用 V2 版本的镜像 [[1]]
+    container_name: dataease-v2
+    ports:
+      - "8080:8080" # 映射容器端口到宿主机
+    environment:
+      # V2 版本通常内置了元数据存储和分析引擎，可能不再需要单独配置外部 MySQL
+      # 具体环境变量请参考官方 V2 文档，以下为示例，可能需要调整
+      # - DE_DATABASE_HOST= # 如果需要外部数据库
+      # - DE_DATABASE_PORT=
+      # - DE_DATABASE_USER=
+      # - DE_DATABASE_PASSWORD=
+      # - DE_DATABASE_NAME=
+      # V2 可能有新的配置项，如 Doris 相关，请查阅 V2 安装包内的 docker-compose.yml 或 install.conf [[2]]
+    volumes:
+      - ./dataease-data:/opt/dataease/data # 持久化数据
+      # - ./dataease-conf:/opt/dataease/conf # 如果需要挂载配置文件
+    # depends_on: # V2 通常将依赖组件打包在内，可能不需要显式依赖
+    #   - mysql
+    # networks: # V2 通常使用默认 bridge 网络即可
+    #   - de-net
+
+# networks: # V2 通常使用默认网络，可省略
+#   de-net:
+#     driver: bridge
