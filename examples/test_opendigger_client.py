@@ -10,12 +10,12 @@ from pathlib import Path
 import sys
 
 # Allow running the example directly via `python examples/test_opendigger_client.py`
-# by adding the repo root to import search path.
+# by adding the repo root (project root) to import search path.
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from OpenDiggerAPI.client import OpenDiggerClient
+from src.online.OpenDiggerAPI.client import OpenDiggerClient
 
 
 def main() -> None:

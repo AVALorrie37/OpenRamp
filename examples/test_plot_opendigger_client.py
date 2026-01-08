@@ -11,12 +11,12 @@ import sys
 import streamlit as st
 
 # 允许直接通过 `streamlit run examples/test_opendigger_client.py` 运行，
-# 把项目根目录加入到 sys.path 里，方便导入 OpenDiggerAPI 包。
+# 把项目根目录加入到 sys.path 里，方便导入 online/offline 模块。
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from OpenDiggerAPI.client import OpenDiggerClient  # noqa: E402
+from src.online.OpenDiggerAPI.client import OpenDiggerClient  # noqa: E402
 
 
 def fetch_activity_data(repo_id: str, timeout: float = 8.0):
