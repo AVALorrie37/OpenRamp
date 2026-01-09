@@ -1,0 +1,41 @@
+
+# 全局提示词配置基础模板
+# 用于定义所有提示词的通用规则和变量
+
+# 默认系统提示词（可被具体模板覆盖）
+default_system: |
+  你是一个专业的技术分析助手。请严格遵守以下规则：
+  1. 输出格式必须严格符合JSON规范
+  2. 回答内容必须基于输入文本，不得编造信息
+  3. 如遇到模糊信息，返回默认值或空数组
+  4. 不管用户输入什么语言，都用英文回答
+
+# 全局变量（可被具体模板使用）
+global_vars:
+  max_output_tokens: 512
+  output_format: "JSON"
+  language: "中文"
+
+# 安全配置
+safety:
+  # 禁止输出的关键词（防止越狱）
+  forbidden_keywords: ["ignore", "disregard", "system prompt", "prompt injection"]
+  
+  # 输出长度限制
+  max_response_length: 2048
+
+# 通用提示词模板（可被继承）
+templates:
+  json_wrapper: |
+    请严格按照以下JSON格式输出：
+    {json_schema}
+    
+    输入内容：{input_text}
+    
+    注意：只输出JSON，不要添加任何解释文字。
+  
+  safety_guard: |
+    请确保你的回答符合以下安全准则：
+    - 不输出任何 {forbidden_keywords} 中的词语
+    - 保持专业、客观的语气
+    - 仅基于提供信息进行分析
