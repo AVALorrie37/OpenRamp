@@ -88,7 +88,7 @@ class GitHubClient:
         if total_count == 0:
             print(f"Debug: API returned 0 total results for query: {query}")
         else:
-            print(f"Debug: API returned {total_count} total results, {len(data.get('items', []))} in this page")
+            print(f"Success: API returned {total_count} total results, {len(data.get('items', []))} in this page")
         
         return data.get("items", [])
     
@@ -141,7 +141,7 @@ class GitHubClient:
             remaining_quota = max_total - total_fetched
             current_batch_size = min(batch_size, remaining_quota)
             
-            print(f"Debug: Fetching page {page} ({current_batch_size} repos), query: {query[:80]}...")
+            print(f"Success: Fetching page {page} ({current_batch_size} repos), query: {query[:80]}...")
             
             # 获取一页数据
             try:
@@ -152,7 +152,7 @@ class GitHubClient:
             
             if not items:
                 # 没有更多结果了
-                print(f"Debug: No more results from API (page {page})")
+                print(f"Warning: No more results from API (page {page})")
                 break
             
             total_fetched += len(items)
