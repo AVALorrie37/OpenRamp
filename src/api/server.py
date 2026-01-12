@@ -13,8 +13,8 @@ except ImportError:
         "需要安装 fastapi 和 uvicorn: pip install fastapi uvicorn"
     )
 
-from src.online.OpenDiggerAPI.client import OpenDiggerClient
-from src.offline.loader import OfflineRepoLoader
+from src.data_layer.online.OpenDiggerAPI.client import OpenDiggerClient
+from src.data_layer.offline.loader import OfflineRepoLoader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

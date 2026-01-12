@@ -102,7 +102,7 @@ streamlit run examples/streamlit_dashboard.py
 生成离线仓库ID列表（可选）：
 
 ```bash
-python scripts/generate_repo_list.py
+python src/data_layer/generate_repo_list.py
 ```
 
 这将生成 `data/offline_repo_ids.json` 文件。

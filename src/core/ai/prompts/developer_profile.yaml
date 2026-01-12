@@ -6,7 +6,7 @@ system: |
   要求：
   1. 仅输出JSON，不要添加任何解释文字
   2. skills用英文标签，小写，不要下划线
-  3. skills: ["python", "sql", "docker"]
+  3. 示例：skills: ["python", "sql", "docker", "machine-learning", "open-source"]
 
 user_template: |
   **用户输入**：{user_input}
