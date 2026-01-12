@@ -15,4 +15,10 @@ __pycache__/
 
 # 离线数据
 top_300_metrics/
+
+# 缓存
 **/opendigger_cache/
+**/profile_cache/
+
+# 设计方案
+design_text/

@@ -97,3 +97,57 @@ class OllamaProvider(BaseAIProvider):
         except Exception as e:
             logger.error(f"Ollama API error: {str(e)}")
             raise RuntimeError(f"AI generation failed: {str(e)}")
+    
+    def chat(
+        self,
+        messages: list,
+        system_prompt: Optional[str] = None,
+        **kwargs
+    ) -> str:
+        """
+        多轮对话接口
+        
+        Args:
+            messages: 对话历史 [{"role": "user/assistant", "content": "..."}]
+            system_prompt: 系统提示词（角色定义）
+            **kwargs: 额外参数（如temperature等）
+        
+        Returns:
+            AI响应文本
+        """
+        try:
+            # 构建完整消息列表
+            full_messages = []
+            if system_prompt:
+                full_messages.append({"role": "system", "content": system_prompt})
+            full_messages.extend(messages)
+            
+            payload = {
+                "model": self.model,
+                "messages": full_messages,
+                "options": {
+                    "temperature": kwargs.get("temperature", 0.3),
+                    "num_predict": kwargs.get("max_tokens", 1024)
+                },
+                "stream": False
+            }
+
+            response = requests.post(
+                f"{self.base_url}/api/chat",
+                json=payload,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            return result['message']['content'].strip()
+            
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Ollama HTTP Error {response.status_code}: {response.text}")
+            raise RuntimeError(f"AI chat failed: {e}")
+        except requests.exceptions.Timeout:
+            logger.error(f"Ollama request timeout after {self.timeout}s")
+            raise RuntimeError("AI chat failed: Request timeout")
+        except Exception as e:
+            logger.error(f"Ollama API error: {str(e)}")
+            raise RuntimeError(f"AI chat failed: {str(e)}")
