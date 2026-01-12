@@ -64,14 +64,16 @@ class GitHubClient:
     def _fetch_page(self, query: str, page: int, per_page: int) -> list:
         """
         获取单页搜索结果
+        
+        按 updated 字段降序排序，以筛选出最活跃的仓库
         """
         response = requests.get(
             f"{BASE_URL}/search/repositories",
             headers=self.headers,
             params={
                 "q": query,
-                "sort": GITHUB_API["DEFAULT_QUERY_PARAMS"]["sort"],
-                "order": GITHUB_API["DEFAULT_QUERY_PARAMS"]["order"],
+                "sort": "updated",  # 按更新时间排序，筛选最活跃的仓库
+                "order": "desc",    # 降序：最近更新的在前
                 "per_page": per_page,
                 "page": page
             }
@@ -109,8 +111,10 @@ class GitHubClient:
         if not self.token:
             print("Warning: Running in unauthenticated mode, results may be limited")
         
-        # 计算近1年的日期（365天前）
+        # 计算近1年的日期（365天前）- 用于过滤最近更新的仓库
         one_year_ago = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+        # 计算2个月前的日期（60天前）- 用于排除最近新建的仓库
+        one_month_ago = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
         
         # 构建查询：使用OR逻辑，增加搜索结果数量
         # GitHub搜索语法：空格表示AND，OR需要显式使用
@@ -123,10 +127,13 @@ class GitHubClient:
                 formatted_keywords.append(kw)
         
         # 使用OR连接多个关键词（GitHub搜索语法）
+        # 添加两个过滤条件：
+        # 1. pushed:>{one_year_ago} - 最近一年有更新
+        # 2. created:<{one_month_ago} - 创建时间早于一个月前（排除最近一个月新建的）
         if len(keywords) > 1:
-            query = f"{' OR '.join(formatted_keywords)} pushed:>{one_year_ago}"
+            query = f"{' OR '.join(formatted_keywords)} pushed:>{one_year_ago} created:<{one_month_ago}"
         else:
-            query = f"{formatted_keywords[0]} pushed:>{one_year_ago}"
+            query = f"{formatted_keywords[0]} pushed:>{one_year_ago} created:<{one_month_ago}"
         
         batch_size = GITHUB_API.get("BATCH_SIZE", 15)
         max_total = int(self.results_limit)
@@ -177,7 +184,7 @@ class GitHubClient:
                     if len(filtered_results) >= target_count:
                         break
             
-            print(f"Debug: Fetched {total_fetched} total, {len(filtered_results)} with keywords (target: {target_count})")
+            print(f"Success: Fetched {total_fetched} total, {len(filtered_results)} with keywords (target: {target_count})")
             
             # 如果已经满足数量，提前结束
             if len(filtered_results) >= target_count:
