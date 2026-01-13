@@ -27,3 +27,6 @@ design_text/
 
 # 开发报告
 docs/
+
+# 前端依赖
+node_modules/

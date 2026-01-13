@@ -3,10 +3,17 @@ FastAPI 服务器，提供统一的仓库数据接口。
 """
 
 import logging
-from typing import List, Optional
+import sys
+import json
+import asyncio
+from typing import List, Optional, Dict, Any
+from collections import deque
+from datetime import datetime
 
 try:
-    from fastapi import FastAPI, HTTPException, Query
+    from fastapi import FastAPI, HTTPException, Query, Body
+    from fastapi.responses import StreamingResponse
+    from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel
 except ImportError:
     raise ImportError(
@@ -15,11 +22,39 @@ except ImportError:
 
 from src.data_layer.online.OpenDiggerAPI.client import OpenDiggerClient
 from src.data_layer.offline.loader import OfflineRepoLoader
+from src.core.profile import ConversationalProfileBuilder
+from src.core.match import MatchScorer, UserProfile, RepoData
+from src.data_layer.online.integrated_search import IntegratedRepoSearch
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OpenDigger API Server", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_log_buffer = deque(maxlen=200)
+_log_lock = asyncio.Lock()
+
+class LogHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = {
+            "level": record.levelname,
+            "message": self.format(record),
+            "timestamp": datetime.now().isoformat()
+        }
+        _log_buffer.append(log_entry)
+
+_log_handler = LogHandler()
+_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(_log_handler)
+logging.getLogger().addHandler(_log_handler)
 
 # 全局缓存
 _offline_cache: Optional[List[dict]] = None
@@ -231,6 +266,205 @@ async def get_repos(
 async def health_check():
     """健康检查端点"""
     return {"status": "ok"}
+
+
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+    session_id: Optional[str] = None
+
+
+class ProfileConfirmRequest(BaseModel):
+    user_id: str
+
+
+class MatchRequest(BaseModel):
+    user_id: str
+    repo_id: str
+
+
+class SearchRequest(BaseModel):
+    user_id: str
+    limit: Optional[int] = 10
+
+
+_profile_builder: Optional[ConversationalProfileBuilder] = None
+_match_scorer: Optional[MatchScorer] = None
+_integrated_search: Optional[IntegratedRepoSearch] = None
+
+
+def get_profile_builder() -> ConversationalProfileBuilder:
+    global _profile_builder
+    if _profile_builder is None:
+        _profile_builder = ConversationalProfileBuilder()
+    return _profile_builder
+
+
+def get_match_scorer() -> MatchScorer:
+    global _match_scorer
+    if _match_scorer is None:
+        _match_scorer = MatchScorer()
+    return _match_scorer
+
+
+def get_integrated_search() -> IntegratedRepoSearch:
+    global _integrated_search
+    if _integrated_search is None:
+        _integrated_search = IntegratedRepoSearch()
+    return _integrated_search
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest = Body(...)):
+    try:
+        builder = get_profile_builder()
+        result = builder.chat(request.user_id, request.message)
+        return {
+            "reply": result.get("reply", ""),
+            "status": result.get("status", "collecting"),
+            "skills": result.get("skills", []),
+            "preferences": result.get("preferences", []),
+            "action": result.get("action", "NONE"),
+            "confirmed": result.get("confirmed", False),
+            "profile": result.get("profile") if result.get("confirmed") else None
+        }
+    except Exception as e:
+        logger.error(f"Chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/profile/confirm")
+async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
+    try:
+        builder = get_profile_builder()
+        cached_profile = builder.get_cached_profile(request.user_id)
+        if cached_profile:
+            return {
+                "profile": cached_profile,
+                "skills": cached_profile.get("skills", [])
+            }
+        raise HTTPException(status_code=404, detail="Profile not found. Please complete the conversation first.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Confirm profile error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    try:
+        builder = get_profile_builder()
+        profile = builder.get_cached_profile(user_id)
+        if profile:
+            return {
+                "skills": profile.get("skills", []),
+                "preferences": profile.get("contribution_types", []),
+                "experience": profile.get("experience_level", "intermediate")
+            }
+        return {
+            "skills": [],
+            "preferences": [],
+            "experience": "intermediate"
+        }
+    except Exception as e:
+        logger.error(f"Get profile error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/match")
+async def calculate_match(request: MatchRequest = Body(...)):
+    try:
+        builder = get_profile_builder()
+        scorer = get_match_scorer()
+        
+        user_profile_dict = builder.get_cached_profile(request.user_id)
+        if not user_profile_dict:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        
+        user_profile = UserProfile.from_dict(user_profile_dict)
+        
+        all_repos = load_offline_repos()
+        repo_data_dict = None
+        for repo in all_repos:
+            if repo["repo_id"] == request.repo_id:
+                repo_data_dict = repo
+                break
+        
+        if not repo_data_dict:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        repo_data = RepoData(
+            keywords=repo_data_dict.get("languages", []) + (repo_data_dict.get("description", "") or "").split(),
+            active_days_last_30=30,
+            issues_new_last_30=int(repo_data_dict.get("demand_score", 0) * 50),
+            openrank=repo_data_dict.get("influence_score", 0) * 50,
+            name=repo_data_dict.get("name"),
+            full_name=repo_data_dict.get("repo_id")
+        )
+        
+        match_result = scorer.calculate(user_profile, repo_data)
+        return match_result.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Match calculation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search")
+async def search_repos(request: SearchRequest = Body(...)):
+    try:
+        searcher = get_integrated_search()
+        result = searcher.search_with_profile_matching(
+            user_id=request.user_id,
+            target_count=request.limit or 10
+        )
+        
+        if not result.is_sufficient:
+            return {
+                "mode": "online",
+                "repos": [],
+                "message": result.message
+            }
+        
+        repos = []
+        for repo_result in result.repositories:
+            repos.append({
+                "repo_id": repo_result.repo_id,
+                "name": repo_result.repo_id.split("/")[-1],
+                "description": repo_result.description or "No description",
+                "languages": repo_result.languages or [],
+                "active_score": repo_result.active_score,
+                "influence_score": repo_result.influence_score,
+                "demand_score": repo_result.demand_score,
+                "composite_score": repo_result.match_score,
+                "raw_metrics": None
+            })
+        
+        return {
+            "mode": "online",
+            "repos": repos
+        }
+    except Exception as e:
+        logger.error(f"Search error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/logs/stream")
+async def stream_logs():
+    async def generate():
+        last_index = len(_log_buffer)
+        while True:
+            await asyncio.sleep(0.5)
+            current_logs = list(_log_buffer)
+            if len(current_logs) > last_index:
+                new_logs = current_logs[last_index:]
+                for log_entry in new_logs:
+                    yield f"data: {json.dumps(log_entry)}\n\n"
+                last_index = len(current_logs)
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
