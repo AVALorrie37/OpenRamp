@@ -395,7 +395,7 @@ curl -X POST http://localhost:8000/api/chat \
 
 1. **Fork项目并克隆**
 ```bash
-git clone https://github.com/your-username/OpenRamp.git
+git clone https://github.com/AVALorrie37/OpenRamp.git
 cd OpenRamp
 ```
 
@@ -447,8 +447,8 @@ cd frontend && npm install
 
 ### 联系方式
 
-- Issues: [GitHub Issues](https://github.com/your-username/OpenRamp/issues)
-- Discussions: [GitHub Discussions](https://github.com/your-username/OpenRamp/discussions)
+- Issues: [GitHub Issues](https://github.com/AVALorrie37/OpenRamp/issues)
+- Discussions: [GitHub Discussions](https://github.com/AVALorrie37/OpenRamp/discussions)
 
 ---
 
