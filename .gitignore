@@ -12,6 +12,7 @@ __pycache__/
 # IDE
 .vscode/
 .cursor/
+.cursorignore
 
 # 离线数据
 top_300_metrics/
@@ -22,3 +23,6 @@ top_300_metrics/
 
 # 设计方案
 design_text/
+
+# 开发报告
+docs/
