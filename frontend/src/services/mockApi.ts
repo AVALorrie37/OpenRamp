@@ -126,6 +126,22 @@ export const mockProfileAPI = {
 export const mockMatchAPI = {
   calculate: async (user_id: string, repo_id: string): Promise<MatchResult> => {
     await new Promise(resolve => setTimeout(resolve, 500))
+    
+    const repo = MOCK_REPOS.repos.find(r => r.repo_id === repo_id)
+    
+    if (repo) {
+      return {
+        match_score: repo.composite_score,
+        breakdown: {
+          skill: repo.influence_score,
+          activity: repo.active_score,
+          demand: repo.demand_score
+        },
+        repo_name: repo.name,
+        repo_full_name: repo.repo_id
+      }
+    }
+    
     return {
       match_score: 0.85,
       breakdown: {
