@@ -10,9 +10,9 @@ const MOCK_REPOS: ReposResponse = {
       description: 'A test repository for Python and JavaScript development',
       languages: ['Python', 'JavaScript'],
       active_score: 0.85,
-      influence_score: 0.92,
+      influence_score: 0.23,
       demand_score: 0.75,
-      composite_score: 0.84,
+      composite_score: 0.55,
       raw_metrics: {
         openrank: '2024-01-01:10,2024-01-02:15,2024-01-03:12,2024-01-04:18,2024-01-05:20',
         active_dates: '2024-01-01:23,2024-01-02:18',
@@ -40,7 +40,7 @@ const MOCK_REPOS: ReposResponse = {
       description: 'Web application using React and Node.js for beginners',
       languages: ['JavaScript', 'TypeScript'],
       active_score: 0.72,
-      influence_score: 0.75,
+      influence_score: 0.45,
       demand_score: 0.88,
       composite_score: 0.77,
       raw_metrics: {
