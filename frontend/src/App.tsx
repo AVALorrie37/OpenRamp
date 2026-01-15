@@ -49,13 +49,39 @@ const App: React.FC = () => {
 
   const handleAIChatResponse = async (response: any) => {
     if (response?.confirmed && response?.profile) {
+      // 格式化skills数组，去除可能的[]符号或多余字符
+      let formattedSkills = response.skills || [];
+      
+      if (Array.isArray(formattedSkills)) {
+        // 如果skills中的元素是字符串，确保它们是干净的
+        formattedSkills = formattedSkills.map(skill => {
+          if (typeof skill === 'string') {
+            // 去除首尾空白和可能的括号
+            return skill.trim().replace(/^\[|\]$/g, '');
+          }
+          return skill;
+        });
+      } else if (typeof formattedSkills === 'string') {
+        // 如果skills是字符串形式，尝试解析
+        try {
+          // 尝试解析JSON格式的字符串
+          const parsed = JSON.parse(formattedSkills);
+          formattedSkills = Array.isArray(parsed) ? parsed : [formattedSkills];
+        } catch {
+          // 如果不是JSON格式，按分隔符分割
+          formattedSkills = formattedSkills.split(/[,，\[\]]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+        }
+      }
+  
       updateProfile({
-        skills: response.skills || [],
+        skills: formattedSkills,
         preferences: response.preferences || []
       })
       setToast('技能标签已更新')
     }
-
+  
     if (response?.action === 'SEARCH') {
       await handleSearch()
       setToast('搜索完成，请查看主页')

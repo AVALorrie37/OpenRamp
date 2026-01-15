@@ -15,18 +15,29 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
   const [isAdding, setIsAdding] = useState(false)
 
   const validateTag = (tag: string): boolean => {
-    return /^[a-zA-Z0-9_]+$/.test(tag)
+    // 修改验证规则，移除方括号后再验证
+    const cleanTag = tag.replace(/^\[+|\]+$/g, '').trim()
+    return /^[a-zA-Z0-9_]+$/.test(cleanTag) && cleanTag.length > 0
+  }
+
+  const cleanTag = (tag: string): string => {
+    // 清理标签：移除首尾的方括号和空白
+    return tag.replace(/^\[+/, '')
+              .replace(/\]+$/, '')
+              .trim()
   }
 
   const handleEdit = (index: number, currentValue: string) => {
+    // 编辑时也清理标签
     setEditingIndex(index)
-    setEditValue(currentValue)
+    setEditValue(cleanTag(currentValue))
   }
 
   const handleSave = (index: number) => {
-    if (validateTag(editValue)) {
+    const cleanedValue = cleanTag(editValue)
+    if (validateTag(cleanedValue)) {
       const newSkills = [...(profile?.skills || [])]
-      newSkills[index] = editValue
+      newSkills[index] = cleanedValue
       onUpdate({ skills: newSkills })
       setEditingIndex(null)
       setEditValue('')
@@ -40,8 +51,9 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
   }
 
   const handleAdd = () => {
-    if (validateTag(newTag)) {
-      const newSkills = [...(profile?.skills || []), newTag]
+    const cleanedTag = cleanTag(newTag)
+    if (validateTag(cleanedTag)) {
+      const newSkills = [...(profile?.skills || []), cleanedTag]
       onUpdate({ skills: newSkills })
       setNewTag('')
       setIsAdding(false)
@@ -132,7 +144,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                       color: theme.text
                     }}
                   >
-                    [{skill}]
+                    {cleanTag(skill)}  {/* 移除方括号，只显示干净的标签 */}
                   </span>
                   <button
                     onClick={() => handleDelete(index)}
