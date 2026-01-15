@@ -80,7 +80,15 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
   }
 
   return (
-    <div style={{ padding: '16px' }}>
+    <div style={{ 
+      padding: '16px',
+      height: '100%', 
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center'
+      }}>
       <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: theme.text }}>
         OpenRank活跃度图（近30天）
       </h4>
@@ -88,7 +96,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
         data={chartData}
         options={{
           responsive: true,
-          maintainAspectRatio: false,
+          maintainAspectRatio: true,
           plugins: {
             legend: {
               display: false
@@ -115,7 +123,6 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
             }
           }
         }}
-        height={200}
       />
     </div>
   )

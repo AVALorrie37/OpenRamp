@@ -193,12 +193,15 @@ const App: React.FC = () => {
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px'
+            gap: '20px',
+            height: '100%'
           }}>
             <div style={{
               backgroundColor: theme.white,
               borderRadius: '8px',
               border: `1px solid ${theme.border}`,
+              minHeight: '200px',
+              flex:1,
               position: 'relative'
             }}>
               <OpenRankChart repo={selectedRepo || repos[0]} />
@@ -208,6 +211,7 @@ const App: React.FC = () => {
               borderRadius: '8px',
               border: `1px solid ${theme.border}`,
               minHeight: '200px',
+              flex:1,
               position: 'relative'
             }}>
               <KeywordCloud repos={repos} />
