@@ -9,9 +9,16 @@ interface UserDropdownProps {
   profile: UserProfile | null
   onUpdate: (profile: Partial<UserProfile>) => void
   onLogout: () => void
+  onLogin?: () => void 
 }
 
-const UserDropdown: React.FC<UserDropdownProps> = ({ username, profile, onUpdate, onLogout }) => {
+const UserDropdown: React.FC<UserDropdownProps> = ({ 
+  username, 
+  profile, 
+  onUpdate, 
+  onLogout, 
+  onLogin 
+}) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -32,7 +39,14 @@ const UserDropdown: React.FC<UserDropdownProps> = ({ username, profile, onUpdate
   }, [isOpen])
 
   if (!username) {
-    return <UserAvatar username={null} onClick={() => setIsOpen(true)} />
+    // 未登录状态下，点击头像触发登录回调
+    return onLogin ? (
+      <div onClick={onLogin} style={{ cursor: 'pointer' }}>
+        <UserAvatar username={null} onClick={() => {}} />
+      </div>
+    ) : (
+      <UserAvatar username={null} onClick={() => setIsOpen(true)} />
+    )
   }
 
   return (

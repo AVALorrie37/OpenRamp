@@ -150,6 +150,7 @@ const App: React.FC = () => {
             profile={profile}
             onUpdate={updateProfile}
             onLogout={logout}
+            onLogin={() => setShowLoginModal(true)}  // 传递登录回调
           />
         </div>
       </header>
