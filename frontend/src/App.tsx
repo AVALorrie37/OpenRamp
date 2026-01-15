@@ -16,7 +16,6 @@ import LoginModal from './components/Module2_UserSystem/LoginModal'
 import AIButton from './components/Module3_AIAssistant/AIButton'
 import AIChatWindow from './components/Module3_AIAssistant/AIChatWindow'
 import DebugLogWindow from './components/Module4_DebugWindow/DebugLogWindow'
-import MatchRadarChart from './components/Module5_RadarVisualization/MatchRadarChart'
 import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
@@ -30,7 +29,6 @@ const App: React.FC = () => {
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
-  const [showRadar, setShowRadar] = useState(false)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const { logs, clearLogs } = useDebugLogs(showDebug)
@@ -86,7 +84,6 @@ const App: React.FC = () => {
           repo_name: repo.name,
           repo_full_name: repo.repo_id
         })
-        setShowRadar(true)
       } catch (error) {
         console.error('Match error:', error)
       }
@@ -227,17 +224,10 @@ const App: React.FC = () => {
             justifyContent: 'center',
             alignItems: 'center'
           }}>
-            <RadarPlaceholder isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} />
-            {!isLoggedIn && (
-              <div style={{
-                textAlign: 'center',
-                color: theme.text,
-                opacity: 0.6,
-                padding: '40px'
-              }}>
-                请先登录并确认技能
-              </div>
-            )}
+            <RadarPlaceholder 
+              isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
+              matchData={matchData}
+            />
           </div>
         </div>
 
@@ -292,18 +282,6 @@ const App: React.FC = () => {
         isOpen={showDebug}
         logs={logs}
         onClear={clearLogs}
-      />
-
-      <MatchRadarChart
-        isOpen={showRadar}
-        onClose={() => setShowRadar(false)}
-        matchData={matchData ? {
-          skill: matchData.breakdown.skill,
-          activity: matchData.breakdown.activity,
-          demand: matchData.breakdown.demand,
-          repoName: matchData.repo_name || '',
-          matchScore: matchData.match_score
-        } : null}
       />
 
       {toast && (
