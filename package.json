@@ -1,0 +1,22 @@
+
+{
+    "name": "openramp",
+    "version": "1.0.0",
+    "scripts": {
+        "dev-all": "concurrently -n \"Ollama,Backend,Frontend\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\"",
+        
+        "dev": "concurrently -n \"Backend,Frontend\" -c \"bgBlue.bold,bgGreen.bold\" \"npm run backend\" \"npm run frontend:dev\"",
+
+        "mock": "cross-env VITE_USE_MOCK=true npm --prefix frontend run dev",
+
+      "backend": "python -m src.api.server",
+
+      "frontend:dev": "npm --prefix frontend run dev",
+
+      "ollama": "ollama serve"
+    },
+    "devDependencies": {
+      "concurrently": "^8.2.0",
+      "cross-env": "^7.0.3"
+    }
+  }
