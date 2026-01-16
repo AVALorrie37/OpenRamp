@@ -1,4 +1,6 @@
-"""Ollama抽象层，提供统一的AI调用接口"""
+"""Ollama抽象层，提供统一的AI调用接口
+# src/core/ai/provider.py
+"""
 
 import os
 import logging

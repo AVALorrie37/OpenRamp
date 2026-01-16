@@ -1,0 +1,6 @@
+# 所有Agent共享的JSON输出规则
+json_rules: |
+  1. Output ONLY valid JSON
+  2. No markdown code blocks
+  3. No explanations outside JSON
+  4. Empty fields as [] or "unknown"
