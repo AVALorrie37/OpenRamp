@@ -1,11 +1,21 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { chatAPI } from '../services/api'
+import { storage } from '../utils/storage'
 import type { ChatMessage, ChatResponse } from '../types'
 
 export const useAIChat = (user_id: string | null) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | undefined>()
+
+  useEffect(() => {
+    if (user_id) {
+      const savedMessages = storage.getChatMessages(user_id)
+      setMessages(savedMessages)
+    } else {
+      setMessages([])
+    }
+  }, [user_id])
 
   const sendMessage = useCallback(async (content: string): Promise<ChatResponse | null> => {
     if (!user_id || !content.trim()) return null
@@ -15,7 +25,11 @@ export const useAIChat = (user_id: string | null) => {
       content,
       timestamp: Date.now()
     }
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => {
+      const newMessages = [...prev, userMessage]
+      storage.saveChatMessages(user_id, newMessages)
+      return newMessages
+    })
     setLoading(true)
 
     try {
@@ -26,7 +40,11 @@ export const useAIChat = (user_id: string | null) => {
         content: response.reply,
         timestamp: Date.now()
       }
-      setMessages(prev => [...prev, assistantMessage])
+      setMessages(prev => {
+        const updatedMessages = [...prev, assistantMessage]
+        storage.saveChatMessages(user_id, updatedMessages)
+        return updatedMessages
+      })
 
       return response
     } catch (error) {
@@ -36,7 +54,11 @@ export const useAIChat = (user_id: string | null) => {
         content: '抱歉，发生了错误。请稍后再试。',
         timestamp: Date.now()
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => {
+        const errorMessages = [...prev, errorMessage]
+        storage.saveChatMessages(user_id, errorMessages)
+        return errorMessages
+      })
       return null
     } finally {
       setLoading(false)
@@ -46,7 +68,10 @@ export const useAIChat = (user_id: string | null) => {
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(undefined)
-  }, [])
+    if (user_id) {
+      storage.clearChatMessages(user_id)
+    }
+  }, [user_id])
 
   return {
     messages,
