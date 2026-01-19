@@ -42,8 +42,8 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn, profile])
 
-  const handleLogin = (user: string) => {
-    login(user)
+  const handleLogin = (user: string, language: 'chinese' | 'english') => {
+    login(user, language)
     setShowLoginModal(false)
   }
 

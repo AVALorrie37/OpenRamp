@@ -24,6 +24,7 @@ export interface UserProfile {
   preferences: string[]
   experience?: string
   searchHistory?: string[]
+  language?: 'chinese' | 'english'
 }
 
 export interface ChatMessage {

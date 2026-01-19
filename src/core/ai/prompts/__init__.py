@@ -47,13 +47,6 @@ class PromptManager:
     def get_agent_prompt(self, agent_type: str, **kwargs) -> Tuple[str, str]:
         """
         获取指定Agent的系统提示词和用户提示词
-        
-        Args:
-            agent_type: agent类型 ("profile_parser", "conversation", etc.)
-            **kwargs: 模板变量
-        
-        Returns:
-            (system_prompt, user_prompt)
         """
         try:
             # 构建Agent配置路径
@@ -104,6 +97,22 @@ class PromptManager:
 
         except Exception as e:
             raise RuntimeError(f"[PromptManager.get_agent_prompt] 构建Agent提示词失败 (agent: {agent_type}): {str(e)}")
+
+    def get_conversation_prompt(self, user_input: str, session_context: Dict[str, Any] = None) -> Tuple[str, str]:
+        """
+        获取交互协调员提示词
+        """
+        # 修复：不直接使用session_context作为模板变量
+        system_prompt, _ = self.get_agent_prompt('conversation')
+        
+        # 如果有上下文信息，可以添加到用户输入中
+        if session_context:
+            context_info = f"\n\nPrevious context: {session_context}\n\n"
+            user_input = context_info + user_input
+        else:
+            user_input = user_input
+        
+        return system_prompt, user_input
 
     def get_developer_profile_prompt(self, user_input: str) -> Tuple[str, str]:
         """

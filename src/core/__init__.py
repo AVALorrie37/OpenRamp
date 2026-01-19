@@ -9,7 +9,6 @@ def __getattr__(name):
     # Profile 模块相关
     profile_exports = {
         "ProfileBuilder", 
-        "ConversationalProfileBuilder", 
         "ProfileSession", 
         "SessionStatus",
         "TriggerAction",
@@ -29,7 +28,6 @@ def __getattr__(name):
     if name in profile_exports:
         from .profile import (
             ProfileBuilder, 
-            ConversationalProfileBuilder, 
             ProfileSession, 
             SessionStatus,
             TriggerAction,
@@ -54,7 +52,6 @@ def __getattr__(name):
 __all__ = [
     # Profile 模块
     "ProfileBuilder", 
-    "ConversationalProfileBuilder", 
     "ProfileSession", 
     "SessionStatus",
     "TriggerAction",

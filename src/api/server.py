@@ -22,9 +22,10 @@ except ImportError:
 
 from src.data_layer.online.OpenDiggerAPI.client import OpenDiggerClient
 from src.data_layer.offline.loader import OfflineRepoLoader
-from src.core.profile import ConversationalProfileBuilder
+from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
 from src.data_layer.online.integrated_search import IntegratedRepoSearch
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -272,6 +273,7 @@ class ChatRequest(BaseModel):
     user_id: str
     message: str
     session_id: Optional[str] = None
+    language: Optional[str] = None
 
 
 class ProfileConfirmRequest(BaseModel):
@@ -288,16 +290,35 @@ class SearchRequest(BaseModel):
     limit: Optional[int] = 10
 
 
-_profile_builder: Optional[ConversationalProfileBuilder] = None
+_conversation_handlers: Dict[str, ConversationHandler] = {}
 _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
 
 
-def get_profile_builder() -> ConversationalProfileBuilder:
-    global _profile_builder
-    if _profile_builder is None:
-        _profile_builder = ConversationalProfileBuilder()
-    return _profile_builder
+def get_conversation_handler(user_id: str, user_language: str = None) -> ConversationHandler:
+    """获取或创建用户的对话处理器"""
+    global _conversation_handlers
+    if user_id not in _conversation_handlers:
+        # 如果没有提供language，尝试从profile获取
+        if user_language is None:
+            user_language = _get_user_language_from_profile(user_id)
+        _conversation_handlers[user_id] = ConversationHandler(user_id=user_id, user_language=user_language or 'chinese')
+    else:
+        # 如果handler已存在但language有更新，更新它
+        if user_language and user_language != _conversation_handlers[user_id].user_language:
+            _conversation_handlers[user_id].set_user_language(user_language)
+    return _conversation_handlers[user_id]
+
+def _get_user_language_from_profile(user_id: str) -> Optional[str]:
+    """从用户profile获取语言偏好"""
+    try:
+        handler = ConversationHandler(user_id=user_id)
+        cached = handler._load_profile_from_cache()
+        if cached and cached.get('language'):
+            return cached.get('language')
+    except:
+        pass
+    return None
 
 
 def get_match_scorer() -> MatchScorer:
@@ -317,16 +338,27 @@ def get_integrated_search() -> IntegratedRepoSearch:
 @app.post("/api/chat")
 async def chat(request: ChatRequest = Body(...)):
     try:
-        builder = get_profile_builder()
-        result = builder.chat(request.user_id, request.message)
+        # 如果请求中提供了language，使用它；否则从profile获取
+        handler = get_conversation_handler(request.user_id, request.language)
+        result = handler.process_user_input(request.message)
+        
+        # 转换返回格式以兼容前端
+        action = result.get('action', 'REPLY')
+        data = result.get('data', {})
+        confirmed = data.get('confirmed', False) or action == 'CONFIRM_PROFILE'
+        
         return {
             "reply": result.get("reply", ""),
-            "status": result.get("status", "collecting"),
-            "skills": result.get("skills", []),
-            "preferences": result.get("preferences", []),
-            "action": result.get("action", "NONE"),
-            "confirmed": result.get("confirmed", False),
-            "profile": result.get("profile") if result.get("confirmed") else None
+            "status": "collecting" if not confirmed else "confirmed",
+            "skills": data.get("skills", []),
+            "preferences": data.get("contribution_styles", []),
+            "action": action,
+            "confirmed": confirmed,
+            "profile": {
+                "skills": data.get("skills", []),
+                "contribution_types": data.get("contribution_styles", []),
+                "experience_level": "intermediate"
+            } if confirmed else None
         }
     except Exception as e:
         logger.error(f"Chat error: {e}", exc_info=True)
@@ -336,12 +368,19 @@ async def chat(request: ChatRequest = Body(...)):
 @app.post("/api/profile/confirm")
 async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
     try:
-        builder = get_profile_builder()
-        cached_profile = builder.get_cached_profile(request.user_id)
-        if cached_profile:
+        handler = get_conversation_handler(request.user_id)
+        profile = handler.get_current_profile()
+        
+        if profile.get('skills') or profile.get('contribution_styles'):
+            # 触发确认保存，使用handler的user_language
+            result = handler._handle_confirm(handler.user_language)
             return {
-                "profile": cached_profile,
-                "skills": cached_profile.get("skills", [])
+                "profile": {
+                    "skills": profile.get("skills", []),
+                    "contribution_types": profile.get("contribution_styles", []),
+                    "experience_level": "intermediate"
+                },
+                "skills": profile.get("skills", [])
             }
         raise HTTPException(status_code=404, detail="Profile not found. Please complete the conversation first.")
     except HTTPException:
@@ -354,18 +393,26 @@ async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
 @app.get("/api/profile/{user_id}")
 async def get_profile(user_id: str):
     try:
-        builder = get_profile_builder()
-        profile = builder.get_cached_profile(user_id)
-        if profile:
+        handler = get_conversation_handler(user_id)
+        profile = handler.get_current_profile()
+        
+        # 尝试从缓存获取language
+        cached = handler._load_profile_from_cache()
+        user_language = cached.get('language') if cached else handler.user_language
+        
+        if profile.get('skills') or profile.get('contribution_styles'):
             return {
                 "skills": profile.get("skills", []),
-                "preferences": profile.get("contribution_types", []),
-                "experience": profile.get("experience_level", "intermediate")
+                "preferences": profile.get("contribution_styles", []),
+                "experience": "intermediate",
+                "language": user_language or 'chinese'
             }
+        
         return {
             "skills": [],
             "preferences": [],
-            "experience": "intermediate"
+            "experience": "intermediate",
+            "language": user_language or 'chinese'
         }
     except Exception as e:
         logger.error(f"Get profile error: {e}", exc_info=True)
@@ -375,13 +422,18 @@ async def get_profile(user_id: str):
 @app.post("/api/match")
 async def calculate_match(request: MatchRequest = Body(...)):
     try:
-        builder = get_profile_builder()
+        handler = get_conversation_handler(request.user_id)
         scorer = get_match_scorer()
         
-        user_profile_dict = builder.get_cached_profile(request.user_id)
-        if not user_profile_dict:
+        profile = handler.get_current_profile()
+        if not profile.get('skills') and not profile.get('contribution_styles'):
             raise HTTPException(status_code=404, detail="User profile not found")
         
+        user_profile_dict = {
+            "skills": profile.get("skills", []),
+            "contribution_style": profile.get("contribution_styles", [])[0] if profile.get("contribution_styles") else None,
+            "experience_level": "intermediate"
+        }
         user_profile = UserProfile.from_dict(user_profile_dict)
         
         all_repos = load_offline_repos()
