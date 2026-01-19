@@ -2,11 +2,14 @@
 import re
 import json
 import hashlib
+import logging
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 from .provider import OllamaProvider
 from .prompts import PromptManager
 from .utils import validate_and_parse
+
+logger = logging.getLogger(__name__)
 
 class ConversationHandler:
     """Agent1：交互协调员"""
@@ -435,11 +438,14 @@ class ProfileParser:
             解析后的画像数据
         """
         if not conversation_summary.strip():
+            logger.info("[Agent2] Empty conversation summary, returning empty profile")
             return {
                 'skills': [],
                 'contribution_styles': [],
                 'raw_ai_response': '{}'
             }
+        
+        logger.info(f"[Agent2] Parsing profile from conversation summary (length: {len(conversation_summary)})")
         
         # 获取Agent2提示词
         system_prompt, _ = self.prompt_manager.get_agent_prompt(
@@ -448,15 +454,20 @@ class ProfileParser:
         )
         
         # 调用Agent2
+        logger.info("[Agent2] Calling AI provider to parse profile")
         ai_response = self.provider.generate(
             prompt_template=conversation_summary,
             variables={},
             system_prompt=system_prompt,
             temperature=0.0
         )
+        logger.info(f"[Agent2] AI response received (length: {len(ai_response)})")
+        logger.debug(f"[Agent2] Raw AI response: {ai_response[:500]}")
         
         # 解析并过滤结果
         parsed_result = validate_and_parse(ai_response)
+        
+        logger.info(f"[Agent2] Parsed result - Skills: {parsed_result['skills']}, Contribution styles: {parsed_result['contribution_styles']}")
         
         return {
             'skills': parsed_result['skills'],

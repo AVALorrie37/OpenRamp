@@ -153,26 +153,50 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
           borderTop: `1px solid ${theme.border}`,
           backgroundColor: theme.white
         }}>
-          <form onSubmit={handleSubmit}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="输入消息..."
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${loading ? theme.primary : theme.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                outline: 'none',
-                marginBottom: '12px',
-                boxSizing: 'border-box',
-                animation: loading ? 'pulse 1.5s ease-in-out infinite' : 'none'
-              }}
-            />
+          <form onSubmit={handleSubmit} style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', marginBottom: '12px' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="输入消息..."
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '10px 45px 10px 10px',
+                  border: `1px solid ${loading ? theme.primary : theme.border}`,
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  animation: loading ? 'pulse 1.5s ease-in-out infinite' : 'none'
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || loading}
+                onClick={(e) => handleSubmit(e)}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: (!input.trim() || loading) ? 'not-allowed' : 'pointer',
+                  padding: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: (!input.trim() || loading) ? theme.border : theme.primary,
+                  fontSize: '20px',
+                  transition: 'color 0.2s'
+                }}
+              >
+                ➤
+              </button>
+            </div>
             <SuggestionButtons onSuggestionClick={handleSuggestion} />
           </form>
         </div>

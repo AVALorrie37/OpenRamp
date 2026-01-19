@@ -6,7 +6,8 @@ import logging
 import sys
 import json
 import asyncio
-from typing import List, Optional, Dict, Any
+import time
+from typing import List, Optional, Dict, Any, Tuple
 from collections import deque
 from datetime import datetime
 
@@ -274,6 +275,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     language: Optional[str] = None
+    agent_type: str = 'agent1'
 
 
 class ProfileConfirmRequest(BaseModel):
@@ -291,23 +293,40 @@ class SearchRequest(BaseModel):
 
 
 _conversation_handlers: Dict[str, ConversationHandler] = {}
+_session_to_handler: Dict[str, str] = {}
 _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
 
 
-def get_conversation_handler(user_id: str, user_language: str = None) -> ConversationHandler:
-    """获取或创建用户的对话处理器"""
-    global _conversation_handlers
-    if user_id not in _conversation_handlers:
-        # 如果没有提供language，尝试从profile获取
+def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
+    """获取或创建用户的对话处理器，返回(handler, session_id)"""
+    global _conversation_handlers, _session_to_handler
+    
+    handler_key = f"{user_id}_{agent_type}"
+    
+    if session_id and session_id in _session_to_handler:
+        handler_key = _session_to_handler[session_id]
+        if handler_key in _conversation_handlers:
+            handler = _conversation_handlers[handler_key]
+            if user_language and user_language != handler.user_language:
+                handler.set_user_language(user_language)
+            return handler, session_id
+    
+    if handler_key not in _conversation_handlers:
         if user_language is None:
             user_language = _get_user_language_from_profile(user_id)
-        _conversation_handlers[user_id] = ConversationHandler(user_id=user_id, user_language=user_language or 'chinese')
-    else:
-        # 如果handler已存在但language有更新，更新它
-        if user_language and user_language != _conversation_handlers[user_id].user_language:
-            _conversation_handlers[user_id].set_user_language(user_language)
-    return _conversation_handlers[user_id]
+        _conversation_handlers[handler_key] = ConversationHandler(user_id=user_id, user_language=user_language or 'chinese')
+    
+    if not session_id:
+        session_id = f"{user_id}_{agent_type}_{int(time.time() * 1000)}"
+    
+    _session_to_handler[session_id] = handler_key
+    handler = _conversation_handlers[handler_key]
+    
+    if user_language and user_language != handler.user_language:
+        handler.set_user_language(user_language)
+    
+    return handler, session_id
 
 def _get_user_language_from_profile(user_id: str) -> Optional[str]:
     """从用户profile获取语言偏好"""
@@ -338,11 +357,27 @@ def get_integrated_search() -> IntegratedRepoSearch:
 @app.post("/api/chat")
 async def chat(request: ChatRequest = Body(...)):
     try:
-        # 如果请求中提供了language，使用它；否则从profile获取
-        handler = get_conversation_handler(request.user_id, request.language)
+        handler, session_id = get_conversation_handler(
+            request.user_id, 
+            request.agent_type, 
+            request.language, 
+            request.session_id
+        )
         result = handler.process_user_input(request.message)
         
-        # 转换返回格式以兼容前端
+        if request.agent_type != 'agent1':
+            logger.info(f"[{request.agent_type}] User: {request.user_id}, Message: {request.message[:100]}")
+            logger.info(f"[{request.agent_type}] Response: {result.get('reply', '')[:200]}")
+            return {
+                "reply": "",
+                "status": "hidden",
+                "skills": [],
+                "preferences": [],
+                "action": "REPLY",
+                "confirmed": False,
+                "session_id": session_id
+            }
+        
         action = result.get('action', 'REPLY')
         data = result.get('data', {})
         confirmed = data.get('confirmed', False) or action == 'CONFIRM_PROFILE'
@@ -354,6 +389,7 @@ async def chat(request: ChatRequest = Body(...)):
             "preferences": data.get("contribution_styles", []),
             "action": action,
             "confirmed": confirmed,
+            "session_id": session_id,
             "profile": {
                 "skills": data.get("skills", []),
                 "contribution_types": data.get("contribution_styles", []),

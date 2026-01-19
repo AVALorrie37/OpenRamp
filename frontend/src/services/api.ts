@@ -25,8 +25,8 @@ export const reposAPI = USE_MOCK ? mockReposAPI : {
 }
 
 export const chatAPI = USE_MOCK ? mockChatAPI : {
-  send: async (user_id: string, message: string, session_id?: string): Promise<ChatResponse> => {
-    const response = await api.post('/api/chat', { user_id, message, session_id })
+  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1'): Promise<ChatResponse> => {
+    const response = await api.post('/api/chat', { user_id, message, session_id, agent_type })
     return response.data
   }
 }

@@ -7,13 +7,19 @@ export const useAIChat = (user_id: string | null) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | undefined>()
+  const agentType = 'agent1'
 
   useEffect(() => {
     if (user_id) {
       const savedMessages = storage.getChatMessages(user_id)
       setMessages(savedMessages)
+      const savedSessionId = storage.getSessionId(user_id)
+      if (savedSessionId) {
+        setSessionId(savedSessionId)
+      }
     } else {
       setMessages([])
+      setSessionId(undefined)
     }
   }, [user_id])
 
@@ -33,7 +39,12 @@ export const useAIChat = (user_id: string | null) => {
     setLoading(true)
 
     try {
-      const response = await chatAPI.send(user_id, content, sessionId)
+      const response = await chatAPI.send(user_id, content, sessionId, agentType)
+      
+      if (response.session_id && response.session_id !== sessionId) {
+        setSessionId(response.session_id)
+        storage.saveSessionId(user_id, response.session_id)
+      }
       
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -63,13 +74,14 @@ export const useAIChat = (user_id: string | null) => {
     } finally {
       setLoading(false)
     }
-  }, [user_id, sessionId])
+  }, [user_id, sessionId, agentType])
 
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(undefined)
     if (user_id) {
       storage.clearChatMessages(user_id)
+      storage.clearSessionId(user_id)
     }
   }, [user_id])
 

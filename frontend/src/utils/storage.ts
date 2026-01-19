@@ -32,5 +32,20 @@ export const storage = {
   clearChatMessages: (username: string): void => {
     const key = `${CHAT_MESSAGES_PREFIX}${username}`
     localStorage.removeItem(key)
+  },
+
+  getSessionId: (username: string): string | null => {
+    const key = `session_id_${username}`
+    return localStorage.getItem(key)
+  },
+
+  saveSessionId: (username: string, sessionId: string): void => {
+    const key = `session_id_${username}`
+    localStorage.setItem(key, sessionId)
+  },
+
+  clearSessionId: (username: string): void => {
+    const key = `session_id_${username}`
+    localStorage.removeItem(key)
   }
 }

@@ -63,7 +63,7 @@ export const mockReposAPI = {
 }
 
 export const mockChatAPI = {
-  send: async (user_id: string, message: string, session_id?: string): Promise<ChatResponse> => {
+  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1'): Promise<ChatResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1000))
     
     const lowerMessage = message.toLowerCase()
@@ -75,7 +75,8 @@ export const mockChatAPI = {
         skills: ['python', 'javascript', 'react'],
         preferences: ['bug_fix', 'docs'],
         action: 'CONFIRM',
-        confirmed: true
+        confirmed: true,
+        session_id: session_id || `${user_id}_agent1_${Date.now()}`
       }
     }
     
@@ -86,7 +87,8 @@ export const mockChatAPI = {
         skills: ['python', 'javascript'],
         preferences: ['bug_fix'],
         action: 'SEARCH',
-        confirmed: false
+        confirmed: false,
+        session_id: session_id || `${user_id}_agent1_${Date.now()}`
       }
     }
     
@@ -96,7 +98,8 @@ export const mockChatAPI = {
       skills: ['python'],
       preferences: [],
       action: 'NONE',
-      confirmed: false
+      confirmed: false,
+      session_id: session_id || `${user_id}_agent1_${Date.now()}`
     }
   }
 }
