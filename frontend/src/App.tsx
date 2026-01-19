@@ -24,7 +24,7 @@ import type { RepoResponse, MatchResult } from './types'
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn } = useUser()
   const { repos, loading: reposLoading, fetchRepos } = useRepos()
-  const { messages, loading: chatLoading, sendMessage } = useAIChat(username)
+  const { messages, loading: chatLoading, sendMessage } = useAIChat(username, profile)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
