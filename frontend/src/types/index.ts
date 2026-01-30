@@ -40,6 +40,7 @@ export interface ChatResponse {
   preferences: string[]
   action: string
   confirmed: boolean
+  profile_updated?: boolean
   session_id?: string
   error?: string
 }

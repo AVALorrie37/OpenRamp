@@ -63,11 +63,9 @@ export const mockReposAPI = {
 }
 
 export const mockChatAPI = {
-  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1'): Promise<ChatResponse> => {
+  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1', _language?: string): Promise<ChatResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
     const lowerMessage = message.toLowerCase()
-    
     if (lowerMessage.includes('确认') || lowerMessage.includes('确认技能')) {
       return {
         reply: '✅ 已确认！你的技能标签已保存。',
@@ -76,10 +74,10 @@ export const mockChatAPI = {
         preferences: ['bug_fix', 'docs'],
         action: 'CONFIRM',
         confirmed: true,
+        profile_updated: true,
         session_id: session_id || `${user_id}_agent1_${Date.now()}`
       }
     }
-    
     if (lowerMessage.includes('搜索') || lowerMessage.includes('搜索匹配项目')) {
       return {
         reply: '🔍 正在为你搜索匹配的项目...',
@@ -88,10 +86,10 @@ export const mockChatAPI = {
         preferences: ['bug_fix'],
         action: 'SEARCH',
         confirmed: false,
+        profile_updated: false,
         session_id: session_id || `${user_id}_agent1_${Date.now()}`
       }
     }
-    
     return {
       reply: `我理解你说的是：${message}。请继续告诉我你的技能和偏好。`,
       status: 'collecting',
@@ -99,6 +97,7 @@ export const mockChatAPI = {
       preferences: [],
       action: 'NONE',
       confirmed: false,
+      profile_updated: true,
       session_id: session_id || `${user_id}_agent1_${Date.now()}`
     }
   }
@@ -122,6 +121,13 @@ export const mockProfileAPI = {
       skills: ['python', 'javascript'],
       preferences: ['bug_fix', 'docs'],
       experience: 'intermediate'
+    }
+  },
+  sync: async (user_id: string, skills: string[], preferences: string[], language?: string): Promise<{ status: string; message: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    return {
+      status: 'success',
+      message: 'Profile synced successfully'
     }
   }
 }

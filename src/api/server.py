@@ -282,6 +282,13 @@ class ProfileConfirmRequest(BaseModel):
     user_id: str
 
 
+class SyncProfileRequest(BaseModel):
+    user_id: str
+    skills: List[str]
+    preferences: List[str]
+    language: Optional[str] = None
+
+
 class MatchRequest(BaseModel):
     user_id: str
     repo_id: str
@@ -381,20 +388,23 @@ async def chat(request: ChatRequest = Body(...)):
         action = result.get('action', 'REPLY')
         data = result.get('data', {})
         confirmed = data.get('confirmed', False) or action == 'CONFIRM_PROFILE'
-        
+        profile_updated = data.get('profile_updated', False)
+        skills = data.get("skills", [])
+        preferences = data.get("contribution_styles", [])
         return {
             "reply": result.get("reply", ""),
             "status": "collecting" if not confirmed else "confirmed",
-            "skills": data.get("skills", []),
-            "preferences": data.get("contribution_styles", []),
+            "skills": skills,
+            "preferences": preferences,
             "action": action,
             "confirmed": confirmed,
+            "profile_updated": profile_updated,
             "session_id": session_id,
             "profile": {
-                "skills": data.get("skills", []),
-                "contribution_types": data.get("contribution_styles", []),
+                "skills": skills,
+                "contribution_types": preferences,
                 "experience_level": "intermediate"
-            } if confirmed else None
+            } if (confirmed or profile_updated) else None
         }
     except Exception as e:
         logger.error(f"Chat error: {e}", exc_info=True)
@@ -423,6 +433,25 @@ async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
         raise
     except Exception as e:
         logger.error(f"Confirm profile error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/profile/sync")
+async def sync_profile(request: SyncProfileRequest = Body(...)):
+    try:
+        handler, _ = get_conversation_handler(
+            request.user_id,
+            'agent1',
+            request.language,
+            None
+        )
+        handler.sync_profile_from_frontend(request.skills, request.preferences)
+        return {
+            "status": "success",
+            "message": "Profile synced successfully"
+        }
+    except Exception as e:
+        logger.error(f"Sync profile error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

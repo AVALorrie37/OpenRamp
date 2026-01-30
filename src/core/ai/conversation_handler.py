@@ -21,13 +21,13 @@ class ConversationHandler:
         self.user_id = user_id
         self.user_language = user_language  # 用户设置的语言偏好，默认中文
         
-        # 会话状态
-        self.conversation_history = []  # 存储对话历史
+        self.conversation_history = []
+        self.historical_summary = ''
         self.current_profile = {
             'skills': [],
             'contribution_styles': []
         }
-        self.conversation_stage = 'greeting'  # greeting, collecting, confirming, searching
+        self.conversation_stage = 'greeting'
         
         # 设置缓存目录
         current_file = Path(__file__)
@@ -45,6 +45,7 @@ class ConversationHandler:
                     'contribution_styles': cached.get('contribution_styles', [])
                 }
                 self.conversation_history = cached.get('conversation_history', [])
+                self.historical_summary = cached.get('historical_summary', '')
                 # 如果缓存中有language设置，使用它（除非初始化时明确指定了）
                 if cached.get('language') and user_language == 'chinese':
                     self.user_language = cached.get('language')
@@ -58,44 +59,36 @@ class ConversationHandler:
             return "👋 Hi! I'm your open source assistant, helping you find suitable projects to contribute to. Let's talk about your technical background～"
     
     def process_user_input(self, user_input: str) -> Dict[str, Any]:
-        """
-        处理用户输入，返回自然语言回复和动作指令
-        
-        Args:
-            user_input: 用户输入文本
-        
-        Returns:
-            {
-                'reply': '自然语言回复',
-                'action': 'action_type',
-                'data': {...}  # 动作相关数据
-            }
-        """
-        # 将用户输入添加到对话历史
-        self.conversation_history.append({'role': 'user', 'content': user_input})
-        
-        # 使用用户设置的语言偏好，而不是自动检测
         user_language = self.user_language
-        
-        # 检测用户动作（确认、搜索等）
         user_action = self._detect_user_action(user_input)
-        
-        # 处理确认动作
-        if user_action == 'CONFIRM' and self.current_profile.get('skills') or self.current_profile.get('contribution_styles'):
+
+        if self._is_query_intent(user_input, user_language):
+            return self._handle_query_intent(user_language)
+
+        self.conversation_history.append({'role': 'user', 'content': user_input})
+
+        if user_action == 'CONFIRM' and (self.current_profile.get('skills') or self.current_profile.get('contribution_styles')):
             return self._handle_confirm(user_language)
-        
-        # 处理搜索动作
+
         if user_action == 'SEARCH':
             return self._handle_search(user_language)
-        
-        # 构建对话总结（用于Agent2解析）
-        conversation_summary = self._build_conversation_summary()
-        
-        # 每轮对话后自动调用Agent2解析
-        profile_result = self.profile_parser.parse_profile(conversation_summary)
-        
-        # 合并新的解析结果到现有数据（累积合并）
+
+        recent_messages = self._get_recent_messages(4)
+        combined_input = self._build_incremental_summary_input(recent_messages)
+        if self.historical_summary.strip() and combined_input.strip():
+            new_summary = self._summarize_conversation(combined_input)
+            self.historical_summary = new_summary if new_summary else combined_input
+        else:
+            summary_lines = []
+            for msg in recent_messages:
+                role = "User" if msg['role'] == 'user' else "Assistant"
+                summary_lines.append(f"{role}: {msg['content']}")
+            self.historical_summary = "\n".join(summary_lines) if summary_lines else combined_input
+
+        profile_result = self.profile_parser.parse_profile(self.historical_summary)
+        prev_profile = dict(self.current_profile)
         self.current_profile = self._merge_profile_data(profile_result, self.current_profile)
+        profile_changed = self._profile_changed(prev_profile, self.current_profile)
         
         # 将JSON结果转换为自然语言（用于Agent1理解）
         profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
@@ -136,15 +129,12 @@ class ConversationHandler:
             else:
                 ai_response += "\n\n(Feel free to add more skills or preferences if you have any～)"
         
-        # 解析AI回复，提取动作指令
         reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
-        
-        # 更新动作数据
         action_data.update({
             'skills': self.current_profile['skills'],
-            'contribution_styles': self.current_profile['contribution_styles']
+            'contribution_styles': self.current_profile['contribution_styles'],
+            'profile_updated': profile_changed
         })
-        
         return {
             'reply': reply,
             'action': action,
@@ -154,6 +144,48 @@ class ConversationHandler:
     def get_current_profile(self) -> Dict[str, Any]:
         """获取当前用户画像"""
         return self.current_profile
+    
+    def sync_profile_from_frontend(self, skills: list, preferences: list) -> None:
+        self.current_profile = {
+            'skills': skills,
+            'contribution_styles': preferences
+        }
+        self.historical_summary = self._profile_to_synthetic_conversation(self.current_profile)
+        profile_text = self._format_profile_for_agent1(self.current_profile, self.user_language)
+        if self.user_language == 'chinese':
+            sync_message = f"System: 用户已手动更新个人信息。{profile_text}"
+        else:
+            sync_message = f"System: User has manually updated profile. {profile_text}"
+        found_system_message = False
+        for i in range(len(self.conversation_history) - 1, -1, -1):
+            if self.conversation_history[i].get('role') == 'system' or \
+               (self.conversation_history[i].get('role') == 'assistant' and
+                'System:' in self.conversation_history[i].get('content', '')):
+                self.conversation_history[i] = {'role': 'system', 'content': sync_message}
+                found_system_message = True
+                break
+        if not found_system_message:
+            self.conversation_history.insert(0, {'role': 'system', 'content': sync_message})
+        if self.user_id:
+            self._save_profile_to_cache()
+
+    def _profile_to_synthetic_conversation(self, profile: Dict) -> str:
+        skills = profile.get('skills', [])
+        styles = profile.get('contribution_styles', [])
+        styles_map = {
+            'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+            'community': '社区支持', 'review': '代码审查', 'test': '编写测试'
+        }
+        if self.user_language == 'chinese':
+            skills_txt = '、'.join(skills) if skills else '暂无'
+            styles_txt = '、'.join([styles_map.get(s, s) for s in styles]) if styles else '暂无'
+            return f"User: 我的技能是{skills_txt}，贡献偏好是{styles_txt}。\nAssistant: 已记录。"
+        else:
+            skills_txt = ', '.join(skills) if skills else 'none'
+            styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+                             'community': 'community support', 'review': 'code review', 'test': 'testing'}
+            styles_txt = ', '.join([styles_map_en.get(s, s) for s in styles]) if styles else 'none'
+            return f"User: My skills are {skills_txt}, contribution preferences are {styles_txt}.\nAssistant: Got it."
     
     def _build_conversation_summary(self) -> str:
         """构建对话总结（用于Agent2解析）"""
@@ -276,18 +308,78 @@ class ConversationHandler:
             return 'english'
     
     def _detect_user_action(self, user_input: str) -> str:
-        """检测用户输入中的动作"""
         user_lower = user_input.lower()
-        
         confirm_keywords = ["确认", "没问题", "对的", "正确", "ok", "yes", "确定", "好的", "可以", "confirm"]
         if any(kw in user_lower for kw in confirm_keywords):
             return 'CONFIRM'
-        
         search_keywords = ["搜索", "找项目", "推荐", "search", "find", "recommend"]
         if any(kw in user_lower for kw in search_keywords):
             return 'SEARCH'
-        
         return 'NONE'
+
+    def _is_query_intent(self, user_input: str, language: str) -> bool:
+        query_patterns = [
+            r'我的技能|我的信息|显示.*技能|查看.*偏好|我有什么|告诉我|列出.*技能|列出.*偏好',
+            r'技能.*什么|偏好.*什么|信息.*什么|现在的技能|当前的技能|我的偏好|我的贡献偏好',
+            r'my skills|my profile|show me|what are my|tell me|list my',
+            r'what.*skills|what.*preferences|what.*profile|current skills|my preferences|my contribution'
+        ]
+        lower_input = user_input.lower()
+        return any(re.search(p, lower_input, re.I) or re.search(p, user_input) for p in query_patterns)
+
+    def _handle_query_intent(self, language: str) -> Dict[str, Any]:
+        profile_text = self._format_profile_for_agent1(self.current_profile, language)
+        if language == 'chinese':
+            reply = f"根据我们的对话，你目前的画像如下：\n\n{profile_text}"
+        else:
+            reply = f"Based on our conversation, your current profile:\n\n{profile_text}"
+        return {
+            'reply': reply,
+            'action': 'REPLY',
+            'data': {
+                'skills': self.current_profile['skills'],
+                'contribution_styles': self.current_profile['contribution_styles'],
+                'profile_updated': False
+            }
+        }
+
+    def _get_recent_messages(self, n: int) -> list:
+        return self.conversation_history[-n:] if self.conversation_history else []
+
+    def _build_incremental_summary_input(self, recent_messages: list) -> str:
+        lines = []
+        if self.historical_summary.strip():
+            lines.append(f"# Previous summary:\n{self.historical_summary}")
+        if recent_messages:
+            msg_lines = []
+            for msg in recent_messages:
+                role = "User" if msg['role'] == 'user' else "Assistant"
+                msg_lines.append(f"{role}: {msg['content']}")
+            lines.append(f"\n# New messages:\n" + "\n".join(msg_lines))
+        return "\n".join(lines) if lines else ""
+
+    def _summarize_conversation(self, combined_input: str) -> str:
+        if not combined_input.strip():
+            return ""
+        try:
+            system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation_summarizer')
+            result = self.provider.generate(
+                prompt_template=combined_input,
+                variables={},
+                system_prompt=system_prompt,
+                temperature=0.2
+            )
+            return result.strip() if result else combined_input
+        except Exception as e:
+            logger.warning(f"Summarizer failed: {e}, using raw input")
+            return combined_input
+
+    def _profile_changed(self, prev: Dict, curr: Dict) -> bool:
+        prev_skills = set(prev.get('skills', []))
+        prev_styles = set(prev.get('contribution_styles', []))
+        curr_skills = set(curr.get('skills', []))
+        curr_styles = set(curr.get('contribution_styles', []))
+        return prev_skills != curr_skills or prev_styles != curr_styles
     
     def _handle_confirm(self, language: str) -> Dict[str, Any]:
         """处理确认动作"""
@@ -306,7 +398,8 @@ class ConversationHandler:
             'data': {
                 'skills': self.current_profile['skills'],
                 'contribution_styles': self.current_profile['contribution_styles'],
-                'confirmed': True
+                'confirmed': True,
+                'profile_updated': True
             }
         }
     
@@ -323,6 +416,7 @@ class ConversationHandler:
             'data': {
                 'skills': self.current_profile['skills'],
                 'contribution_styles': self.current_profile['contribution_styles'],
+                'profile_updated': False,
                 'search_criteria': {
                     'skills': self.current_profile['skills'],
                     'preferences': self.current_profile['contribution_styles']
@@ -343,6 +437,7 @@ class ConversationHandler:
             'skills': self.current_profile['skills'],
             'contribution_styles': self.current_profile['contribution_styles'],
             'conversation_history': self.conversation_history,
+            'historical_summary': self.historical_summary,
             'language': self.user_language
         }
         

@@ -25,8 +25,8 @@ export const reposAPI = USE_MOCK ? mockReposAPI : {
 }
 
 export const chatAPI = USE_MOCK ? mockChatAPI : {
-  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1'): Promise<ChatResponse> => {
-    const response = await api.post('/api/chat', { user_id, message, session_id, agent_type })
+  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1', language?: string): Promise<ChatResponse> => {
+    const response = await api.post('/api/chat', { user_id, message, session_id, agent_type, language })
     return response.data
   }
 }
@@ -38,6 +38,10 @@ export const profileAPI = USE_MOCK ? mockProfileAPI : {
   },
   get: async (user_id: string): Promise<UserProfile> => {
     const response = await api.get(`/api/profile/${user_id}`)
+    return response.data
+  },
+  sync: async (user_id: string, skills: string[], preferences: string[], language?: string): Promise<{ status: string; message: string }> => {
+    const response = await api.post('/api/profile/sync', { user_id, skills, preferences, language })
     return response.data
   }
 }
