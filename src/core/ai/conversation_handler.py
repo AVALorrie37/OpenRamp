@@ -206,8 +206,13 @@ class ConversationHandler:
         
         context_lines = ["# Conversation History:"]
         for msg in self.conversation_history[-6:]:  # 只保留最近6条消息
-            role = "User" if msg['role'] == 'user' else "Assistant"
-            context_lines.append(f"{role}: {msg['content']}")
+            role = msg.get('role', 'user')
+            if role == 'system':
+                context_lines.append(f"System: {msg['content']}")
+            elif role == 'user':
+                context_lines.append(f"User: {msg['content']}")
+            else:
+                context_lines.append(f"Assistant: {msg['content']}")
         
         return "\n".join(context_lines) + "\n\nCurrent:"
     

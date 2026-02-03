@@ -12,7 +12,18 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   useEffect(() => {
     if (user_id) {
       const savedMessages = storage.getChatMessages(user_id)
-      setMessages(savedMessages)
+      if (savedMessages.length === 0) {
+        const welcomeMessage: ChatMessage = {
+          role: 'assistant',
+          content: '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
+          timestamp: Date.now()
+        }
+        const messagesWithWelcome = [welcomeMessage]
+        setMessages(messagesWithWelcome)
+        storage.saveChatMessages(user_id, messagesWithWelcome)
+      } else {
+        setMessages(savedMessages)
+      }
       const savedSessionId = storage.getSessionId(user_id)
       if (savedSessionId) {
         setSessionId(savedSessionId)

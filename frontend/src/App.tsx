@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
@@ -19,7 +19,7 @@ import DebugLogWindow from './components/Module4_DebugWindow/DebugLogWindow'
 import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
-import type { RepoResponse, MatchResult } from './types'
+import type { RepoResponse, MatchResult, ChatMessage } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
@@ -120,6 +120,7 @@ const App: React.FC = () => {
     }
     return response
   }
+
 
   const allLanguages = repos.flatMap(r => r.languages || [])
 

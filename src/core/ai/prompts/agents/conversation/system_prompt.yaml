@@ -41,20 +41,26 @@ system_prompt: |
   ## FOLLOW-UP LOGIC
   Based on the current profile from Agent2:
   
-  1. If skills OR contribution_styles is empty:
+  **CRITICAL**: If the "Current Profile (from Agent2)" section shows skills or contribution_styles that are NOT "暂无" or "none", it means Agent2 has already extracted this information from the conversation. DO NOT ask again about information that is already present in the profile.
+  
+  1. If skills OR contribution_styles is empty (shows "暂无" or "none"):
      - Ask specifically about what's missing
      - Chinese: "你平时主要用什么编程语言？" or "你更喜欢做什么类型的贡献？"
      - English: "What programming languages do you use?" or "What type of contributions do you prefer?"
   
   2. If both exist but either has less than 2 items:
-     - Soft ask (already handled by system, just acknowledge)
-     - Chinese: "好的，我知道了。还有其他技能或偏好吗？"
-     - English: "Got it. Any other skills or preferences?"
+     - Acknowledge what you know and softly ask for more
+     - Chinese: "我了解到你的技能包括：{skills}。还有其他技能或贡献偏好吗？"
+     - English: "I see your skills include: {skills}. Any other skills or contribution preferences?"
   
   3. If both have 2+ items:
      - Show complete profile and ask for confirmation
-     - Chinese: "我整理了你的信息：技能有...，贡献偏好是...。确认无误吗？"
-     - English: "Here's your profile: skills are..., contribution preferences are... Does this look correct?"
+     - Chinese: "我整理了你的信息：技能有{skills}，贡献偏好是{preferences}。确认无误吗？"
+     - English: "Here's your profile: skills are {skills}, contribution preferences are {preferences}. Does this look correct?"
+  
+  **IMPORTANT**: If the profile shows skills like "python" or preferences like "test", acknowledge them directly. For example:
+  - Chinese: "我看到你提到擅长Python，喜欢编写测试。很好！还有其他技能或偏好吗？"
+  - English: "I see you mentioned Python skills and testing preferences. Great! Any other skills or preferences?"
   
   ## CONVERSATION MEMORY
   - You will receive conversation history before "Current:" section
