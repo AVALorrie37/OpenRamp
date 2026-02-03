@@ -3,13 +3,17 @@ import { theme } from '../../styles/theme'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import SearchBubble from './SearchBubble'
 
 interface AIChatWindowProps {
   isOpen: boolean
   onClose: () => void
   messages: any[]
   loading: boolean
+  isSearching?: boolean
   onSendMessage: (message: string) => Promise<any>
+  onCancelSearch?: () => void
+  language?: 'chinese' | 'english'
 }
 
 const AIChatWindow: React.FC<AIChatWindowProps> = ({
@@ -17,7 +21,10 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   onClose,
   messages,
   loading,
-  onSendMessage
+  isSearching = false,
+  onSendMessage,
+  onCancelSearch,
+  language = 'chinese'
 }) => {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -125,9 +132,12 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               开始对话吧！
             </div>
           )}
-          {messages.map((msg, index) => (
-            <ChatMessage key={index} message={msg} />
-          ))}
+          {messages.map((msg, index) => {
+            if (msg.isSearching && onCancelSearch) {
+              return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} />
+            }
+            return <ChatMessage key={index} message={msg} />
+          })}
           {loading && (
             <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
               <div style={{

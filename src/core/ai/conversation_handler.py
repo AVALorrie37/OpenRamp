@@ -27,6 +27,10 @@ class ConversationHandler:
             'skills': [],
             'contribution_styles': []
         }
+        self.previous_profile = {
+            'skills': [],
+            'contribution_styles': []
+        }
         self.conversation_stage = 'greeting'
         
         # 设置缓存目录
@@ -43,6 +47,10 @@ class ConversationHandler:
                 self.current_profile = {
                     'skills': cached.get('skills', []),
                     'contribution_styles': cached.get('contribution_styles', [])
+                }
+                self.previous_profile = {
+                    'skills': cached.get('previous_skills', []),
+                    'contribution_styles': cached.get('previous_contribution_styles', [])
                 }
                 self.conversation_history = cached.get('conversation_history', [])
                 self.historical_summary = cached.get('historical_summary', '')
@@ -89,6 +97,13 @@ class ConversationHandler:
         prev_profile = dict(self.current_profile)
         self.current_profile = self._merge_profile_data(profile_result, self.current_profile)
         profile_changed = self._profile_changed(prev_profile, self.current_profile)
+        
+        profile_unchanged = self._profile_unchanged(self.previous_profile, self.current_profile)
+        if profile_unchanged and self._is_profile_sufficient(self.current_profile):
+            self.previous_profile = dict(self.current_profile)
+            return self._handle_auto_search(user_language)
+        
+        self.previous_profile = dict(self.current_profile)
         
         # 将JSON结果转换为自然语言（用于Agent1理解）
         profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
@@ -385,6 +400,18 @@ class ConversationHandler:
         curr_styles = set(curr.get('contribution_styles', []))
         return prev_skills != curr_skills or prev_styles != curr_styles
     
+    def _profile_unchanged(self, prev: Dict, curr: Dict) -> bool:
+        prev_skills = set(prev.get('skills', []))
+        prev_styles = set(prev.get('contribution_styles', []))
+        curr_skills = set(curr.get('skills', []))
+        curr_styles = set(curr.get('contribution_styles', []))
+        return prev_skills == curr_skills and prev_styles == curr_styles and len(prev_skills) > 0
+    
+    def _is_profile_sufficient(self, profile: Dict) -> bool:
+        skills = profile.get('skills', [])
+        styles = profile.get('contribution_styles', [])
+        return len(skills) > 0 and len(styles) > 0
+    
     def _handle_confirm(self, language: str) -> Dict[str, Any]:
         """处理确认动作"""
         # 保存到文件缓存
@@ -428,6 +455,44 @@ class ConversationHandler:
             }
         }
     
+    def _handle_auto_search(self, language: str) -> Dict[str, Any]:
+        """处理自动搜索（当画像连续两次相同时）"""
+        skills = self.current_profile['skills']
+        styles = self.current_profile['contribution_styles']
+        
+        styles_map = {
+            'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+            'community': '社区支持', 'review': '代码审查', 'test': '编写测试'
+        }
+        styles_map_en = {
+            'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+            'community': 'community support', 'review': 'code review', 'test': 'testing'
+        }
+        
+        if language == 'chinese':
+            skills_text = '、'.join(skills) if skills else '暂无'
+            styles_text = '、'.join([styles_map.get(s, s) for s in styles]) if styles else '暂无'
+            reply = f"根据你的技能（{skills_text}）和贡献偏好（{styles_text}），我将开始搜索匹配的开源项目..."
+        else:
+            skills_text = ', '.join(skills) if skills else 'none'
+            styles_text = ', '.join([styles_map_en.get(s, s) for s in styles]) if styles else 'none'
+            reply = f"Based on your skills ({skills_text}) and contribution preferences ({styles_text}), I'll start searching for matching open source projects..."
+        
+        return {
+            'reply': reply,
+            'action': 'SEARCH_PROJECTS',
+            'data': {
+                'skills': skills,
+                'contribution_styles': styles,
+                'profile_updated': False,
+                'auto_search': True,
+                'search_criteria': {
+                    'skills': skills,
+                    'preferences': styles
+                }
+            }
+        }
+    
     def _save_profile_to_cache(self):
         """持久化用户画像到文件"""
         if not self.user_id:
@@ -440,6 +505,8 @@ class ConversationHandler:
             'user_id': self.user_id,
             'skills': self.current_profile['skills'],
             'contribution_styles': self.current_profile['contribution_styles'],
+            'previous_skills': self.previous_profile['skills'],
+            'previous_contribution_styles': self.previous_profile['contribution_styles'],
             'conversation_history': self.conversation_history,
             'historical_summary': self.historical_summary,
             'language': self.user_language
@@ -510,12 +577,50 @@ class ConversationHandler:
                 'skills': self.current_profile['skills'],
                 'contribution_styles': self.current_profile['contribution_styles']
             })
+            if not reply_content:
+                skills_text = '、'.join(self.current_profile['skills']) if self.current_profile['skills'] else '暂无'
+                styles_map = {
+                    'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+                    'community': '社区支持', 'review': '代码审查', 'test': '编写测试'
+                }
+                styles_text = '、'.join([styles_map.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else '暂无'
+                if language == 'chinese':
+                    reply_content = f"我整理了你的信息：技能有{skills_text}，贡献偏好是{styles_text}。确认无误吗？"
+                else:
+                    styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+                                     'community': 'community support', 'review': 'code review', 'test': 'testing'}
+                    styles_text_en = ', '.join([styles_map_en.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else 'none'
+                    skills_text_en = ', '.join(self.current_profile['skills']) if self.current_profile['skills'] else 'none'
+                    reply_content = f"Here's your profile: skills are {skills_text_en}, contribution preferences are {styles_text_en}. Does this look correct?"
         
         elif action == 'SEARCH_PROJECTS':
             action_data['search_criteria'] = {
                 'skills': self.current_profile['skills'],
                 'preferences': self.current_profile['contribution_styles']
             }
+            if not reply_content:
+                if language == 'chinese':
+                    reply_content = "🔍 正在搜索匹配的开源项目..."
+                else:
+                    reply_content = "🔍 Searching for matching open source projects..."
+        
+        if not reply_content:
+            should_ask, ask_type = self._should_ask_followup(self.current_profile)
+            if not should_ask and ask_type == 'ready_to_confirm':
+                skills_text = '、'.join(self.current_profile['skills']) if self.current_profile['skills'] else '暂无'
+                styles_map = {
+                    'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+                    'community': '社区支持', 'review': '代码审查', 'test': '编写测试'
+                }
+                styles_text = '、'.join([styles_map.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else '暂无'
+                if language == 'chinese':
+                    reply_content = f"我整理了你的信息：技能有{skills_text}，贡献偏好是{styles_text}。确认无误吗？"
+                else:
+                    styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+                                     'community': 'community support', 'review': 'code review', 'test': 'testing'}
+                    styles_text_en = ', '.join([styles_map_en.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else 'none'
+                    skills_text_en = ', '.join(self.current_profile['skills']) if self.current_profile['skills'] else 'none'
+                    reply_content = f"Here's your profile: skills are {skills_text_en}, contribution preferences are {styles_text_en}. Does this look correct?"
         
         return reply_content, action, action_data
 

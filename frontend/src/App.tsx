@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
@@ -24,7 +24,6 @@ import type { RepoResponse, MatchResult, ChatMessage } from './types'
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
   const { repos, loading: reposLoading, fetchRepos } = useRepos()
-  const { messages, loading: chatLoading, sendMessage } = useAIChat(username, profile, isProfileModified, resetProfileModified)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
@@ -32,6 +31,16 @@ const App: React.FC = () => {
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const { logs, clearLogs } = useDebugLogs(showDebug)
+  const handleSearchComplete = useCallback((searchRepos: any[]) => {
+    if (searchRepos && searchRepos.length > 0) {
+      fetchRepos({ repo_ids: searchRepos.map((r: { repo_id: string }) => r.repo_id), limit: 10 })
+      if (username) {
+        localStorage.setItem(`last_search_${username}`, Date.now().toString())
+      }
+      setToast('搜索完成，请查看主页')
+    }
+  }, [username, fetchRepos])
+  const { messages, loading: chatLoading, isSearching, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   useEffect(() => {
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
@@ -63,8 +72,8 @@ const App: React.FC = () => {
           formattedSkills = Array.isArray(parsed) ? parsed : [formattedSkills];
         } catch {
           formattedSkills = formattedSkills.split(/[,，\[\]]/)
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0);
         }
       }
       updateProfile({
@@ -296,7 +305,10 @@ const App: React.FC = () => {
         onClose={() => setShowAIChat(false)}
         messages={messages}
         loading={chatLoading}
+        isSearching={isSearching}
         onSendMessage={handleSendMessage}
+        onCancelSearch={cancelSearch}
+        language={profile?.language || 'chinese'}
       />
 
       <DebugLogWindow

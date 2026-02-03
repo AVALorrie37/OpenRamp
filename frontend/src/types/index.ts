@@ -31,6 +31,9 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  action?: string
+  isSearching?: boolean
+  searchId?: string
 }
 
 export interface ChatResponse {
@@ -43,6 +46,7 @@ export interface ChatResponse {
   profile_updated?: boolean
   session_id?: string
   error?: string
+  auto_search?: boolean
 }
 
 export interface MatchResult {
