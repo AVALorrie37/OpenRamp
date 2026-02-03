@@ -23,6 +23,7 @@ class ConversationHandler:
         
         self.conversation_history = []
         self.historical_summary = ''
+        self.query_summary_memory = ''
         self.current_profile = {
             'skills': [],
             'contribution_styles': []
@@ -54,6 +55,7 @@ class ConversationHandler:
                 }
                 self.conversation_history = cached.get('conversation_history', [])
                 self.historical_summary = cached.get('historical_summary', '')
+                self.query_summary_memory = cached.get('query_summary_memory', '')
                 # 如果缓存中有language设置，使用它（除非初始化时明确指定了）
                 if cached.get('language') and user_language == 'chinese':
                     self.user_language = cached.get('language')
@@ -79,7 +81,11 @@ class ConversationHandler:
             return self._handle_confirm(user_language)
 
         if user_action == 'SEARCH':
-            return self._handle_search(user_language)
+            result = self._handle_search(user_language)
+            self.conversation_history.append({'role': 'assistant', 'content': result['reply']})
+            if self.user_id:
+                self._save_profile_to_cache()
+            return result
 
         recent_messages = self._get_recent_messages(4)
         combined_input = self._build_incremental_summary_input(recent_messages)
@@ -130,9 +136,6 @@ class ConversationHandler:
             fallback_reply = self._get_fallback_reply(user_input, user_language)
             ai_response = fallback_reply
         
-        # 将AI回复添加到对话历史
-        self.conversation_history.append({'role': 'assistant', 'content': ai_response})
-        
         # 判断是否需要追问
         should_ask, ask_type = self._should_ask_followup(self.current_profile)
         
@@ -145,11 +148,21 @@ class ConversationHandler:
                 ai_response += "\n\n(Adding more details will help you find better projects~ You can also manually update your profile in the information page~)"
         
         reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
+        if profile_changed and action == 'REPLY':
+            reply = self._format_acknowledgment_reply(user_language)
+            if should_ask and ask_type == 'soft_ask':
+                if user_language == 'chinese':
+                    reply += "\n\n（补充更多细节更有利于匹配项目哦～你也可以在个人信息中手动修改标签~）"
+                else:
+                    reply += "\n\n(Adding more details will help you find better projects~ You can also manually update your profile in the information page~)"
+        self.conversation_history.append({'role': 'assistant', 'content': reply})
         action_data.update({
             'skills': self.current_profile['skills'],
             'contribution_styles': self.current_profile['contribution_styles'],
             'profile_updated': profile_changed
         })
+        if self.user_id:
+            self._save_profile_to_cache()
         return {
             'reply': reply,
             'action': action,
@@ -247,6 +260,23 @@ class ConversationHandler:
             'contribution_styles': merged_styles
         }
     
+    def _format_acknowledgment_reply(self, language: str) -> str:
+        """根据当前画像生成确认式回复文案，保证与前端展示一致"""
+        skills = self.current_profile.get('skills', [])
+        styles = self.current_profile.get('contribution_styles', [])
+        if language == 'chinese':
+            skills_text = '、'.join(skills) if skills else '暂无'
+            styles_map = {'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+                          'community': '社区支持', 'review': '代码审查', 'test': '编写测试'}
+            styles_text = '、'.join([styles_map.get(s, s) for s in styles]) if styles else '暂无'
+            return f"我了解到你的兴趣！你喜欢使用 {skills_text} 进行开发，你更喜欢 {styles_text}。确认无误吗？"
+        else:
+            skills_text = ', '.join(skills) if skills else 'none'
+            styles_map = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+                          'community': 'community support', 'review': 'code review', 'test': 'testing'}
+            styles_text = ', '.join([styles_map.get(s, s) for s in styles]) if styles else 'none'
+            return f"I've noted your interests! You like using {skills_text} for development, and prefer {styles_text}. Does this look correct?"
+
     def _format_profile_for_agent1(self, profile: Dict, language: str) -> str:
         """将JSON结果转换为自然语言（用于Agent1理解）"""
         skills = profile.get('skills', [])
@@ -352,6 +382,11 @@ class ConversationHandler:
             reply = f"根据我们的对话，你目前的画像如下：\n\n{profile_text}"
         else:
             reply = f"Based on our conversation, your current profile:\n\n{profile_text}"
+        if self.query_summary_memory.strip():
+            self.query_summary_memory += "\n"
+        self.query_summary_memory += f"User asked profile; Assistant showed current profile."
+        if self.user_id:
+            self._save_profile_to_cache()
         return {
             'reply': reply,
             'action': 'REPLY',
@@ -509,6 +544,7 @@ class ConversationHandler:
             'previous_contribution_styles': self.previous_profile['contribution_styles'],
             'conversation_history': self.conversation_history,
             'historical_summary': self.historical_summary,
+            'query_summary_memory': self.query_summary_memory,
             'language': self.user_language
         }
         
