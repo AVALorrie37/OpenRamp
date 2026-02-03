@@ -3,12 +3,16 @@ import { chatAPI, profileAPI, searchAPI } from '../services/api'
 import { storage } from '../utils/storage'
 import type { ChatMessage, ChatResponse, UserProfile } from '../types'
 
+const DEV_SEARCH_DURATION_SECONDS = 30
+
 export const useAIChat = (user_id: string | null, profile: UserProfile | null = null, isProfileModified?: () => boolean, resetProfileModified?: () => void, onSearchComplete?: (repos: any[]) => void) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [searchProgressSeconds, setSearchProgressSeconds] = useState<number | null>(null)
   const [sessionId, setSessionId] = useState<string | undefined>()
   const searchAbortControllerRef = useRef<AbortController | null>(null)
+  const searchStartTimeRef = useRef<number>(0)
   const agentType = 'agent1'
 
   useEffect(() => {
@@ -38,6 +42,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
     setIsSearching(true)
+    setSearchProgressSeconds(null)
     const searchMessage: ChatMessage = {
       role: 'assistant',
       content: '',
@@ -53,10 +58,27 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
 
     const abortController = new AbortController()
     searchAbortControllerRef.current = abortController
+    searchStartTimeRef.current = Date.now()
+
+    const lang = profile?.language || 'chinese'
+    const cancelMessage = (sec: number) => lang === 'chinese' ? `搜索已终止，已进行 ${sec} 秒` : `Search cancelled after ${sec} seconds`
 
     try {
-      const searchResult = await searchAPI.search(user_id, 10, abortController.signal)
+      if (import.meta.env.DEV) {
+        for (let s = 0; s < DEV_SEARCH_DURATION_SECONDS; s++) {
+          if (abortController.signal.aborted) {
+            const e = new Error('canceled') as Error & { name: string }
+            e.name = 'CanceledError'
+            throw e
+          }
+          setSearchProgressSeconds(s)
+          await new Promise(r => setTimeout(r, 1000))
+        }
+        setSearchProgressSeconds(null)
+      }
+      const searchResult = await (import.meta.env.DEV ? searchAPI.search(user_id, 10) : searchAPI.search(user_id, 10, abortController.signal))
       setIsSearching(false)
+      setSearchProgressSeconds(null)
       setMessages(prev => {
         const updated = prev.map((msg, idx) => 
           idx === prev.length - 1 && msg.isSearching 
@@ -71,14 +93,22 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       }
     } catch (error: any) {
       if (error.name === 'CanceledError' || error.message?.includes('canceled')) {
+        const elapsed = Math.round((Date.now() - searchStartTimeRef.current) / 1000)
+        const text = cancelMessage(elapsed)
         setIsSearching(false)
+        setSearchProgressSeconds(null)
         setMessages(prev => {
-          const updated = prev.filter((msg, idx) => !(idx === prev.length - 1 && msg.isSearching))
+          const updated = prev.map((msg, idx) => 
+            idx === prev.length - 1 && msg.isSearching 
+              ? { ...msg, isSearching: false, content: text }
+              : msg
+          )
           storage.saveChatMessages(user_id, updated)
           return updated
         })
       } else {
         setIsSearching(false)
+        setSearchProgressSeconds(null)
         setMessages(prev => {
           const updated = prev.map((msg, idx) => 
             idx === prev.length - 1 && msg.isSearching 
@@ -92,7 +122,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     } finally {
       searchAbortControllerRef.current = null
     }
-  }, [onSearchComplete])
+  }, [onSearchComplete, profile?.language])
 
   const sendMessage = useCallback(async (content: string): Promise<ChatResponse | null> => {
     if (!user_id || !content.trim()) return null
@@ -144,7 +174,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
         return updatedMessages
       })
 
-      if (response.action === 'SEARCH_PROJECTS' && response.auto_search) {
+      if (response.action === 'SEARCH_PROJECTS') {
         handleAutoSearch(user_id)
       }
 
@@ -173,12 +203,14 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       searchAbortControllerRef.current = null
     }
     setIsSearching(false)
+    setSearchProgressSeconds(null)
   }, [])
 
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(undefined)
     setIsSearching(false)
+    setSearchProgressSeconds(null)
     if (searchAbortControllerRef.current) {
       searchAbortControllerRef.current.abort()
       searchAbortControllerRef.current = null
@@ -193,6 +225,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     messages,
     loading,
     isSearching,
+    searchProgressSeconds,
     sendMessage,
     clearMessages,
     cancelSearch

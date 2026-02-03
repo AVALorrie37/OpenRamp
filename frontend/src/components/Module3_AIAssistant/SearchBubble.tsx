@@ -5,9 +5,13 @@ import LoadingSpinner from '../shared/LoadingSpinner'
 interface SearchBubbleProps {
   onCancel: () => void
   language?: 'chinese' | 'english'
+  progressSeconds?: number | null
 }
 
-const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chinese' }) => {
+const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chinese', progressSeconds = null }) => {
+  const progressText = progressSeconds != null
+    ? (language === 'chinese' ? `正在搜索... ${progressSeconds}s` : `Searching... ${progressSeconds}s`)
+    : (language === 'chinese' ? '🔍 正在搜索匹配的开源项目...' : '🔍 Searching for matching open source projects...')
   return (
     <div style={{
       display: 'flex',
@@ -28,7 +32,7 @@ const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chine
       }}>
         <LoadingSpinner />
         <span style={{ flex: 1 }}>
-          {language === 'chinese' ? '🔍 正在搜索匹配的开源项目...' : '🔍 Searching for matching open source projects...'}
+          {progressText}
         </span>
         <button
           onClick={onCancel}

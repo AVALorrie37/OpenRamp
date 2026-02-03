@@ -391,6 +391,7 @@ async def chat(request: ChatRequest = Body(...)):
         profile_updated = data.get('profile_updated', False)
         skills = data.get("skills", [])
         preferences = data.get("contribution_styles", [])
+        auto_search = data.get("auto_search", False)
         return {
             "reply": result.get("reply", ""),
             "status": "collecting" if not confirmed else "confirmed",
@@ -400,6 +401,7 @@ async def chat(request: ChatRequest = Body(...)):
             "confirmed": confirmed,
             "profile_updated": profile_updated,
             "session_id": session_id,
+            "auto_search": auto_search,
             "profile": {
                 "skills": skills,
                 "contribution_types": preferences,
