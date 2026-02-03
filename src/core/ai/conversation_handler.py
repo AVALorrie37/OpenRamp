@@ -125,9 +125,9 @@ class ConversationHandler:
         if should_ask and ask_type == 'soft_ask':
             # 软询问：在回复后添加软询问
             if user_language == 'chinese':
-                ai_response += "\n\n（如果还有其他技能或偏好，也可以告诉我哦～）"
+                ai_response += "\n\n（补充更多细节更有利于匹配项目哦～你也可以在个人信息中手动修改标签~）"
             else:
-                ai_response += "\n\n(Feel free to add more skills or preferences if you have any～)"
+                ai_response += "\n\n(Adding more details will help you find better projects~ You can also manually update your profile in the information page~)"
         
         reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
         action_data.update({
@@ -269,14 +269,13 @@ class ConversationHandler:
         
         if not skills and not styles:
             return True, 'both_empty'
-        elif not skills:
+        if not skills:
             return True, 'skills_empty'
-        elif not styles:
+        if not styles:
             return True, 'styles_empty'
-        elif len(skills) < 2 or len(styles) < 2:
-            return True, 'soft_ask'  # 软询问
-        else:
-            return False, 'ready_to_confirm'
+        if len(skills) < 2:
+            return True, 'soft_ask'  # 软询问只针对技能数量不足
+        return False, 'ready_to_confirm'
     
     def set_user_language(self, language: str):
         """设置用户语言偏好"""
