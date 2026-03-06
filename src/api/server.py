@@ -381,6 +381,7 @@ async def chat(request: ChatRequest = Body(...)):
                 "skills": [],
                 "preferences": [],
                 "action": "REPLY",
+                "intent": "",
                 "confirmed": False,
                 "session_id": session_id
             }
@@ -392,12 +393,14 @@ async def chat(request: ChatRequest = Body(...)):
         skills = data.get("skills", [])
         preferences = data.get("contribution_styles", [])
         auto_search = data.get("auto_search", False)
+        intent = data.get("intent", "")
         return {
             "reply": result.get("reply", ""),
             "status": "collecting" if not confirmed else "confirmed",
             "skills": skills,
             "preferences": preferences,
             "action": action,
+            "intent": intent,
             "confirmed": confirmed,
             "profile_updated": profile_updated,
             "session_id": session_id,

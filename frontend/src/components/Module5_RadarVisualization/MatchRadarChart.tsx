@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import type { FC } from 'react'
 import {
   Radar,
   RadarChart,
@@ -23,7 +23,7 @@ interface MatchRadarChartProps {
   embedded?: boolean
 }
 
-const MatchRadarChart: React.FC<MatchRadarChartProps> = ({ 
+const MatchRadarChart: FC<MatchRadarChartProps> = ({ 
   isOpen, 
   onClose, 
   matchData, 

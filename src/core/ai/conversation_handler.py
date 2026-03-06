@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 from .provider import OllamaProvider
 from .prompts import PromptManager
-from .utils import validate_and_parse
+from .utils import validate_and_parse, extract_json_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -68,24 +68,94 @@ class ConversationHandler:
         else:
             return "👋 Hi! I'm your open source assistant, helping you find suitable projects to contribute to. Let's talk about your technical background～"
     
+    def _recognize_intent(self, user_input: str) -> str:
+        allowed = {'search_repo', 'update_profile', 'query_status', 'ask_content', 'irrelevant'}
+        try:
+            system_prompt, _ = self.prompt_manager.get_agent_prompt('intent_recognizer', input_text=user_input)
+            raw = self.provider.generate(
+                prompt_template=user_input,
+                variables={},
+                system_prompt=system_prompt,
+                temperature=0.0
+            )
+            json_str = extract_json_from_response(raw or '')
+            if not json_str:
+                return 'ask_content'
+            data = json.loads(json_str)
+            intent = (data.get('intent') or '').strip()
+            return intent if intent in allowed else 'ask_content'
+        except Exception:
+            return 'ask_content'
+
     def process_user_input(self, user_input: str) -> Dict[str, Any]:
         user_language = self.user_language
+        intent = self._recognize_intent(user_input)
         user_action = self._detect_user_action(user_input)
 
-        if self._is_query_intent(user_input, user_language):
-            return self._handle_query_intent(user_language)
+        if intent == 'query_status' or self._is_query_intent(user_input, user_language):
+            result = self._handle_query_intent(user_language)
+            result.setdefault('data', {}).update({'intent': 'query_status'})
+            return result
+
+        if intent == 'irrelevant':
+            reply = "我可能没太理解～如果你想找适合贡献的开源项目，可以告诉我你的技术栈和偏好。" if user_language == 'chinese' else "I might not have enough context—tell me your tech stack and preferences and I can recommend projects."
+            return {
+                'reply': reply,
+                'action': 'REPLY',
+                'data': {
+                    'intent': 'irrelevant',
+                    'skills': self.current_profile.get('skills', []),
+                    'contribution_styles': self.current_profile.get('contribution_styles', []),
+                    'profile_updated': False
+                }
+            }
 
         self.conversation_history.append({'role': 'user', 'content': user_input})
 
         if user_action == 'CONFIRM' and (self.current_profile.get('skills') or self.current_profile.get('contribution_styles')):
-            return self._handle_confirm(user_language)
+            result = self._handle_confirm(user_language)
+            result.setdefault('data', {}).update({'intent': intent})
+            return result
 
-        if user_action == 'SEARCH':
+        if intent == 'search_repo' or user_action == 'SEARCH':
             result = self._handle_search(user_language)
             self.conversation_history.append({'role': 'assistant', 'content': result['reply']})
             if self.user_id:
                 self._save_profile_to_cache()
+            result.setdefault('data', {}).update({'intent': 'search_repo'})
             return result
+
+        if intent == 'ask_content':
+            profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
+            base_system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation')
+            system_prompt = self._inject_language_instruction(base_system_prompt, user_language)
+            conversation_context = self._build_conversation_context()
+            user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
+            try:
+                ai_response = self.provider.generate(
+                    prompt_template=user_prompt,
+                    variables={},
+                    system_prompt=system_prompt,
+                    temperature=0.3
+                )
+            except Exception:
+                ai_response = self._get_fallback_reply(user_input, user_language)
+
+            reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
+            self.conversation_history.append({'role': 'assistant', 'content': reply})
+            action_data.update({
+                'skills': self.current_profile['skills'],
+                'contribution_styles': self.current_profile['contribution_styles'],
+                'profile_updated': False,
+                'intent': 'ask_content'
+            })
+            if self.user_id:
+                self._save_profile_to_cache()
+            return {
+                'reply': reply,
+                'action': action,
+                'data': action_data
+            }
 
         recent_messages = self._get_recent_messages(4)
         combined_input = self._build_incremental_summary_input(recent_messages)
@@ -159,7 +229,8 @@ class ConversationHandler:
         action_data.update({
             'skills': self.current_profile['skills'],
             'contribution_styles': self.current_profile['contribution_styles'],
-            'profile_updated': profile_changed
+            'profile_updated': profile_changed,
+            'intent': intent if intent in ('update_profile', 'ask_content', 'search_repo') else 'update_profile'
         })
         if self.user_id:
             self._save_profile_to_cache()

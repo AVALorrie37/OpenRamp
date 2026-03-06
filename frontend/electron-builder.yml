@@ -1,7 +1,7 @@
 appId: com.openramp.desktop
 productName: OpenRamp
 directories:
-  output: release
+  output: release2
 files:
   - dist/**/*
   - dist-electron/**/*

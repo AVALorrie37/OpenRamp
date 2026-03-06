@@ -442,7 +442,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                   }}
                 >
                   <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{pref.label}</div>
-                  <div style={{ fontSize: '11px', color: theme.textSecondary }}>{pref.description}</div>
+                  <div style={{ fontSize: '11px', color: theme.accent }}>{pref.description}</div>
                 </div>
               ))}
             </div>

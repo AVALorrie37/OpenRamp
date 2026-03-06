@@ -121,7 +121,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick }) => {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <span style={{
                   padding: '4px 8px',
-                  backgroundColor: theme.success,
+                  backgroundColor: theme.primary,
                   color: theme.white,
                   borderRadius: '4px',
                   fontSize: '11px',

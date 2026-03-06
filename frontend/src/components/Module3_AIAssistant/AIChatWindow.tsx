@@ -10,7 +10,6 @@ interface AIChatWindowProps {
   onClose: () => void
   messages: any[]
   loading: boolean
-  isSearching?: boolean
   searchProgressSeconds?: number | null
   onSendMessage: (message: string) => Promise<any>
   onCancelSearch?: () => void
@@ -22,7 +21,6 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   onClose,
   messages,
   loading,
-  isSearching = false,
   searchProgressSeconds = null,
   onSendMessage,
   onCancelSearch,

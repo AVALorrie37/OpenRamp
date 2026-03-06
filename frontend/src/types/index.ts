@@ -42,6 +42,7 @@ export interface ChatResponse {
   skills: string[]
   preferences: string[]
   action: string
+  intent?: string
   confirmed: boolean
   profile_updated?: boolean
   session_id?: string

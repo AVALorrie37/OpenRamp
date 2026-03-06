@@ -3,7 +3,7 @@ import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
-import { searchAPI, matchAPI, profileAPI } from './services/api'
+import { searchAPI, matchAPI } from './services/api'
 import { theme } from './styles/theme'
 
 import TechStackCloud from './components/Module1_MainCenter/TechStackCloud'
@@ -19,7 +19,7 @@ import DebugLogWindow from './components/Module4_DebugWindow/DebugLogWindow'
 import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
-import type { RepoResponse, MatchResult, ChatMessage } from './types'
+import type { RepoResponse, MatchResult } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
@@ -40,7 +40,7 @@ const App: React.FC = () => {
       setToast('搜索完成，请查看主页')
     }
   }, [username, fetchRepos])
-  const { messages, loading: chatLoading, isSearching, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
+  const { messages, loading: chatLoading, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   useEffect(() => {
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
@@ -118,7 +118,7 @@ const App: React.FC = () => {
     }
   }
 
-  const handleTagClick = (lang: string) => {
+  const handleTagClick = () => {
     fetchRepos({ limit: 10 })
   }
 
@@ -305,7 +305,6 @@ const App: React.FC = () => {
         onClose={() => setShowAIChat(false)}
         messages={messages}
         loading={chatLoading}
-        isSearching={isSearching}
         searchProgressSeconds={searchProgressSeconds}
         onSendMessage={handleSendMessage}
         onCancelSearch={cancelSearch}

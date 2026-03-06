@@ -63,3 +63,14 @@ export const searchAPI = USE_MOCK ? mockSearchAPI : {
     return response.data
   }
 }
+
+export const intentAPI = {
+  queryStatus: async (user_id: string) => {
+    // TODO: 对接意图 query_status 的后端接口
+    return chatAPI.send(user_id, 'show my profile')
+  },
+  submitProfileUpdate: async (user_id: string, message: string, session_id?: string, language?: string) => {
+    // TODO: 对接意图 update_profile 的后端接口
+    return chatAPI.send(user_id, message, session_id, 'agent1', language)
+  }
+}

@@ -63,7 +63,7 @@ export const mockReposAPI = {
 }
 
 export const mockChatAPI = {
-  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1', _language?: string): Promise<ChatResponse> => {
+  send: async (user_id: string, message: string, session_id?: string, _agent_type: string = 'agent1', _language?: string): Promise<ChatResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1000))
     const lowerMessage = message.toLowerCase()
     if (lowerMessage.includes('确认') || lowerMessage.includes('确认技能')) {
@@ -104,7 +104,7 @@ export const mockChatAPI = {
 }
 
 export const mockProfileAPI = {
-  confirm: async (user_id: string): Promise<{ profile: any; skills: string[] }> => {
+  confirm: async (_user_id: string): Promise<{ profile: any; skills: string[] }> => {
     await new Promise(resolve => setTimeout(resolve, 300))
     return {
       profile: {
@@ -115,7 +115,7 @@ export const mockProfileAPI = {
       skills: ['python', 'javascript']
     }
   },
-  get: async (user_id: string): Promise<UserProfile> => {
+  get: async (_user_id: string): Promise<UserProfile> => {
     await new Promise(resolve => setTimeout(resolve, 300))
     return {
       skills: ['python', 'javascript'],
@@ -123,7 +123,7 @@ export const mockProfileAPI = {
       experience: 'intermediate'
     }
   },
-  sync: async (user_id: string, skills: string[], preferences: string[], language?: string): Promise<{ status: string; message: string }> => {
+  sync: async (_user_id: string, _skills: string[], _preferences: string[], _language?: string): Promise<{ status: string; message: string }> => {
     await new Promise(resolve => setTimeout(resolve, 100))
     return {
       status: 'success',
@@ -133,7 +133,7 @@ export const mockProfileAPI = {
 }
 
 export const mockMatchAPI = {
-  calculate: async (user_id: string, repo_id: string): Promise<MatchResult> => {
+  calculate: async (_user_id: string, repo_id: string): Promise<MatchResult> => {
     await new Promise(resolve => setTimeout(resolve, 500))
     
     const repo = MOCK_REPOS.repos.find(r => r.repo_id === repo_id)
@@ -165,7 +165,7 @@ export const mockMatchAPI = {
 }
 
 export const mockSearchAPI = {
-  search: async (user_id: string, limit?: number): Promise<ReposResponse> => {
+  search: async (_user_id: string, limit?: number): Promise<ReposResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1500))
     return {
       mode: 'online',
