@@ -556,11 +556,11 @@ async def search_repos(request: SearchRequest = Body(...)):
                 "repo_id": repo_result.repo_id,
                 "name": repo_result.repo_id.split("/")[-1],
                 "description": repo_result.description or "No description",
-                "languages": repo_result.languages or [],
+                "languages": repo_result.languages,
                 "active_score": repo_result.active_score,
                 "influence_score": repo_result.influence_score,
                 "demand_score": repo_result.demand_score,
-                "composite_score": repo_result.match_score,
+                "composite_score": repo_result.composite_score,
                 "raw_metrics": None
             })
         

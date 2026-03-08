@@ -31,6 +31,7 @@ try:
     from .GithubAPI.client import GitHubClient
     from .GithubAPI.schemas import SearchResult, RepoMetadata
     from .OpenDiggerAPI.client import OpenDiggerClient
+    from ..offline.loader import OfflineRepoLoader
 finally:
     # Clean up temporary paths
     paths_to_remove = [
@@ -65,6 +66,11 @@ class IntegratedRepoResult:
     opendigger_metrics: Dict[str, Any]    # OpenDigger activity data
     match_score: Optional[float] = None   # Match score (if profile provided)
     match_breakdown: Optional[Dict[str, float]] = None  # Score breakdown
+    active_score: float = 0.0             # Same semantics as offline loader
+    influence_score: float = 0.0
+    demand_score: float = 0.0
+    composite_score: float = 0.0          # 0.5*active + 0.3*influence + 0.2*demand
+    languages: List[str] = field(default_factory=list)  # From github_keywords or []
 
 
 @dataclass
@@ -193,6 +199,27 @@ class IntegratedRepoSearch:
             # Network errors or other issues
             print(f"Warning: Failed to fetch OpenDigger data for {repo_id}: {e}")
             return None
+    
+    def _compute_unified_scores(
+        self,
+        opendigger_metrics: Dict[str, Any],
+        github_keywords: List[str]
+    ) -> Dict[str, Any]:
+        active_data = opendigger_metrics.get("active_dates_and_times") or {}
+        openrank_data = opendigger_metrics.get("openrank") or {}
+        issues_data = opendigger_metrics.get("issues_new") or {}
+        loader = OfflineRepoLoader()
+        active_score = loader._calculate_active_score(active_data if isinstance(active_data, dict) else {})
+        influence_score = loader._calculate_influence_score(openrank_data if isinstance(openrank_data, dict) else {})
+        demand_score = loader._calculate_demand_score(issues_data if isinstance(issues_data, dict) else {})
+        composite_score = 0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score
+        return {
+            "active_score": round(active_score, 4),
+            "influence_score": round(influence_score, 4),
+            "demand_score": round(demand_score, 4),
+            "composite_score": round(composite_score, 4),
+            "languages": list(github_keywords) if github_keywords else [],
+        }
     
     def _calculate_match_score(
         self,
@@ -332,12 +359,18 @@ class IntegratedRepoSearch:
                 
                 if metrics is not None:
                     # Success! Create integrated result
+                    unified = self._compute_unified_scores(metrics, result.keywords)
                     integrated_result = IntegratedRepoResult(
                         repo_id=result.repo_id,
                         github_keywords=result.keywords,
                         description=result.description,
                         metadata=result.metadata,
-                        opendigger_metrics=metrics
+                        opendigger_metrics=metrics,
+                        active_score=unified["active_score"],
+                        influence_score=unified["influence_score"],
+                        demand_score=unified["demand_score"],
+                        composite_score=unified["composite_score"],
+                        languages=unified["languages"],
                     )
                     qualified_repos.append(integrated_result)
                     print(f"✓ Valid ({len(qualified_repos)}/{target_count})")
@@ -398,14 +431,18 @@ class IntegratedRepoSearch:
             print(f"Info: Repository {repo_id} does not have OpenDigger metrics")
             return None
         
-        # For single repo lookup, we create minimal GitHub metadata
-        # In a production system, you might want to fetch actual GitHub data
+        unified = self._compute_unified_scores(metrics, [])
         return IntegratedRepoResult(
             repo_id=repo_id,
-            github_keywords=[],  # Not available for single lookup
+            github_keywords=[],
             description="",
             metadata=RepoMetadata(stars=0, last_updated=""),
-            opendigger_metrics=metrics
+            opendigger_metrics=metrics,
+            active_score=unified["active_score"],
+            influence_score=unified["influence_score"],
+            demand_score=unified["demand_score"],
+            composite_score=unified["composite_score"],
+            languages=unified["languages"],
         )
     
     def clear_opendigger_cache(self, repo_id: Optional[str] = None) -> int:
