@@ -1,5 +1,7 @@
 const STORAGE_PREFIX = 'user_'
 const CHAT_MESSAGES_PREFIX = 'chat_messages_'
+const PRESET_REPOS_KEY = 'preset_repos'
+const USER_REPOS_PREFIX = 'user_repos_'
 
 export const storage = {
   getUserData: (username: string): any => {
@@ -47,5 +49,25 @@ export const storage = {
   clearSessionId: (username: string): void => {
     const key = `session_id_${username}`
     localStorage.removeItem(key)
+  },
+
+  getPresetRepos: (): any[] | null => {
+    const data = localStorage.getItem(PRESET_REPOS_KEY)
+    return data ? JSON.parse(data) : null
+  },
+
+  savePresetRepos: (repos: any[]): void => {
+    localStorage.setItem(PRESET_REPOS_KEY, JSON.stringify(repos))
+  },
+
+  getUserRepos: (username: string): any[] | null => {
+    const key = `${USER_REPOS_PREFIX}${username}`
+    const data = localStorage.getItem(key)
+    return data ? JSON.parse(data) : null
+  },
+
+  saveUserRepos: (username: string, repos: any[]): void => {
+    const key = `${USER_REPOS_PREFIX}${username}`
+    localStorage.setItem(key, JSON.stringify(repos))
   }
 }

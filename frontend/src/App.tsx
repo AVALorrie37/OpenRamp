@@ -23,7 +23,7 @@ import type { RepoResponse, MatchResult } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos } = useRepos()
+  const { repos, loading: reposLoading, fetchRepos, refresh } = useRepos(username)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
@@ -52,8 +52,16 @@ const App: React.FC = () => {
   }, [isLoggedIn, profile])
 
   const handleLogin = (user: string, language: 'chinese' | 'english') => {
+    setSelectedRepo(null)
+    setMatchData(null)
     login(user, language)
     setShowLoginModal(false)
+  }
+
+  const handleLogout = () => {
+    setSelectedRepo(null)
+    setMatchData(null)
+    logout()
   }
 
   const handleAIChatResponse = async (response: any) => {
@@ -119,7 +127,7 @@ const App: React.FC = () => {
   }
 
   const handleTagClick = () => {
-    fetchRepos({ limit: 10 })
+    refresh()
   }
 
   const handleSendMessage = async (message: string) => {
@@ -178,8 +186,8 @@ const App: React.FC = () => {
             username={username}
             profile={profile}
             onUpdate={updateProfile}
-            onLogout={logout}
-            onLogin={() => setShowLoginModal(true)}  // 传递登录回调
+            onLogout={handleLogout}
+            onLogin={() => setShowLoginModal(true)}
           />
         </div>
       </header>
