@@ -4,7 +4,7 @@ import json
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Callable
 from .provider import OllamaProvider
 from .prompts import PromptManager
 from .utils import validate_and_parse, extract_json_from_response
@@ -87,17 +87,24 @@ class ConversationHandler:
         except Exception:
             return 'ask_content'
 
-    def process_user_input(self, user_input: str) -> Dict[str, Any]:
+    def process_user_input(self, user_input: str, on_stage: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+        def stage(name: str, data: Optional[Dict[str, Any]] = None):
+            if on_stage:
+                on_stage(name, data or {})
+
         user_language = self.user_language
+        stage("intent_recognizing", {})
         intent = self._recognize_intent(user_input)
         user_action = self._detect_user_action(user_input)
 
         if intent == 'query_status' or self._is_query_intent(user_input, user_language):
+            stage("intent_done", {"intent": intent, "next": "query_status"})
             result = self._handle_query_intent(user_language)
             result.setdefault('data', {}).update({'intent': 'query_status'})
             return result
 
         if intent == 'irrelevant':
+            stage("intent_done", {"intent": intent, "next": "irrelevant"})
             reply = "我可能没太理解～如果你想找适合贡献的开源项目，可以告诉我你的技术栈和偏好。" if user_language == 'chinese' else "I might not have enough context—tell me your tech stack and preferences and I can recommend projects."
             return {
                 'reply': reply,
@@ -113,17 +120,21 @@ class ConversationHandler:
         self.conversation_history.append({'role': 'user', 'content': user_input})
 
         if user_action == 'CONFIRM' and (self.current_profile.get('skills') or self.current_profile.get('contribution_styles')):
+            stage("intent_done", {"intent": intent, "next": "confirm"})
             result = self._handle_confirm(user_language)
             result.setdefault('data', {}).update({'intent': intent})
             return result
 
         if intent == 'search_repo' or user_action == 'SEARCH':
+            stage("intent_done", {"intent": intent, "next": "search_repo"})
             result = self._handle_search(user_language)
             self.conversation_history.append({'role': 'assistant', 'content': result['reply']})
             if self.user_id:
                 self._save_profile_to_cache()
             result.setdefault('data', {}).update({'intent': 'search_repo'})
             return result
+
+        stage("intent_done", {"intent": intent, "next": "generating_reply"})
 
         if intent == 'ask_content':
             profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
@@ -132,6 +143,7 @@ class ConversationHandler:
             conversation_context = self._build_conversation_context()
             user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
             try:
+                stage("generating_reply", {})
                 ai_response = self.provider.generate(
                     prompt_template=user_prompt,
                     variables={},
@@ -196,6 +208,7 @@ class ConversationHandler:
         
         try:
             # 调用Agent1获取回复
+            stage("generating_reply", {})
             ai_response = self.provider.generate(
                 prompt_template=user_prompt,
                 variables={},

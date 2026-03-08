@@ -7,6 +7,8 @@ import sys
 import json
 import asyncio
 import time
+import queue
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Dict, Any, Tuple
 from collections import deque
 from datetime import datetime
@@ -416,10 +418,105 @@ async def chat(request: ChatRequest = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _chat_result_to_response(result: Dict[str, Any], session_id: str, agent_type: str) -> Dict[str, Any]:
+    if agent_type != 'agent1':
+        return {
+            "reply": "", "status": "hidden", "skills": [], "preferences": [],
+            "action": "REPLY", "intent": "", "confirmed": False, "session_id": session_id
+        }
+    action = result.get('action', 'REPLY')
+    data = result.get('data', {})
+    confirmed = data.get('confirmed', False) or action == 'CONFIRM_PROFILE'
+    profile_updated = data.get('profile_updated', False)
+    skills = data.get("skills", [])
+    preferences = data.get("contribution_styles", [])
+    auto_search = data.get("auto_search", False)
+    intent = data.get("intent", "")
+    return {
+        "reply": result.get("reply", ""),
+        "status": "collecting" if not confirmed else "confirmed",
+        "skills": skills,
+        "preferences": preferences,
+        "action": action,
+        "intent": intent,
+        "confirmed": confirmed,
+        "profile_updated": profile_updated,
+        "session_id": session_id,
+        "auto_search": auto_search,
+        "profile": {
+            "skills": skills,
+            "contribution_types": preferences,
+            "experience_level": "intermediate"
+        } if (confirmed or profile_updated) else None
+    }
+
+
+_stream_executor = ThreadPoolExecutor(max_workers=4)
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest = Body(...)):
+    async def event_stream():
+        sync_q = queue.Queue()
+        try:
+            handler, session_id = get_conversation_handler(
+                request.user_id,
+                request.agent_type,
+                request.language,
+                request.session_id
+            )
+
+            def on_stage(name: str, data: Dict[str, Any]):
+                sync_q.put({"type": "stage", "stage": name, "data": data})
+
+            def run():
+                try:
+                    result = handler.process_user_input(request.message, on_stage=on_stage)
+                    sync_q.put({"type": "result", "result": result, "session_id": session_id})
+                except Exception as e:
+                    sync_q.put({"type": "error", "detail": str(e)})
+
+            loop = asyncio.get_event_loop()
+            fut = _stream_executor.submit(run)
+            while True:
+                try:
+                    item = await asyncio.wait_for(
+                        loop.run_in_executor(None, sync_q.get),
+                        timeout=300.0
+                    )
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'stage': 'error', 'detail': 'timeout'})}\n\n"
+                    break
+                if item["type"] == "stage":
+                    yield f"data: {json.dumps({'stage': item['stage'], **item['data']})}\n\n"
+                elif item["type"] == "result":
+                    result = item["result"]
+                    session_id = item["session_id"]
+                    if request.agent_type != 'agent1':
+                        payload = _chat_result_to_response(result, session_id, request.agent_type)
+                    else:
+                        payload = _chat_result_to_response(result, session_id, 'agent1')
+                    payload["stage"] = "reply"
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    break
+                else:
+                    yield f"data: {json.dumps({'stage': 'error', 'detail': item.get('detail', 'unknown')})}\n\n"
+                    break
+        except Exception as e:
+            logger.error(f"Chat stream error: {e}", exc_info=True)
+            yield f"data: {json.dumps({'stage': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
+    )
+
+
 @app.post("/api/profile/confirm")
 async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
     try:
-        handler = get_conversation_handler(request.user_id)
+        handler, _ = get_conversation_handler(request.user_id)
         profile = handler.get_current_profile()
         
         if profile.get('skills') or profile.get('contribution_styles'):
@@ -463,7 +560,7 @@ async def sync_profile(request: SyncProfileRequest = Body(...)):
 @app.get("/api/profile/{user_id}")
 async def get_profile(user_id: str):
     try:
-        handler = get_conversation_handler(user_id)
+        handler, _ = get_conversation_handler(user_id)
         profile = handler.get_current_profile()
         
         # 尝试从缓存获取language
@@ -492,7 +589,7 @@ async def get_profile(user_id: str):
 @app.post("/api/match")
 async def calculate_match(request: MatchRequest = Body(...)):
     try:
-        handler = get_conversation_handler(request.user_id)
+        handler, _ = get_conversation_handler(request.user_id)
         scorer = get_match_scorer()
         
         profile = handler.get_current_profile()

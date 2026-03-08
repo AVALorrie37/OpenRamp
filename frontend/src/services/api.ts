@@ -25,9 +25,46 @@ export const reposAPI = USE_MOCK ? mockReposAPI : {
 }
 
 export const chatAPI = USE_MOCK ? mockChatAPI : {
-  send: async (user_id: string, message: string, session_id?: string, agent_type: string = 'agent1', language?: string): Promise<ChatResponse> => {
-    const response = await api.post('/api/chat', { user_id, message, session_id, agent_type, language })
-    return response.data
+  send: async (
+    user_id: string,
+    message: string,
+    session_id?: string,
+    agent_type: string = 'agent1',
+    language?: string,
+    onStage?: (stage: string, data: Record<string, unknown>) => void
+  ): Promise<ChatResponse> => {
+    const body = { user_id, message, session_id, agent_type, language }
+    const res = await fetch(`${API_BASE}/api/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) throw new Error(res.statusText)
+    const reader = res.body?.getReader()
+    if (!reader) throw new Error('No body')
+    const dec = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += dec.decode(value, { stream: true })
+      const lines = buf.split('\n\n')
+      buf = lines.pop() ?? ''
+      for (const chunk of lines) {
+        const m = chunk.match(/^data:\s*(.+)$/m)
+        if (!m) continue
+        try {
+          const payload = JSON.parse(m[1].trim()) as Record<string, unknown>
+          const stage = payload.stage as string
+          if (stage === 'reply') return payload as unknown as ChatResponse
+          if (stage === 'error') throw new Error((payload.detail as string) || 'Unknown error')
+          onStage?.(stage, payload)
+        } catch (e) {
+          if (e instanceof Error && e.message !== 'Unknown error') throw e
+        }
+      }
+    }
+    throw new Error('Stream ended without reply')
   }
 }
 

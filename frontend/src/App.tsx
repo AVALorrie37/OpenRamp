@@ -40,7 +40,7 @@ const App: React.FC = () => {
       setToast('搜索完成，请查看主页')
     }
   }, [username, fetchRepos])
-  const { messages, loading: chatLoading, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
+  const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   useEffect(() => {
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
@@ -313,6 +313,7 @@ const App: React.FC = () => {
         onClose={() => setShowAIChat(false)}
         messages={messages}
         loading={chatLoading}
+        loadingStage={loadingStage}
         searchProgressSeconds={searchProgressSeconds}
         onSendMessage={handleSendMessage}
         onCancelSearch={cancelSearch}

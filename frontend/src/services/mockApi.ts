@@ -63,7 +63,7 @@ export const mockReposAPI = {
 }
 
 export const mockChatAPI = {
-  send: async (user_id: string, message: string, session_id?: string, _agent_type: string = 'agent1', _language?: string): Promise<ChatResponse> => {
+  send: async (user_id: string, message: string, session_id?: string, _agent_type: string = 'agent1', _language?: string, _onStage?: (stage: string, data: Record<string, unknown>) => void): Promise<ChatResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1000))
     const lowerMessage = message.toLowerCase()
     if (lowerMessage.includes('确认') || lowerMessage.includes('确认技能')) {

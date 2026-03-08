@@ -8,6 +8,7 @@ const DEV_SEARCH_DURATION_SECONDS = 30
 export const useAIChat = (user_id: string | null, profile: UserProfile | null = null, isProfileModified?: () => boolean, resetProfileModified?: () => void, onSearchComplete?: (repos: any[]) => void) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchProgressSeconds, setSearchProgressSeconds] = useState<number | null>(null)
   const [sessionId, setSessionId] = useState<string | undefined>()
@@ -153,9 +154,21 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     })
 
     setLoading(true)
+    setLoadingStage('intent_recognizing')
 
     try {
-      const response = await chatAPI.send(user_id, content, sessionId, agentType, profile?.language)
+      const response = await chatAPI.send(
+        user_id,
+        content,
+        sessionId,
+        agentType,
+        profile?.language,
+        (stage, data) => {
+          if (stage === 'intent_recognizing') setLoadingStage('intent_recognizing')
+          else if (stage === 'intent_done') setLoadingStage((data.next as string) || 'generating_reply')
+          else if (stage === 'generating_reply') setLoadingStage('generating_reply')
+        }
+      )
       
       if (response.session_id && response.session_id !== sessionId) {
         setSessionId(response.session_id)
@@ -194,6 +207,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       return null
     } finally {
       setLoading(false)
+      setLoadingStage(null)
     }
   }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch])
 
@@ -224,6 +238,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   return {
     messages,
     loading,
+    loadingStage,
     isSearching,
     searchProgressSeconds,
     sendMessage,
