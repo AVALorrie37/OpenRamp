@@ -1,6 +1,4 @@
 # OpenRamp — 开源贡献智能匹配系统｜Built via DataEase plugin extension with OpenDigger data
-Team: FortunaAtoms
-Competition: OpenSODA 2025
 
 Smooth your OpenRamp to contribution. Smart project matching for open source newcomers.
 
@@ -109,7 +107,11 @@ npm install
 
 2. **开发模式**
 ```bash
+# 1.前后端联调
+ollama serve
 npm run dev
+# 2.一键调试
+npm run dev-all
 ```
 
 3. **Electron桌面应用**
