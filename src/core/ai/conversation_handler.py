@@ -251,63 +251,17 @@ class ConversationHandler:
                 'data': action_data
             }
 
-        # 增量更新用户画像（仅在intent为update_profile时）
         profile_changed = False
         if intent == 'update_profile':
             prev_profile = dict(self.current_profile)
             updated = self._update_profile_from_delta(user_input, user_language)
             profile_changed = updated and self._profile_changed(prev_profile, self.current_profile)
-            profile_unchanged = self._profile_unchanged(self.previous_profile, self.current_profile)
-            if profile_unchanged and self._is_profile_sufficient(self.current_profile):
-                self.previous_profile = dict(self.current_profile)
-                return self._handle_auto_search(user_language)
             self.previous_profile = dict(self.current_profile)
-        
-        # 使用当前画像构建对话上下文并生成Agent1回复
-        profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
-        
-        # 获取Agent1系统提示词
-        base_system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation')
-        
-        # 注入用户语言偏好指令
-        system_prompt = self._inject_language_instruction(base_system_prompt, user_language)
-        
-        # 构建完整的对话上下文（包含当前画像信息）
-        conversation_context = self._build_conversation_context()
-        user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
-        
-        try:
-            # 调用Agent1获取回复
-            stage("generating_reply", {})
-            ai_response = self.provider.generate(
-                prompt_template=user_prompt,
-                variables={},
-                system_prompt=system_prompt,
-                temperature=0.3
-            )
-        except Exception as e:
-            fallback_reply = self._get_fallback_reply(user_input, user_language)
-            ai_response = fallback_reply
-        
-        # 判断是否需要追问
-        should_ask, ask_type = self._should_ask_followup(self.current_profile)
-        
-        # 根据判断结果调整回复
-        if should_ask and ask_type == 'soft_ask':
-            # 软询问：在回复后添加软询问
-            if user_language == 'chinese':
-                ai_response += "\n\n（补充更多细节更有利于匹配项目哦～你也可以在个人信息中手动修改标签~）"
-            else:
-                ai_response += "\n\n(Adding more details will help you find better projects~ You can also manually update your profile in the information page~)"
-        
-        reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
-        if profile_changed and action == 'REPLY':
-            reply = self._format_acknowledgment_reply(user_language)
-            if should_ask and ask_type == 'soft_ask':
-                if user_language == 'chinese':
-                    reply += "\n\n（补充更多细节更有利于匹配项目哦～你也可以在个人信息中手动修改标签~）"
-                else:
-                    reply += "\n\n(Adding more details will help you find better projects~ You can also manually update your profile in the information page~)"
+
+        stage("generating_reply", {})
+        reply = self._format_rule_based_reply(user_language)
+        action = 'REPLY'
+        action_data = {}
         self.conversation_history.append({'role': 'assistant', 'content': reply})
         action_data.update({
             'skills': self.current_profile['skills'],
@@ -430,6 +384,42 @@ class ConversationHandler:
                           'community': 'community support', 'review': 'code review', 'test': 'testing'}
             styles_text = ', '.join([styles_map.get(s, s) for s in styles]) if styles else 'none'
             return f"I've noted your interests! You like using {skills_text} for development, and prefer {styles_text}. Does this look correct?"
+
+    def _format_rule_based_reply(self, language: str) -> str:
+        """规则回复：告知当前画像并给出建议"""
+        skills = self.current_profile.get('skills', [])
+        styles = self.current_profile.get('contribution_styles', [])
+        styles_map = {'bug_fix': '修复bug', 'feature': '开发新功能', 'docs': '编写文档',
+                      'community': '社区支持', 'review': '代码审查', 'test': '编写测试'}
+        styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
+                        'community': 'community support', 'review': 'code review', 'test': 'testing'}
+        _, ask_type = self._should_ask_followup(self.current_profile)
+        if language == 'chinese':
+            skills_txt = '、'.join(skills) if skills else '暂无'
+            styles_txt = '、'.join([styles_map.get(s, s) for s in styles]) if styles else '暂无'
+            base = f"当前信息：技能 {skills_txt}，贡献偏好 {styles_txt}。"
+            if ask_type == 'both_empty':
+                return base + "建议补充技能和贡献偏好信息。"
+            if ask_type == 'skills_empty':
+                return base + "建议补充技能信息。"
+            if ask_type == 'styles_empty':
+                return base + "建议补充贡献偏好。"
+            if ask_type == 'soft_ask':
+                return base + "建议补充更多细节，或确认无误后开始搜索。"
+            return base + "确认无误后可以开始搜索。"
+        else:
+            skills_txt = ', '.join(skills) if skills else 'none'
+            styles_txt = ', '.join([styles_map_en.get(s, s) for s in styles]) if styles else 'none'
+            base = f"Current info: skills {skills_txt}, contribution preferences {styles_txt}. "
+            if ask_type == 'both_empty':
+                return base + "Suggest adding skills and contribution preferences."
+            if ask_type == 'skills_empty':
+                return base + "Suggest adding skills."
+            if ask_type == 'styles_empty':
+                return base + "Suggest adding contribution preferences."
+            if ask_type == 'soft_ask':
+                return base + "Suggest adding more details, or start search when ready."
+            return base + "Start search when confirmed."
 
     def _format_profile_for_agent1(self, profile: Dict, language: str) -> str:
         """将JSON结果转换为自然语言（用于Agent1理解）"""
