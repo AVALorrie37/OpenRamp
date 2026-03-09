@@ -74,18 +74,40 @@ class ConversationHandler:
             return 'irrelevant'
         t = user_input.strip()
         lower = t.lower()
+        # query_status
         if any(k in t for k in ('我的技能', '我的信息', '当前画像', '现在的技能', '我的偏好')):
             return 'query_status'
         if any(k in lower for k in ('show my profile', 'my skills', 'current profile')):
             return 'query_status'
+        # search_repo
         if any(k in t for k in ('搜索', '找项目', '推荐项目', '推荐一些')):
             return 'search_repo'
         if any(k in lower for k in ('search', 'find', 'recommend', 'repo', 'repository', 'projects')):
             return 'search_repo'
-        if any(k in t for k in ('我会', '我擅长', '技术栈', '简历', '经历', '经验', '做过', '喜欢贡献', '偏好')):
+        # update_profile：技能/偏好类信息
+        if any(k in t for k in ('我擅长', '技术栈', '简历', '经历', '经验', '做过', '喜欢贡献', '偏好')):
             return 'update_profile'
-        if any(k in lower for k in ('i can', 'i know', 'my background', 'resume', 'experience')):
+        # 中文：“我会/我可以”及副词变体（我还会、我也可以、我都会、我也可以）
+        if re.search(r'我\S*(还|也|很|都)?\S*会', t) or re.search(r'我\S*(还|也|都)?\S*可以', t):
             return 'update_profile'
+        # 中文：“喜欢”及副词/否定（我还喜欢、我不喜欢…）
+        if re.search(r'我\S*(还|也|很|非常)?\S*喜欢', t) or re.search(r'我\S*不\S*喜欢', t):
+            return 'update_profile'
+        # 英文：I can / I will 及副词（I also can, I can also, I really will…）
+        if any(re.search(p, lower) for p in (
+            r'\bi\s+(also|really|still|quite)\s+can\b',
+            r'\bi\s+can\s+also\b',
+            r'\bi\s+(also|really|still)\s+will\b',
+            r'\bi\s+(also|really|still|quite)\s+like\b',
+            r'\bi\s+(also|really|still|quite)\s+enjoy\b',
+            r"\bi\s+don't\s+like\b",
+            r"\bi\s+do not\s+like\b",
+            r'\bi\s+am\s+good\s+at\b',
+        )):
+            return 'update_profile'
+        if any(k in lower for k in ('i can', 'i will', 'i know', 'my background', 'resume', 'experience')):
+            return 'update_profile'
+        # ask_content：问句类
         if any(k in t for k in ('怎么', '为什么', '如何', '什么', '哪个')):
             return 'ask_content'
         if any(k in lower for k in ('what is', 'how to', 'explain', 'help me understand', 'why ', 'which ')):
@@ -229,31 +251,19 @@ class ConversationHandler:
                 'data': action_data
             }
 
-        recent_messages = self._get_recent_messages(4)
-        combined_input = self._build_incremental_summary_input(recent_messages)
-        if self.historical_summary.strip() and combined_input.strip():
-            new_summary = self._summarize_conversation(combined_input)
-            self.historical_summary = new_summary if new_summary else combined_input
-        else:
-            summary_lines = []
-            for msg in recent_messages:
-                role = "User" if msg['role'] == 'user' else "Assistant"
-                summary_lines.append(f"{role}: {msg['content']}")
-            self.historical_summary = "\n".join(summary_lines) if summary_lines else combined_input
-
-        profile_result = self.profile_parser.parse_profile(self.historical_summary)
-        prev_profile = dict(self.current_profile)
-        self.current_profile = self._merge_profile_data(profile_result, self.current_profile)
-        profile_changed = self._profile_changed(prev_profile, self.current_profile)
-        
-        profile_unchanged = self._profile_unchanged(self.previous_profile, self.current_profile)
-        if profile_unchanged and self._is_profile_sufficient(self.current_profile):
+        # 增量更新用户画像（仅在intent为update_profile时）
+        profile_changed = False
+        if intent == 'update_profile':
+            prev_profile = dict(self.current_profile)
+            updated = self._update_profile_from_delta(user_input, user_language)
+            profile_changed = updated and self._profile_changed(prev_profile, self.current_profile)
+            profile_unchanged = self._profile_unchanged(self.previous_profile, self.current_profile)
+            if profile_unchanged and self._is_profile_sufficient(self.current_profile):
+                self.previous_profile = dict(self.current_profile)
+                return self._handle_auto_search(user_language)
             self.previous_profile = dict(self.current_profile)
-            return self._handle_auto_search(user_language)
         
-        self.previous_profile = dict(self.current_profile)
-        
-        # 将JSON结果转换为自然语言（用于Agent1理解）
+        # 使用当前画像构建对话上下文并生成Agent1回复
         profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
         
         # 获取Agent1系统提示词
@@ -565,26 +575,122 @@ class ConversationHandler:
         if recent_messages:
             msg_lines = []
             for msg in recent_messages:
-                role = "User" if msg['role'] == 'user' else "Assistant"
-                msg_lines.append(f"{role}: {msg['content']}")
-            lines.append(f"\n# New messages:\n" + "\n".join(msg_lines))
+                if msg.get('role') == 'user':
+                    msg_lines.append(f"User: {msg.get('content', '')}")
+            if msg_lines:
+                lines.append(f"\n# New messages (user only):\n" + "\n".join(msg_lines))
         return "\n".join(lines) if lines else ""
 
     def _summarize_conversation(self, combined_input: str) -> str:
         if not combined_input.strip():
             return ""
+        # Only summarize when input is long enough; otherwise return as-is
+        if len(combined_input) < 800:
+            return combined_input
         try:
             system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation_summarizer')
             result = self.provider.generate(
                 prompt_template=combined_input,
                 variables={},
                 system_prompt=system_prompt,
-                temperature=0.2
+                temperature=0.2,
+                max_tokens=256
             )
             return result.strip() if result else combined_input
         except Exception as e:
             logger.warning(f"Summarizer failed: {e}, using raw input")
             return combined_input
+
+    def _update_profile_from_delta(self, user_input: str, language: str) -> bool:
+        """调用profile_delta Agent，根据本轮对话更新画像增量。"""
+        try:
+            profile_text = self._format_profile_for_agent1(self.current_profile, language)
+            system_prompt, _ = self.prompt_manager.get_agent_prompt(
+                'profile_delta',
+                input_text=user_input
+            )
+            combined_input = (
+                f"Current Profile:\n{profile_text}\n\n"
+                f"User update:\n{user_input}"
+            )
+            raw = self.provider.generate(
+                prompt_template=combined_input,
+                variables={},
+                system_prompt=system_prompt,
+                temperature=0.0,
+                max_tokens=256
+            )
+            json_str = extract_json_from_response(raw or '')
+            if not json_str:
+                logger.warning("[ProfileDelta] Empty or non-JSON response, skip update")
+                return False
+            try:
+                delta = json.loads(json_str)
+            except Exception as e:
+                logger.warning(f"[ProfileDelta] JSON parse failed: {e}")
+                return False
+            return self._apply_profile_delta(delta)
+        except Exception as e:
+            logger.warning(f"[ProfileDelta] Failed to update profile from delta: {e}")
+            return False
+
+    def _apply_profile_delta(self, delta: Dict[str, Any]) -> bool:
+        """根据diff结果增删技能与贡献偏好。"""
+        if not isinstance(delta, dict):
+            return False
+        current_skills = list(self.current_profile.get('skills', []))
+        current_styles = list(self.current_profile.get('contribution_styles', []))
+        skills_set = {s for s in current_skills if isinstance(s, str) and s.strip()}
+        styles_set = {s for s in current_styles if isinstance(s, str) and s.strip()}
+
+        def _norm_skill(value: str) -> str:
+            return value.strip().lower().replace(' ', '-') if isinstance(value, str) else ''
+
+        def _norm_style(value: str) -> str:
+            v = value.strip().lower() if isinstance(value, str) else ''
+            return v
+
+        allowed_styles = {"bug_fix", "feature", "docs", "community", "review", "test"}
+
+        # additions
+        for raw in delta.get('add_skills') or []:
+            norm = _norm_skill(raw)
+            if norm:
+                skills_set.add(norm)
+        for raw in delta.get('add_styles') or []:
+            norm = _norm_style(raw)
+            if norm in allowed_styles:
+                styles_set.add(norm)
+
+        # removals
+        remove_skill_values = []
+        for raw in delta.get('remove_skills') or []:
+            norm = _norm_skill(raw)
+            if norm:
+                remove_skill_values.append(norm)
+        if remove_skill_values:
+            new_skills = set()
+            for s in skills_set:
+                if all(s.lower() != r for r in remove_skill_values):
+                    new_skills.add(s)
+            skills_set = new_skills
+
+        remove_style_values = []
+        for raw in delta.get('remove_styles') or []:
+            norm = _norm_style(raw)
+            if norm in allowed_styles:
+                remove_style_values.append(norm)
+        if remove_style_values:
+            styles_set = {s for s in styles_set if s not in remove_style_values}
+
+        new_profile = {
+            'skills': sorted(skills_set),
+            'contribution_styles': sorted(styles_set)
+        }
+        changed = self._profile_changed(self.current_profile, new_profile)
+        if changed:
+            self.current_profile = new_profile
+        return changed
 
     def _profile_changed(self, prev: Dict, curr: Dict) -> bool:
         prev_skills = set(prev.get('skills', []))
