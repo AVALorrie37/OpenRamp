@@ -14,6 +14,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
   const [newTag, setNewTag] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [tagError, setTagError] = useState<string | null>(null)
+  const lang: 'chinese' | 'english' = profile?.language || 'chinese'
   
   // 贡献偏好相关状态
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>(profile?.preferences || [])
@@ -29,19 +30,19 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
     const cleanTag = tag.replace(/^\[+|\]+$/g, '').trim()
     
     if (!cleanTag) {
-      return { isValid: false, error: '标签不能为空' }
+      return { isValid: false, error: lang === 'english' ? 'Tag cannot be empty' : '标签不能为空' }
     }
     
     if (!/^[a-zA-Z0-9_]+$/.test(cleanTag)) {
-      return { isValid: false, error: '仅允许字母、数字和下划线' }
+      return { isValid: false, error: lang === 'english' ? 'Only letters, numbers and underscores are allowed' : '仅允许字母、数字和下划线' }
     }
     
     if (cleanTag.length > 20) {
-      return { isValid: false, error: '标签长度不能超过20个字符' }
+      return { isValid: false, error: lang === 'english' ? 'Tag length cannot exceed 20 characters' : '标签长度不能超过20个字符' }
     }
     
     if ((profile?.skills || []).includes(cleanTag)) {
-      return { isValid: false, error: '该标签已存在' }
+      return { isValid: false, error: lang === 'english' ? 'Tag already exists' : '该标签已存在' }
     }
     
     return { isValid: true, error: null }
@@ -132,14 +133,23 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
   }, [showPreferenceSelector])
 
   // 贡献偏好类型映射
-  const preferenceTypes = {
-    "bug_fix": { label: "Bug修复", description: "喜欢修复代码错误和缺陷" },
-    "feature": { label: "功能开发", description: "喜欢开发新功能和特性" },
-    "docs": { label: "文档编写", description: "喜欢完善项目文档和说明" },
-    "community": { label: "社区建设", description: "喜欢回答问题和帮助他人" },
-    "review": { label: "代码审查", description: "喜欢审查代码质量" },
-    "test": { label: "测试编写", description: "喜欢编写测试用例" }
-  }
+  const preferenceTypes = lang === 'english'
+    ? {
+      bug_fix: { label: 'Bug fixes', description: 'Like fixing code errors and defects' },
+      feature: { label: 'Feature development', description: 'Like developing new features' },
+      docs: { label: 'Documentation', description: 'Like improving project docs' },
+      community: { label: 'Community', description: 'Like answering questions and helping others' },
+      review: { label: 'Code review', description: 'Like reviewing code quality' },
+      test: { label: 'Testing', description: 'Like writing test cases' }
+    }
+    : {
+      bug_fix: { label: 'Bug修复', description: '喜欢修复代码错误和缺陷' },
+      feature: { label: '功能开发', description: '喜欢开发新功能和特性' },
+      docs: { label: '文档编写', description: '喜欢完善项目文档和说明' },
+      community: { label: '社区建设', description: '喜欢回答问题和帮助他人' },
+      review: { label: '代码审查', description: '喜欢审查代码质量' },
+      test: { label: '测试编写', description: '喜欢编写测试用例' }
+    }
 
   const handleTogglePreference = (preference: string) => {
     const newPreferences = selectedPreferences.includes(preference)
@@ -187,14 +197,47 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
       padding: '20px',
       minWidth: '300px'
     }}>
-      <h3 style={{
-        margin: '0 0 16px 0',
-        fontSize: '16px',
-        color: theme.text,
-        fontWeight: 600
-      }}>
-        个人信息
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{
+          margin: 0,
+          fontSize: '16px',
+          color: theme.text,
+          fontWeight: 600
+        }}>
+          {lang === 'english' ? 'Profile' : '个人信息'}
+        </h3>
+        <div>
+          <button
+            onClick={() => onUpdate({ language: 'chinese' as any })}
+            style={{
+              padding: '4px 8px',
+              marginRight: '8px',
+              borderRadius: '12px',
+              border: `1px solid ${theme.border}`,
+              backgroundColor: profile?.language === 'chinese' ? theme.primary : theme.background,
+              color: profile?.language === 'chinese' ? theme.white : theme.text,
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            中文
+          </button>
+          <button
+            onClick={() => onUpdate({ language: 'english' as any })}
+            style={{
+              padding: '4px 8px',
+              borderRadius: '12px',
+              border: `1px solid ${theme.border}`,
+              backgroundColor: profile?.language === 'english' ? theme.primary : theme.background,
+              color: profile?.language === 'english' ? theme.white : theme.text,
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            EN
+          </button>
+        </div>
+      </div>
 
       {/* 技能标签部分 */}
       <div style={{ marginBottom: '20px' }}>
@@ -204,7 +247,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           color: theme.text,
           fontWeight: 500
         }}>
-          技能标签
+          {lang === 'english' ? 'Skill tags' : '技能标签'}
         </div>
         <div style={{
           display: 'flex',
@@ -312,7 +355,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                       setTagError(null)
                     }
                   }}
-                  placeholder="输入标签"
+                  placeholder={lang === 'english' ? 'Enter tag' : '输入标签'}
                   style={{
                     flex: 1,
                     padding: '6px 12px',
@@ -335,7 +378,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                     fontSize: '12px'
                   }}
                 >
-                  确认
+                  {lang === 'english' ? 'Confirm' : '确认'}
                 </button>
               </div>
               {tagError && (
@@ -361,7 +404,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                 fontSize: '12px'
               }}
             >
-              + 新增标签
+              {lang === 'english' ? '+ Add tag' : '+ 新增标签'}
             </button>
           )}
         </div>
@@ -375,7 +418,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           color: theme.text,
           fontWeight: 500
         }}>
-          贡献偏好
+          {lang === 'english' ? 'Contribution preferences' : '贡献偏好'}
         </div>
         <div style={{
           display: 'flex',
@@ -459,7 +502,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                 fontSize: '12px'
               }}
             >
-              + 选择偏好
+              {lang === 'english' ? '+ Choose preferences' : '+ 选择偏好'}
             </button>
           )}
 
@@ -477,7 +520,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                 marginLeft: '8px'
               }}
             >
-              完成选择
+              {lang === 'english' ? 'Done' : '完成选择'}
             </button>
           )}
         </div>
@@ -497,7 +540,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           marginTop: '20px'
         }}
       >
-        注销
+        {lang === 'english' ? 'Logout' : '注销'}
       </button>
     </div>
   )

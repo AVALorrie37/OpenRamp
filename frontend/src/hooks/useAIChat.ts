@@ -17,29 +17,55 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const agentType = 'agent1'
 
   useEffect(() => {
-    if (user_id) {
+    const initChat = async () => {
+      if (!user_id) {
+        setMessages([])
+        setSessionId(undefined)
+        return
+      }
+
       const savedMessages = storage.getChatMessages(user_id)
-      if (savedMessages.length === 0) {
+      const savedSessionId = storage.getSessionId(user_id)
+
+      if (savedMessages.length > 0) {
+        setMessages(savedMessages)
+        if (savedSessionId) {
+          setSessionId(savedSessionId)
+        }
+        return
+      }
+
+      try {
+        const lang = profile?.language || 'chinese'
+        const res = await (chatAPI as any).greeting(user_id, lang, savedSessionId, agentType)
         const welcomeMessage: ChatMessage = {
           role: 'assistant',
-          content: '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
+          content: res.greeting,
           timestamp: Date.now()
         }
         const messagesWithWelcome = [welcomeMessage]
         setMessages(messagesWithWelcome)
         storage.saveChatMessages(user_id, messagesWithWelcome)
-      } else {
-        setMessages(savedMessages)
+        if (res.session_id) {
+          setSessionId(res.session_id)
+          storage.saveSessionId(user_id, res.session_id)
+        }
+      } catch {
+        const fallbackMessage: ChatMessage = {
+          role: 'assistant',
+          content: profile?.language === 'english'
+            ? 'Welcome to the open source contribution assistant! To help match suitable projects, please briefly introduce your tech stack, experience level, and open source interests.'
+            : '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
+          timestamp: Date.now()
+        }
+        const messagesWithWelcome = [fallbackMessage]
+        setMessages(messagesWithWelcome)
+        storage.saveChatMessages(user_id, messagesWithWelcome)
       }
-      const savedSessionId = storage.getSessionId(user_id)
-      if (savedSessionId) {
-        setSessionId(savedSessionId)
-      }
-    } else {
-      setMessages([])
-      setSessionId(undefined)
     }
-  }, [user_id])
+
+    initChat()
+  }, [user_id, profile?.language])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
     setIsSearching(true)

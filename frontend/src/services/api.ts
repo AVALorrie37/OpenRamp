@@ -24,7 +24,24 @@ export const reposAPI = USE_MOCK ? mockReposAPI : {
   }
 }
 
-export const chatAPI = USE_MOCK ? mockChatAPI : {
+type ChatGreetingResponse = { greeting: string; session_id: string; language: string }
+
+export const chatAPI: typeof mockChatAPI | {
+  send: (
+    user_id: string,
+    message: string,
+    session_id?: string,
+    agent_type?: string,
+    language?: string,
+    onStage?: (stage: string, data: Record<string, unknown>) => void
+  ) => Promise<ChatResponse>
+  greeting: (
+    user_id: string,
+    language?: string,
+    session_id?: string,
+    agent_type?: string
+  ) => Promise<ChatGreetingResponse>
+} = USE_MOCK ? mockChatAPI : {
   send: async (
     user_id: string,
     message: string,
@@ -65,6 +82,20 @@ export const chatAPI = USE_MOCK ? mockChatAPI : {
       }
     }
     throw new Error('Stream ended without reply')
+  },
+  greeting: async (
+    user_id: string,
+    language?: string,
+    session_id?: string,
+    agent_type: string = 'agent1'
+  ): Promise<ChatGreetingResponse> => {
+    const response = await api.post('/api/chat/greeting', {
+      user_id,
+      language,
+      session_id,
+      agent_type
+    })
+    return response.data
   }
 }
 

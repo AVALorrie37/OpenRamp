@@ -115,7 +115,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             color: theme.text,
             fontWeight: 600
           }}>
-            开源贡献智能向导
+            {language === 'english' ? 'Open Source Contribution Assistant' : '开源贡献智能向导'}
           </h3>
           <button
             onClick={onClose}
@@ -145,7 +145,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               opacity: 0.6,
               marginTop: '40px'
             }}>
-              开始对话吧！
+              {language === 'english' ? 'Start chatting!' : '开始对话吧！'}
             </div>
           )}
           {messages.map((msg, index) => {
@@ -186,7 +186,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="输入消息..."
+                placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
                 disabled={loading}
                 style={{
                   width: '100%',
@@ -223,7 +223,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 ➤
               </button>
             </div>
-            <SuggestionButtons onSuggestionClick={handleSuggestion} />
+            <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
           </form>
         </div>
         <style>{`

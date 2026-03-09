@@ -24,6 +24,7 @@ import type { RepoResponse, MatchResult } from './types'
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
   const { repos, loading: reposLoading, fetchRepos, refresh } = useRepos(username)
+  const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
@@ -37,9 +38,9 @@ const App: React.FC = () => {
       if (username) {
         localStorage.setItem(`last_search_${username}`, Date.now().toString())
       }
-      setToast('搜索完成，请查看主页')
+      setToast(uiLanguage === 'english' ? 'Search completed, check the home page' : '搜索完成，请查看主页')
     }
-  }, [username, fetchRepos])
+  }, [username, fetchRepos, uiLanguage])
   const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   useEffect(() => {
@@ -88,7 +89,7 @@ const App: React.FC = () => {
         skills: formattedSkills,
         preferences: response.preferences || []
       });
-      setToast('技能标签已更新');
+      setToast(uiLanguage === 'english' ? 'Skills updated' : '技能标签已更新');
       resetProfileModified();
     }
   
@@ -180,7 +181,7 @@ const App: React.FC = () => {
               onChange={(e) => setShowDebug(e.target.checked)}
               style={{ cursor: 'pointer' }}
             />
-            查看终端
+            {uiLanguage === 'english' ? 'View terminal' : '查看终端'}
           </label>
           <UserDropdown
             username={username}
@@ -283,7 +284,9 @@ const App: React.FC = () => {
             display: 'inline-block',
             animation: 'scroll 20s linear infinite'
           }}>
-            提示：登录获取个性化推荐 | 点击仓库查看匹配详情 | 与AI助手对话确认技能
+            {uiLanguage === 'english'
+              ? 'Tip: Log in to get personalized recommendations | Click a repo to view match details | Chat with the AI assistant to confirm your skills'
+              : '提示：登录获取个性化推荐 | 点击仓库查看匹配详情 | 与AI助手对话确认技能'}
           </div>
           <style>{`
             @keyframes scroll {
@@ -294,7 +297,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <AIButton onClick={() => {
+      <AIButton language={uiLanguage} onClick={() => {
         if (!isLoggedIn) {
           setShowLoginModal(true)
         } else {

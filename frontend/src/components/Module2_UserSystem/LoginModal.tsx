@@ -22,7 +22,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="登录" width="400px">
+    <Modal isOpen={isOpen} onClose={onClose} title={language === 'english' ? 'Login' : '登录'} width="400px">
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '20px' }}>
           <label style={{
@@ -32,13 +32,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
             fontSize: '14px',
             fontWeight: 500
           }}>
-            用户名
+            {language === 'english' ? 'Username' : '用户名'}
           </label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="输入用户名"
+            placeholder={language === 'english' ? 'Enter username' : '输入用户名'}
             style={{
               width: '100%',
               padding: '10px',
@@ -100,7 +100,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
             e.currentTarget.style.backgroundColor = theme.primary
           }}
         >
-          登录
+          {language === 'english' ? 'Login' : '登录'}
         </button>
       </form>
     </Modal>

@@ -100,6 +100,16 @@ export const mockChatAPI = {
       profile_updated: true,
       session_id: session_id || `${user_id}_agent1_${Date.now()}`
     }
+  },
+  greeting: async (user_id: string, language?: string, session_id?: string, _agent_type: string = 'agent1'): Promise<{ greeting: string; session_id: string; language: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return {
+      greeting: language === 'english'
+        ? 'Welcome to the open source contribution assistant! Please briefly introduce your tech stack, experience level, and open source interests so I can match suitable projects for you.'
+        : '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
+      session_id: session_id || `${user_id}_agent1_${Date.now()}`,
+      language: language || 'chinese'
+    }
   }
 }
 

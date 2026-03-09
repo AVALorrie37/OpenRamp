@@ -397,7 +397,7 @@ class ConversationHandler:
         if language == 'chinese':
             skills_txt = '、'.join(skills) if skills else '暂无'
             styles_txt = '、'.join([styles_map.get(s, s) for s in styles]) if styles else '暂无'
-            base = f"当前信息：技能 {skills_txt}，贡献偏好 {styles_txt}。"
+            base = f"当前信息：技能{skills_txt}，贡献偏好{styles_txt}。"
             if ask_type == 'both_empty':
                 return base + "建议补充技能和贡献偏好信息。"
             if ask_type == 'skills_empty':
@@ -537,9 +537,9 @@ class ConversationHandler:
     def _handle_query_intent(self, language: str) -> Dict[str, Any]:
         profile_text = self._format_profile_for_agent1(self.current_profile, language)
         if language == 'chinese':
-            reply = f"根据我们的对话，你目前的画像如下：\n\n{profile_text}"
+            reply = f"根据我们的对话，你目前的画像如下：\n{profile_text}"
         else:
-            reply = f"Based on our conversation, your current profile:\n\n{profile_text}"
+            reply = f"Based on our conversation, your current profile:\n{profile_text}"
         if self.query_summary_memory.strip():
             self.query_summary_memory += "\n"
         self.query_summary_memory += f"User asked profile; Assistant showed current profile."
@@ -875,13 +875,18 @@ class ConversationHandler:
                 }
                 styles_text = '、'.join([styles_map.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else '暂无'
                 if language == 'chinese':
-                    reply_content = f"我整理了你的信息：技能有{skills_text}，贡献偏好是{styles_text}。确认无误吗？"
+                    reply_content = f"我整理了你的信息：\n技能有：{skills_text}\n贡献偏好：{styles_text}\n确认无误吗？"
                 else:
                     styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
                                      'community': 'community support', 'review': 'code review', 'test': 'testing'}
                     styles_text_en = ', '.join([styles_map_en.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else 'none'
                     skills_text_en = ', '.join(self.current_profile['skills']) if self.current_profile['skills'] else 'none'
-                    reply_content = f"Here's your profile: skills are {skills_text_en}, contribution preferences are {styles_text_en}. Does this look correct?"
+                    reply_content = (
+                        "Here's your profile:\n"
+                        f"Skills: {skills_text_en}\n"
+                        f"Contribution preferences: {styles_text_en}\n"
+                        "Does this look correct?"
+                    )
         
         elif action == 'SEARCH_PROJECTS':
             action_data['search_criteria'] = {
@@ -904,13 +909,18 @@ class ConversationHandler:
                 }
                 styles_text = '、'.join([styles_map.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else '暂无'
                 if language == 'chinese':
-                    reply_content = f"我整理了你的信息：技能有{skills_text}，贡献偏好是{styles_text}。确认无误吗？"
+                    reply_content = f"我整理了你的信息：\n技能有：{skills_text}\n贡献偏好：{styles_text}\n确认无误吗？"
                 else:
                     styles_map_en = {'bug_fix': 'bug fixes', 'feature': 'new features', 'docs': 'documentation',
                                      'community': 'community support', 'review': 'code review', 'test': 'testing'}
                     styles_text_en = ', '.join([styles_map_en.get(s, s) for s in self.current_profile['contribution_styles']]) if self.current_profile['contribution_styles'] else 'none'
                     skills_text_en = ', '.join(self.current_profile['skills']) if self.current_profile['skills'] else 'none'
-                    reply_content = f"Here's your profile: skills are {skills_text_en}, contribution preferences are {styles_text_en}. Does this look correct?"
+                    reply_content = (
+                        "Here's your profile:\n"
+                        f"Skills: {skills_text_en}\n"
+                        f"Contribution preferences: {styles_text_en}\n"
+                        "Does this look correct?"
+                    )
         
         return reply_content, action, action_data
 

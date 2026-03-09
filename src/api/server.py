@@ -272,9 +272,36 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.post("/api/chat/greeting")
+async def chat_greeting(request: 'GreetingRequest' = Body(...)):
+    try:
+        handler, session_id = get_conversation_handler(
+            request.user_id,
+            request.agent_type,
+            request.language,
+            request.session_id,
+        )
+        greeting = handler.get_initial_greeting(request.language)
+        return {
+            "greeting": greeting,
+            "session_id": session_id,
+            "language": handler.user_language,
+        }
+    except Exception as e:
+        logger.error(f"Greeting error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    session_id: Optional[str] = None
+    language: Optional[str] = None
+    agent_type: str = 'agent1'
+
+
+class GreetingRequest(BaseModel):
+    user_id: str
     session_id: Optional[str] = None
     language: Optional[str] = None
     agent_type: str = 'agent1'

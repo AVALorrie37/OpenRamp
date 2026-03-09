@@ -3,18 +3,19 @@ import { theme } from '../../styles/theme'
 
 interface AIButtonProps {
   onClick: () => void
+  language?: 'chinese' | 'english'
 }
 
-const AIButton: React.FC<AIButtonProps> = ({ onClick }) => {
+const AIButton: React.FC<AIButtonProps> = ({ onClick, language = 'chinese' }) => {
   return (
     <button
       onClick={onClick}
       style={{
         position: 'fixed',
-        bottom: '30px',
+        bottom: '60px',
         right: '30px',
-        width: '60px',
-        height: '60px',
+        width: '90px',
+        height: '90px',
         borderRadius: '50%',
         backgroundColor: theme.primary,
         color: theme.white,
@@ -38,7 +39,7 @@ const AIButton: React.FC<AIButtonProps> = ({ onClick }) => {
         e.currentTarget.style.transform = 'scale(1)'
       }}
     >
-      AI助手
+      {language === 'english' ? 'AI Assistant' : 'AI助手'}
     </button>
   )
 }

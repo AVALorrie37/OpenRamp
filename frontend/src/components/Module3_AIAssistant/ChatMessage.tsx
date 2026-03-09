@@ -15,15 +15,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       justifyContent: isUser ? 'flex-end' : 'flex-start',
       marginBottom: '12px'
     }}>
-      <div style={{
-        maxWidth: '70%',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        backgroundColor: isUser ? theme.primary : theme.primaryLight,
-        color: isUser ? theme.white : theme.text,
-        fontSize: '14px',
-        lineHeight: '1.5'
-      }}>
+      <div
+        style={{
+          maxWidth: '70%',
+          padding: '12px 16px',
+          borderRadius: '12px',
+          backgroundColor: isUser ? theme.primary : theme.primaryLight,
+          color: isUser ? theme.white : theme.text,
+          fontSize: '14px',
+          lineHeight: '1.5',
+          whiteSpace: 'pre-wrap'
+        }}
+      >
         {message.content}
       </div>
     </div>
