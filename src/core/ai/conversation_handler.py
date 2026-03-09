@@ -68,15 +68,43 @@ class ConversationHandler:
         else:
             return "👋 Hi! I'm your open source assistant, helping you find suitable projects to contribute to. Let's talk about your technical background～"
     
+    def _intent_keyword_fast_path(self, user_input: str) -> Optional[str]:
+        """Keyword-based fast path for intent; returns intent or None if no match."""
+        if not user_input or not user_input.strip():
+            return 'irrelevant'
+        t = user_input.strip()
+        lower = t.lower()
+        if any(k in t for k in ('我的技能', '我的信息', '当前画像', '现在的技能', '我的偏好')):
+            return 'query_status'
+        if any(k in lower for k in ('show my profile', 'my skills', 'current profile')):
+            return 'query_status'
+        if any(k in t for k in ('搜索', '找项目', '推荐项目', '推荐一些')):
+            return 'search_repo'
+        if any(k in lower for k in ('search', 'find', 'recommend', 'repo', 'repository', 'projects')):
+            return 'search_repo'
+        if any(k in t for k in ('我会', '我擅长', '技术栈', '简历', '经历', '经验', '做过', '喜欢贡献', '偏好')):
+            return 'update_profile'
+        if any(k in lower for k in ('i can', 'i know', 'my background', 'resume', 'experience')):
+            return 'update_profile'
+        if any(k in t for k in ('怎么', '为什么', '如何', '什么', '哪个')):
+            return 'ask_content'
+        if any(k in lower for k in ('what is', 'how to', 'explain', 'help me understand', 'why ', 'which ')):
+            return 'ask_content'
+        return None
+
     def _recognize_intent(self, user_input: str) -> str:
         allowed = {'search_repo', 'update_profile', 'query_status', 'ask_content', 'irrelevant'}
+        fast = self._intent_keyword_fast_path(user_input)
+        if fast is not None:
+            return fast
         try:
             system_prompt, _ = self.prompt_manager.get_agent_prompt('intent_recognizer', input_text=user_input)
             raw = self.provider.generate(
                 prompt_template=user_input,
                 variables={},
                 system_prompt=system_prompt,
-                temperature=0.0
+                temperature=0.0,
+                max_tokens=32
             )
             json_str = extract_json_from_response(raw or '')
             if not json_str:
@@ -160,6 +188,38 @@ class ConversationHandler:
                 'contribution_styles': self.current_profile['contribution_styles'],
                 'profile_updated': False,
                 'intent': 'ask_content'
+            })
+            if self.user_id:
+                self._save_profile_to_cache()
+            return {
+                'reply': reply,
+                'action': action,
+                'data': action_data
+            }
+
+        if self._is_likely_question(user_input):
+            profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
+            base_system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation')
+            system_prompt = self._inject_language_instruction(base_system_prompt, user_language)
+            conversation_context = self._build_conversation_context()
+            user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
+            try:
+                stage("generating_reply", {})
+                ai_response = self.provider.generate(
+                    prompt_template=user_prompt,
+                    variables={},
+                    system_prompt=system_prompt,
+                    temperature=0.3
+                )
+            except Exception:
+                ai_response = self._get_fallback_reply(user_input, user_language)
+            reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
+            self.conversation_history.append({'role': 'assistant', 'content': reply})
+            action_data.update({
+                'skills': self.current_profile['skills'],
+                'contribution_styles': self.current_profile['contribution_styles'],
+                'profile_updated': False,
+                'intent': intent
             })
             if self.user_id:
                 self._save_profile_to_cache()
@@ -459,6 +519,20 @@ class ConversationHandler:
         ]
         lower_input = user_input.lower()
         return any(re.search(p, lower_input, re.I) or re.search(p, user_input) for p in query_patterns)
+
+    def _is_likely_question(self, text: str) -> bool:
+        """True if message looks like a question rather than profile info."""
+        if not text or not text.strip():
+            return False
+        t = text.strip()
+        lower = t.lower()
+        if t.endswith('?') or t.endswith('？'):
+            return True
+        q_cn = ('怎么', '如何', '为什么', '什么', '哪个', '怎样', '能否', '会不会')
+        q_en = ('what is', 'how to', 'why ', 'which ', 'explain', 'help me understand', 'can you', 'could you')
+        if any(k in t for k in q_cn) or any(k in lower for k in q_en):
+            return True
+        return False
 
     def _handle_query_intent(self, language: str) -> Dict[str, Any]:
         profile_text = self._format_profile_for_agent1(self.current_profile, language)
