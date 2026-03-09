@@ -14,6 +14,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const [sessionId, setSessionId] = useState<string | undefined>()
   const searchAbortControllerRef = useRef<AbortController | null>(null)
   const searchStartTimeRef = useRef<number>(0)
+  const searchIdRef = useRef<string | null>(null)
   const agentType = 'agent1'
 
   useEffect(() => {
@@ -68,6 +69,8 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   }, [user_id, profile?.language])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
+    const searchId = `${user_id}-${Date.now()}`
+    searchIdRef.current = searchId
     setIsSearching(true)
     setSearchProgressSeconds(null)
     const searchMessage: ChatMessage = {
@@ -75,7 +78,8 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       content: '',
       timestamp: Date.now(),
       action: 'SEARCH_PROJECTS',
-      isSearching: true
+      isSearching: true,
+      searchId
     }
     setMessages(prev => {
       const updatedMessages = [...prev, searchMessage]
@@ -103,7 +107,9 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
         }
         setSearchProgressSeconds(null)
       }
-      const searchResult = await (import.meta.env.DEV ? searchAPI.search(user_id, 10) : searchAPI.search(user_id, 10, abortController.signal))
+      const searchResult = await (import.meta.env.DEV
+        ? searchAPI.search(user_id, 10, searchId)
+        : searchAPI.search(user_id, 10, searchId, abortController.signal))
       setIsSearching(false)
       setSearchProgressSeconds(null)
       setMessages(prev => {
@@ -148,6 +154,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       }
     } finally {
       searchAbortControllerRef.current = null
+      searchIdRef.current = null
     }
   }, [onSearchComplete, profile?.language])
 
@@ -238,12 +245,16 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch])
 
   const cancelSearch = useCallback(() => {
+    const currentSearchId = searchIdRef.current
     if (searchAbortControllerRef.current) {
       searchAbortControllerRef.current.abort()
       searchAbortControllerRef.current = null
     }
     setIsSearching(false)
     setSearchProgressSeconds(null)
+    if (currentSearchId) {
+      ;(searchAPI as any).cancel(currentSearchId).catch(() => {})
+    }
   }, [])
 
   const clearMessages = useCallback(() => {

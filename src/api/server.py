@@ -328,6 +328,10 @@ class SearchRequest(BaseModel):
     limit: Optional[int] = 10
 
 
+class SearchCancelRequest(BaseModel):
+    search_id: str
+
+
 _conversation_handlers: Dict[str, ConversationHandler] = {}
 _session_to_handler: Dict[str, str] = {}
 _match_scorer: Optional[MatchScorer] = None
@@ -694,6 +698,16 @@ async def search_repos(request: SearchRequest = Body(...)):
         }
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search/cancel")
+async def cancel_search(request: SearchCancelRequest = Body(...)):
+    try:
+        logger.info(f"Received search cancel request for search_id={request.search_id}")
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Search cancel error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

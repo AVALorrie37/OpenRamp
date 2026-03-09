@@ -175,11 +175,15 @@ export const mockMatchAPI = {
 }
 
 export const mockSearchAPI = {
-  search: async (_user_id: string, limit?: number): Promise<ReposResponse> => {
+  search: async (_user_id: string, limit?: number, _search_id?: string, _signal?: AbortSignal): Promise<ReposResponse> => {
     await new Promise(resolve => setTimeout(resolve, 1500))
     return {
       mode: 'online',
       repos: MOCK_REPOS.repos.slice(0, limit || 10)
     }
+  },
+  cancel: async (_search_id: string): Promise<{ status: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    return { status: 'ok' }
   }
 }

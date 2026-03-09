@@ -121,16 +121,23 @@ export const matchAPI = USE_MOCK ? mockMatchAPI : {
   }
 }
 
-export const searchAPI = USE_MOCK ? mockSearchAPI : {
-  search: async (user_id: string, limit?: number, signal?: AbortSignal): Promise<ReposResponse> => {
-    const response = await api.post('/api/search', { user_id, limit }, { signal })
-    return response.data
-  },
-  cancel: async (search_id: string): Promise<{ status: string }> => {
-    const response = await api.post('/api/search/cancel', { search_id })
-    return response.data
-  }
+type SearchAPIType = {
+  search: (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal) => Promise<ReposResponse>
+  cancel: (search_id: string) => Promise<{ status: string }>
 }
+
+export const searchAPI: SearchAPIType = USE_MOCK
+  ? (mockSearchAPI as SearchAPIType)
+  : {
+      search: async (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal): Promise<ReposResponse> => {
+        const response = await api.post('/api/search', { user_id, limit, search_id }, { signal })
+        return response.data
+      },
+      cancel: async (search_id: string): Promise<{ status: string }> => {
+        const response = await api.post('/api/search/cancel', { search_id })
+        return response.data
+      }
+    }
 
 export const intentAPI = {
   queryStatus: async (user_id: string) => {
