@@ -759,7 +759,6 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
         repo_ids = [r for r in repo_ids if r]
         if not repo_ids:
             raise HTTPException(status_code=400, detail="No valid repo ids")
-        loader = get_offline_loader()
         offline = load_offline_repos()
         enriched = []
         offline_map = {r["repo_id"]: r for r in offline}
@@ -773,9 +772,24 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
                 unified = convert_online_to_unified(online_data, rid)
                 enriched.append(unified)
             except Exception as e:
-                logger.warning(f"bulk_enrich failed for {rid}: {e}")
-        if not enriched:
-            raise HTTPException(status_code=404, detail="No repos enriched")
+                logger.warning(f"bulk_enrich failed for {rid}, using zero scores: {e}")
+                parts = rid.split("/")
+                repo_name = parts[1] if len(parts) == 2 else rid
+                placeholder = {
+                    "repo_id": rid,
+                    "name": repo_name,
+                    "description": "仓库信息补全中（暂无 OpenDigger 数据）",
+                    "languages": ["unknown"],
+                    "active_score": 0.0,
+                    "influence_score": 0.0,
+                    "demand_score": 0.0,
+                    "composite_score": 0.0,
+                    "raw_metrics": {"note": "no OpenDigger data"}
+                }
+                enriched.append(placeholder)
+                if rid not in offline_map:
+                    offline.append(placeholder)
+                    offline_map[rid] = placeholder
         return {
             "mode": "mixed",
             "repos": enriched,

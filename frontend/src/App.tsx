@@ -143,7 +143,20 @@ const App: React.FC = () => {
       )
       if (enriched && enriched.repos && enriched.repos.length > 0) {
         fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
-        setToast(uiLanguage === 'english' ? 'Added favorites to list' : '已将收藏项目加入列表，信息补全中')
+        const hasZeroScores = enriched.repos.some((r: any) =>
+          (r.active_score === 0 || r.active_score === 0.0) &&
+          (r.influence_score === 0 || r.influence_score === 0.0) &&
+          (r.demand_score === 0 || r.demand_score === 0.0) &&
+          (r.composite_score === 0 || r.composite_score === 0.0)
+        )
+        if (hasZeroScores) {
+          setToast(uiLanguage === 'english'
+            ? 'Added favorites, some repos have no OpenDigger data (scores are 0).'
+            : '已将收藏项目加入列表，其中部分仓库暂无 OpenDigger 数据（评分为 0）。'
+          )
+        } else {
+          setToast(uiLanguage === 'english' ? 'Added favorites to list' : '已将收藏项目加入列表，信息补全中')
+        }
       }
     } catch (error) {
       console.error('bulk_enrich error:', error)
