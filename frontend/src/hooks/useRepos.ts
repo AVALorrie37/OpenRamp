@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { reposAPI } from '../services/api'
+import { reposAPI, searchAPI } from '../services/api'
 import { storage } from '../utils/storage'
 import type { RepoResponse } from '../types'
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export const useRepos = (username: string | null) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
@@ -9,10 +11,12 @@ export const useRepos = (username: string | null) => {
   const [error, setError] = useState<string | null>(null)
 
   const loadPreset = useCallback(async () => {
-    const preset = storage.getPresetRepos()
-    if (preset && preset.length > 0) {
-      setRepos(preset)
-      return
+    if (USE_MOCK) {
+      const preset = storage.getPresetRepos()
+      if (preset && preset.length > 0) {
+        setRepos(preset)
+        return
+      }
     }
     setLoading(true)
     setError(null)
@@ -26,19 +30,54 @@ export const useRepos = (username: string | null) => {
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch repos')
-      setRepos([])
+      const fallback = storage.getPresetRepos()
+      setRepos(fallback && fallback.length > 0 ? fallback : [])
     } finally {
       setLoading(false)
     }
   }, [])
 
   const refreshRepos = useCallback(async () => {
-    if (username) {
-      const userRepos = storage.getUserRepos(username)
-      if (userRepos && userRepos.length > 0) {
-        setRepos(userRepos)
-        return
+    if (USE_MOCK) {
+      if (username) {
+        const userRepos = storage.getUserRepos(username)
+        if (userRepos && userRepos.length > 0) {
+          setRepos(userRepos)
+          return
+        }
       }
+      await loadPreset()
+      return
+    }
+    if (username) {
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await searchAPI.search(username, 10)
+        const list = response.repos || []
+        if (list.length > 0) {
+          storage.saveUserRepos(username, list)
+          setRepos(list)
+        } else {
+          const userRepos = storage.getUserRepos(username)
+          if (userRepos && userRepos.length > 0) {
+            setRepos(userRepos)
+          } else {
+            await loadPreset()
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch repos')
+        const userRepos = storage.getUserRepos(username)
+        if (userRepos && userRepos.length > 0) {
+          setRepos(userRepos)
+        } else {
+          await loadPreset()
+        }
+      } finally {
+        setLoading(false)
+      }
+      return
     }
     await loadPreset()
   }, [username, loadPreset])

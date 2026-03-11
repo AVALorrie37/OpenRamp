@@ -1,7 +1,8 @@
 const STORAGE_PREFIX = 'user_'
 const CHAT_MESSAGES_PREFIX = 'chat_messages_'
-const PRESET_REPOS_KEY = 'preset_repos'
-const USER_REPOS_PREFIX = 'user_repos_'
+const _reposSuffix = () => (import.meta.env.VITE_USE_MOCK === 'true' ? '_mock' : '_live')
+const _presetReposKey = () => `preset_repos${_reposSuffix()}`
+const _userReposKey = (username: string) => `user_repos_${username}${_reposSuffix()}`
 
 export const storage = {
   getUserData: (username: string): any => {
@@ -52,22 +53,20 @@ export const storage = {
   },
 
   getPresetRepos: (): any[] | null => {
-    const data = localStorage.getItem(PRESET_REPOS_KEY)
+    const data = localStorage.getItem(_presetReposKey())
     return data ? JSON.parse(data) : null
   },
 
   savePresetRepos: (repos: any[]): void => {
-    localStorage.setItem(PRESET_REPOS_KEY, JSON.stringify(repos))
+    localStorage.setItem(_presetReposKey(), JSON.stringify(repos))
   },
 
   getUserRepos: (username: string): any[] | null => {
-    const key = `${USER_REPOS_PREFIX}${username}`
-    const data = localStorage.getItem(key)
+    const data = localStorage.getItem(_userReposKey(username))
     return data ? JSON.parse(data) : null
   },
 
   saveUserRepos: (username: string, repos: any[]): void => {
-    const key = `${USER_REPOS_PREFIX}${username}`
-    localStorage.setItem(key, JSON.stringify(repos))
+    localStorage.setItem(_userReposKey(username), JSON.stringify(repos))
   }
 }
