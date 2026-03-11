@@ -141,6 +141,9 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                 fontWeight: 600
               }}>
                 {repo.name}
+                {repo.is_favorited && (
+                  <span style={{ marginLeft: '6px', fontSize: '14px' }}>⭐</span>
+                )}
               </h3>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <span style={{

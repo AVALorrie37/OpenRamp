@@ -10,6 +10,26 @@ export const useRepos = (username: string | null) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const mergeWithFavorites = useCallback((list: RepoResponse[], uname: string | null): RepoResponse[] => {
+    if (!uname) return list
+    const favorites = storage.getUserFavorites(uname) || []
+    if (!favorites || favorites.length === 0) return list
+    const map = new Map<string, RepoResponse>()
+    list.forEach((r) => {
+      map.set(r.repo_id, { ...r, is_favorited: r.is_favorited === true })
+    })
+    favorites.forEach((fav: any) => {
+      const repoId = fav.repo_id
+      if (!repoId) {
+        return
+      }
+      const existing = map.get(repoId)
+      const base: RepoResponse = existing || fav
+      map.set(repoId, { ...base, ...fav, is_favorited: true })
+    })
+    return Array.from(map.values())
+  }, [])
+
   const loadPreset = useCallback(async () => {
     if (USE_MOCK) {
       const preset = storage.getPresetRepos()
@@ -55,13 +75,14 @@ export const useRepos = (username: string | null) => {
       try {
         const response = await searchAPI.search(username, 10)
         const list = response.repos || []
-        if (list.length > 0) {
-          storage.saveUserRepos(username, list)
-          setRepos(list)
+        const merged = mergeWithFavorites(list, username)
+        if (merged.length > 0) {
+          storage.saveUserRepos(username, merged)
+          setRepos(merged)
         } else {
           const userRepos = storage.getUserRepos(username)
           if (userRepos && userRepos.length > 0) {
-            setRepos(userRepos)
+            setRepos(mergeWithFavorites(userRepos, username))
           } else {
             await loadPreset()
           }
@@ -70,7 +91,7 @@ export const useRepos = (username: string | null) => {
         setError(err.message || 'Failed to fetch repos')
         const userRepos = storage.getUserRepos(username)
         if (userRepos && userRepos.length > 0) {
-          setRepos(userRepos)
+          setRepos(mergeWithFavorites(userRepos, username))
         } else {
           await loadPreset()
         }
@@ -92,8 +113,9 @@ export const useRepos = (username: string | null) => {
     try {
       const response = await reposAPI.get(params || { limit: 10 })
       const list = response.repos || []
-      if (params?.repo_ids && params.repo_ids.length > 0 && list.length > 0 && username) {
-        storage.saveUserRepos(username, list)
+      const merged = mergeWithFavorites(list, username)
+      if (params?.repo_ids && params.repo_ids.length > 0 && merged.length > 0 && username) {
+        storage.saveUserRepos(username, merged)
       }
       if (!params?.repo_ids && list.length > 0) {
         const preset = storage.getPresetRepos()
@@ -101,14 +123,14 @@ export const useRepos = (username: string | null) => {
           storage.savePresetRepos(list)
         }
       }
-      setRepos(list)
+      setRepos(merged)
     } catch (err: any) {
       setError(err.message || 'Failed to fetch repos')
       console.error('Fetch repos error:', err)
     } finally {
       setLoading(false)
     }
-  }, [username])
+  }, [username, mergeWithFavorites])
 
   const refreshToPreset = useCallback(() => {
     loadPreset()

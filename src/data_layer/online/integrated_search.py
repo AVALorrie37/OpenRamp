@@ -536,15 +536,15 @@ class IntegratedRepoSearch:
         # Normalize skills to lowercase
         skills = [s.lower().strip() for s in skills]
         
-        print(f"📋 User Skills: {skills}")
-        print(f"🎯 Target: {target_count} repositories with match scores\n")
+        print(f" User Skills: {skills}")
+        print(f" Target: {target_count} repositories with match scores\n")
         
         # Step 2: Generate keyword combinations
         keyword_combinations = self._generate_keyword_combinations(
             skills, min_skill_combination, max_skill_combination
         )
         
-        print(f"🔄 Generated {len(keyword_combinations)} keyword combinations")
+        print(f" Generated {len(keyword_combinations)} keyword combinations")
         for i, combo in enumerate(keyword_combinations[:5], 1):
             print(f"   {i}. {combo}")
         if len(keyword_combinations) > 5:
@@ -558,8 +558,8 @@ class IntegratedRepoSearch:
         
         for round_num, keywords in enumerate(keyword_combinations[:max_rounds], 1):
             print(f"\n--- Round {round_num}/{min(max_rounds, len(keyword_combinations))} ---")
-            print(f"🔍 Keywords: {keywords}")
-            print(f"📊 Currently have {len(all_repos)} unique repositories")
+            print(f" Keywords: {keywords}")
+            print(f" Currently have {len(all_repos)} unique repositories")
             
             # Calculate how many more repos we want to collect
             repos_needed = max(target_count * 2 - len(all_repos), 5)

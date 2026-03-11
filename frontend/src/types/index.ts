@@ -12,6 +12,7 @@ export interface RepoResponse {
     openrank?: string
     issues_new?: string
   }
+  is_favorited?: boolean
 }
 
 export interface ReposResponse {

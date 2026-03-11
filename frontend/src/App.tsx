@@ -3,8 +3,9 @@ import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
-import { searchAPI, matchAPI, reposAPI, manualSearchAPI } from './services/api'
+import { searchAPI, matchAPI, manualSearchAPI } from './services/api'
 import { theme } from './styles/theme'
+import { storage } from './utils/storage'
 
 import TechStackCloud from './components/Module1_MainCenter/TechStackCloud'
 import RepoList from './components/Module1_MainCenter/RepoList'
@@ -142,6 +143,9 @@ const App: React.FC = () => {
         }))
       )
       if (enriched && enriched.repos && enriched.repos.length > 0) {
+        if (username) {
+          storage.saveUserFavorites(username, enriched.repos)
+        }
         fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
         const hasZeroScores = enriched.repos.some((r: any) =>
           (r.active_score === 0 || r.active_score === 0.0) &&

@@ -3,6 +3,7 @@ const CHAT_MESSAGES_PREFIX = 'chat_messages_'
 const _reposSuffix = () => (import.meta.env.VITE_USE_MOCK === 'true' ? '_mock' : '_live')
 const _presetReposKey = () => `preset_repos${_reposSuffix()}`
 const _userReposKey = (username: string) => `user_repos_${username}${_reposSuffix()}`
+const _userFavoritesKey = (username: string) => `user_repos_${username}_favorites${_reposSuffix()}`
 
 export const storage = {
   getUserData: (username: string): any => {
@@ -68,5 +69,14 @@ export const storage = {
 
   saveUserRepos: (username: string, repos: any[]): void => {
     localStorage.setItem(_userReposKey(username), JSON.stringify(repos))
+  },
+
+  getUserFavorites: (username: string): any[] | null => {
+    const data = localStorage.getItem(_userFavoritesKey(username))
+    return data ? JSON.parse(data) : null
+  },
+
+  saveUserFavorites: (username: string, repos: any[]): void => {
+    localStorage.setItem(_userFavoritesKey(username), JSON.stringify(repos))
   }
 }
