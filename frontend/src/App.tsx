@@ -11,6 +11,7 @@ import RepoList from './components/Module1_MainCenter/RepoList'
 import OpenRankChart from './components/Module1_MainCenter/OpenRankChart'
 import KeywordCloud from './components/Module1_MainCenter/KeywordCloud'
 import RadarPlaceholder from './components/Module1_MainCenter/RadarPlaceholder'
+import ManualSearchModal from './components/Module6_ManualSearch/ManualSearchModal'
 import UserDropdown from './components/Module2_UserSystem/UserDropdown'
 import LoginModal from './components/Module2_UserSystem/LoginModal'
 import AIButton from './components/Module3_AIAssistant/AIButton'
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
+  const [showManualSearch, setShowManualSearch] = useState(false)
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -127,6 +129,31 @@ const App: React.FC = () => {
     }
   }
 
+  const handleManualSearchClose = (favorited: { repo_id: string; full_name: string }[]) => {
+    setShowManualSearch(false)
+    if (!favorited || favorited.length === 0) {
+      return
+    }
+    const payload = {
+      repos: favorited.map((r) => ({
+        repo_id: r.repo_id,
+        full_name: r.full_name
+      }))
+    }
+    fetch('/api/repos/bulk_enrich', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }).catch((error) => {
+      console.error('bulk_enrich error:', error)
+    })
+    if (username) {
+      fetchRepos({ repo_ids: favorited.map((r) => r.repo_id), limit: 10 })
+    }
+  }
+
   const handleTagClick = () => {
     refresh()
   }
@@ -223,7 +250,11 @@ const App: React.FC = () => {
             border: `1px solid ${theme.border}`,
             overflow: 'hidden'
           }}>
-            <RepoList repos={repos} onRepoClick={handleRepoClick} />
+            <RepoList
+              repos={repos}
+              onRepoClick={handleRepoClick}
+              onOpenManualSearch={() => setShowManualSearch(true)}
+            />
           </div>
 
           <div style={{
@@ -327,6 +358,13 @@ const App: React.FC = () => {
         isOpen={showDebug}
         logs={logs}
         onClear={clearLogs}
+      />
+
+      <ManualSearchModal
+        isOpen={showManualSearch}
+        username={username}
+        skills={profile?.skills || []}
+        onClose={handleManualSearchClose}
       />
 
       {toast && (

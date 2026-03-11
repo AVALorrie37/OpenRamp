@@ -5,11 +5,12 @@ import type { RepoResponse } from '../../types'
 interface RepoListProps {
   repos: RepoResponse[]
   onRepoClick: (repo: RepoResponse) => void
+  onOpenManualSearch?: () => void
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch }) => {
   const [sortType, setSortType] = useState<SortType>('match')
 
   const sortedRepos = [...repos].sort((a, b) => {
@@ -30,52 +31,75 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick }) => {
     }}>
       <div style={{
         display: 'flex',
-        gap: '8px',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         padding: '12px',
         borderBottom: `1px solid ${theme.border}`
       }}>
-        <button
-          onClick={() => setSortType('match')}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: sortType === 'match' ? theme.primary : theme.background,
-            color: sortType === 'match' ? theme.white : theme.text,
-            border: `1px solid ${theme.primary}`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
-        >
-          匹配总分
-        </button>
-        <button
-          onClick={() => setSortType('active')}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: sortType === 'active' ? theme.primary : theme.background,
-            color: sortType === 'active' ? theme.white : theme.text,
-            border: `1px solid ${theme.primary}`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
-        >
-          活跃度
-        </button>
-        <button
-          onClick={() => setSortType('friendly')}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: sortType === 'friendly' ? theme.primary : theme.background,
-            color: sortType === 'friendly' ? theme.white : theme.text,
-            border: `1px solid ${theme.primary}`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
-        >
-          新手友好度
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setSortType('match')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: sortType === 'match' ? theme.primary : theme.background,
+              color: sortType === 'match' ? theme.white : theme.text,
+              border: `1px solid ${theme.primary}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            匹配总分
+          </button>
+          <button
+            onClick={() => setSortType('active')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: sortType === 'active' ? theme.primary : theme.background,
+              color: sortType === 'active' ? theme.white : theme.text,
+              border: `1px solid ${theme.primary}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            活跃度
+          </button>
+          <button
+            onClick={() => setSortType('friendly')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: sortType === 'friendly' ? theme.primary : theme.background,
+              color: sortType === 'friendly' ? theme.white : theme.text,
+              border: `1px solid ${theme.primary}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            新手友好度
+          </button>
+        </div>
+        {onOpenManualSearch && (
+          <button
+            onClick={onOpenManualSearch}
+            style={{
+              marginLeft: 'auto',
+              padding: '6px 10px',
+              borderRadius: '999px',
+              border: `1px solid ${theme.primary}`,
+              backgroundColor: theme.white,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '12px',
+              color: theme.primary
+            }}
+          >
+            <span>🔍</span>
+          </button>
+        )}
       </div>
       <div style={{
         flex: 1,
