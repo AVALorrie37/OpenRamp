@@ -510,7 +510,7 @@ class IntegratedRepoSearch:
             IntegratedSearchResult 包含按匹配度排序的仓库列表
         """
         print(f"\n{'='*70}")
-        print(f"🔍 Multi-Round Profile-Based Search with Match Scoring")
+        print(f" Multi-Round Profile-Based Search with Match Scoring")
         print(f"{'='*70}\n")
         
         # Step 1: Load user profile
