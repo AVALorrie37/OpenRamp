@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { theme } from '../../styles/theme'
+import { manualSearchAPI } from '../../services/api'
 
 interface ManualSearchRepo {
   repo_id: string
@@ -59,12 +60,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ q: query.trim() })
-      const response = await fetch(`/api/github/search_repos?${params.toString()}`)
-      if (!response.ok) {
-        throw new Error('Search failed')
-      }
-      const data = await response.json()
+      const data = await manualSearchAPI.searchGithub(query.trim())
       const repos: ManualSearchRepo[] = (data.items || []).map((item: any) => ({
         repo_id: item.full_name,
         full_name: item.full_name,

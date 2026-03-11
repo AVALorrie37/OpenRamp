@@ -3,7 +3,7 @@ import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
-import { searchAPI, matchAPI } from './services/api'
+import { searchAPI, matchAPI, reposAPI, manualSearchAPI } from './services/api'
 import { theme } from './styles/theme'
 
 import TechStackCloud from './components/Module1_MainCenter/TechStackCloud'
@@ -129,28 +129,24 @@ const App: React.FC = () => {
     }
   }
 
-  const handleManualSearchClose = (favorited: { repo_id: string; full_name: string }[]) => {
+  const handleManualSearchClose = async (favorited: { repo_id: string; full_name: string }[]) => {
     setShowManualSearch(false)
     if (!favorited || favorited.length === 0) {
       return
     }
-    const payload = {
-      repos: favorited.map((r) => ({
-        repo_id: r.repo_id,
-        full_name: r.full_name
-      }))
-    }
-    fetch('/api/repos/bulk_enrich', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    }).catch((error) => {
+    try {
+      const enriched = await manualSearchAPI.bulkEnrich(
+        favorited.map((r) => ({
+          repo_id: r.repo_id,
+          full_name: r.full_name
+        }))
+      )
+      if (enriched && enriched.repos && enriched.repos.length > 0) {
+        fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
+        setToast(uiLanguage === 'english' ? 'Added favorites to list' : '已将收藏项目加入列表，信息补全中')
+      }
+    } catch (error) {
       console.error('bulk_enrich error:', error)
-    })
-    if (username) {
-      fetchRepos({ repo_ids: favorited.map((r) => r.repo_id), limit: 10 })
     }
   }
 

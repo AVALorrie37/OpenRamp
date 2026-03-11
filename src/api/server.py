@@ -29,6 +29,7 @@ from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
 from src.data_layer.online.integrated_search import IntegratedRepoSearch
 from typing import Optional
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -336,6 +337,7 @@ _conversation_handlers: Dict[str, ConversationHandler] = {}
 _session_to_handler: Dict[str, str] = {}
 _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
+_http_client: Optional[httpx.AsyncClient] = None
 
 
 def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
@@ -392,6 +394,13 @@ def get_integrated_search() -> IntegratedRepoSearch:
     if _integrated_search is None:
         _integrated_search = IntegratedRepoSearch()
     return _integrated_search
+
+
+def get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=10.0)
+    return _http_client
 
 
 @app.post("/api/chat")
@@ -709,6 +718,73 @@ async def cancel_search(request: SearchCancelRequest = Body(...)):
     except Exception as e:
         logger.error(f"Search cancel error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class GithubSearchRequest(BaseModel):
+    query: str
+    per_page: Optional[int] = 20
+    page: Optional[int] = 1
+
+
+class BulkEnrichRequest(BaseModel):
+    repos: List[Dict[str, str]]
+
+
+@app.get("/api/github/search_repos")
+async def github_search_repos(
+    q: str = Query(..., description="GitHub search query"),
+    per_page: int = Query(20, ge=1, le=50),
+    page: int = Query(1, ge=1, le=10),
+):
+    try:
+        client = get_http_client()
+        params = {"q": q, "per_page": per_page, "page": page}
+        headers = {"Accept": "application/vnd.github+json"}
+        resp = await client.get("https://api.github.com/search/repositories", params=params, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        return data
+    except httpx.HTTPError as e:
+        logger.error(f"GitHub search error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="GitHub search failed")
+    except Exception as e:
+        logger.error(f"GitHub search unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/api/repos/bulk_enrich")
+async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
+    try:
+        repo_ids = [r.get("repo_id") or r.get("full_name") for r in request.repos]
+        repo_ids = [r for r in repo_ids if r]
+        if not repo_ids:
+            raise HTTPException(status_code=400, detail="No valid repo ids")
+        loader = get_offline_loader()
+        offline = load_offline_repos()
+        enriched = []
+        offline_map = {r["repo_id"]: r for r in offline}
+        for rid in repo_ids:
+            if rid in offline_map:
+                enriched.append(offline_map[rid])
+                continue
+            try:
+                client = get_online_client()
+                online_data = client.get_activity_data(rid)
+                unified = convert_online_to_unified(online_data, rid)
+                enriched.append(unified)
+            except Exception as e:
+                logger.warning(f"bulk_enrich failed for {rid}: {e}")
+        if not enriched:
+            raise HTTPException(status_code=404, detail="No repos enriched")
+        return {
+            "mode": "mixed",
+            "repos": enriched,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"bulk_enrich error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/api/logs/stream")

@@ -3,9 +3,9 @@
     "name": "openramp",
     "version": "1.0.0",
     "scripts": {
-        "dev-all": "concurrently -n \"Ollama,Backend,Frontend\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\"",
+        "dev-all": "cross-env VITE_USE_MOCK=false concurrently -n \"Ollama,Backend,Frontend\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\"",
         
-        "dev": "concurrently -n \"Backend,Frontend\" -c \"bgBlue.bold,bgGreen.bold\" \"npm run backend\" \"npm run frontend:dev\"",
+        "dev": "cross-env VITE_USE_MOCK=false concurrently -n \"Backend,Frontend\" -c \"bgBlue.bold,bgGreen.bold\" \"npm run backend\" \"npm run frontend:dev\"",
 
         "mock": "cross-env VITE_USE_MOCK=true npm --prefix frontend run dev",
 

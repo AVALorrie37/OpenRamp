@@ -9,6 +9,7 @@ python-dotenv>=1.0.0
 
 # 可选依赖（用于在线模式）
 requests>=2.31.0
+httpx>=0.27.0
 
 # 前端依赖（可选）
 streamlit>=1.28.0

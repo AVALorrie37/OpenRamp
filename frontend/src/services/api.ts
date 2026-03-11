@@ -24,6 +24,19 @@ export const reposAPI = USE_MOCK ? mockReposAPI : {
   }
 }
 
+export const manualSearchAPI = {
+  searchGithub: async (query: string, per_page: number = 20, page: number = 1) => {
+    const response = await api.get('/api/github/search_repos', {
+      params: { q: query, per_page, page }
+    })
+    return response.data
+  },
+  bulkEnrich: async (repos: { repo_id: string; full_name: string }[]) => {
+    const response = await api.post('/api/repos/bulk_enrich', { repos })
+    return response.data as ReposResponse
+  }
+}
+
 type ChatGreetingResponse = { greeting: string; session_id: string; language: string }
 
 export const chatAPI: typeof mockChatAPI | {
