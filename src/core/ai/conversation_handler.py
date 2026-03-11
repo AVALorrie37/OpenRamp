@@ -201,7 +201,20 @@ class ConversationHandler:
                     temperature=0.3
                 )
             except Exception:
-                ai_response = self._get_fallback_reply(user_input, user_language)
+                cached = self._load_profile_from_cache()
+                if cached:
+                    skills = cached.get('skills', [])
+                    styles = cached.get('contribution_styles', [])
+                    if user_language == 'chinese':
+                        skills_txt = '、'.join(skills) if skills else '暂无'
+                        styles_txt = '、'.join(styles) if styles else '暂无'
+                        ai_response = f"根据你之前的画像信息（技能：{skills_txt}；贡献偏好：{styles_txt}），我暂时无法连接到 AI 服务，但仍然可以基于这些信息给你一些方向建议。"
+                    else:
+                        skills_txt = ', '.join(skills) if skills else 'none'
+                        styles_txt = ', '.join(styles) if styles else 'none'
+                        ai_response = f"Based on your previous profile (skills: {skills_txt}; contribution preferences: {styles_txt}), I cannot reach the AI service right now but can still suggest directions using this information."
+                else:
+                    ai_response = self._get_fallback_reply(user_input, user_language)
 
             reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
             self.conversation_history.append({'role': 'assistant', 'content': reply})
@@ -234,7 +247,20 @@ class ConversationHandler:
                     temperature=0.3
                 )
             except Exception:
-                ai_response = self._get_fallback_reply(user_input, user_language)
+                cached = self._load_profile_from_cache()
+                if cached:
+                    skills = cached.get('skills', [])
+                    styles = cached.get('contribution_styles', [])
+                    if user_language == 'chinese':
+                        skills_txt = '、'.join(skills) if skills else '暂无'
+                        styles_txt = '、'.join(styles) if styles else '暂无'
+                        ai_response = f"根据你之前的画像信息（技能：{skills_txt}；贡献偏好：{styles_txt}），我暂时无法连接到 AI 服务，但仍然可以基于这些信息回答你的问题。"
+                    else:
+                        skills_txt = ', '.join(skills) if skills else 'none'
+                        styles_txt = ', '.join(styles) if styles else 'none'
+                        ai_response = f"Based on your previous profile (skills: {skills_txt}; contribution preferences: {styles_txt}), I cannot reach the AI service right now but can still answer using this information."
+                else:
+                    ai_response = self._get_fallback_reply(user_input, user_language)
             reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
             self.conversation_history.append({'role': 'assistant', 'content': reply})
             action_data.update({

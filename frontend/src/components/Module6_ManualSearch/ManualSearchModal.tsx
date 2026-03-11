@@ -104,9 +104,9 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
     setLoading(true)
     setError(null)
     try {
-      const data = await manualSearchAPI.searchGithub(finalQuery, perPage, nextPage)
-      setTotalCount(typeof data.total_count === 'number' ? data.total_count : 0)
-      const repos: ManualSearchRepo[] = (data.items || []).map((item: any) => ({
+      const data: any = await manualSearchAPI.searchGithub(finalQuery, perPage, nextPage)
+      setTotalCount(typeof (data as any).total_count === 'number' ? (data as any).total_count : 0)
+      const repos: ManualSearchRepo[] = ((data as any).items || []).map((item: any) => ({
         repo_id: item.full_name,
         full_name: item.full_name,
         html_url: item.html_url,
@@ -119,8 +119,35 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
         }
       }))
       setResults(repos)
+      try {
+        window.localStorage.setItem(
+          'manual_search_last_results',
+          JSON.stringify({
+            query: finalQuery,
+            items: repos
+          })
+        )
+      } catch {
+      }
     } catch (e: any) {
-      setError(e?.message || 'Search error')
+      let fallbackUsed = false
+      try {
+        const cachedRaw = window.localStorage.getItem('manual_search_last_results')
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw) as { query: string; items: ManualSearchRepo[] }
+          if (cached.items && cached.items.length > 0) {
+            setResults(cached.items)
+            setTotalCount(cached.items.length)
+            fallbackUsed = true
+          }
+        }
+      } catch {
+      }
+      if (!fallbackUsed) {
+        setError(e?.message || 'Search error')
+      } else {
+        setError('当前网络不可用，已展示最近一次搜索结果（离线缓存）。')
+      }
     } finally {
       setLoading(false)
     }

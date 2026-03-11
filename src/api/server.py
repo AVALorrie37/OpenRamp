@@ -186,59 +186,61 @@ async def startup_event():
 
 @app.get("/api/repos", response_model=ReposResponse)
 async def get_repos(
-    mode: str = Query("offline", description="数据源模式: online 或 offline"),
+    mode: str = Query("online", description="数据源模式: online 或 offline"),
     repo_ids: Optional[List[str]] = Query(None, description="仓库ID列表"),
     limit: int = Query(20, description="返回数量上限", ge=1, le=1000),
 ):
     """
     获取仓库数据列表。
-
-    - **mode**: 数据源模式，`offline`（默认）或 `online`
-    - **repo_ids**: 可选的仓库ID列表，如果提供则只返回这些仓库
-    - **limit**: 返回数量上限（默认20，最大1000）
     """
+    source = "offline"
     try:
         if mode == "online":
-            # 在线模式
             if not repo_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail="在线模式必须提供 repo_ids 参数",
-                )
-
-            client = get_online_client()
-            repos = []
-            for repo_id in repo_ids:
-                try:
-                    online_data = client.get_activity_data(repo_id)
-                    unified_data = convert_online_to_unified(online_data, repo_id)
-                    repos.append(unified_data)
-                except Exception as e:
-                    logger.warning(f"获取仓库 {repo_id} 在线数据失败: {e}")
-                    # 尝试使用离线缓存作为降级
-                    offline_repos = load_offline_repos()
-                    for offline_repo in offline_repos:
-                        if offline_repo["repo_id"] == repo_id:
-                            repos.append(offline_repo)
-                            break
-                    else:
-                        logger.error(f"仓库 {repo_id} 在线和离线数据都不可用")
-
+                offline_repos = load_offline_repos()
+                if not offline_repos:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="在线模式必须提供 repo_ids 参数，且当前无离线数据可用",
+                    )
+                repos = offline_repos
+                source = "offline"
+            else:
+                client = get_online_client()
+                repos = []
+                offline_repos = load_offline_repos()
+                offline_map = {r["repo_id"]: r for r in offline_repos}
+                for repo_id in repo_ids:
+                    used_offline = False
+                    try:
+                        online_data = client.get_activity_data(repo_id)
+                        unified_data = convert_online_to_unified(online_data, repo_id)
+                        unified_data["source"] = "opendigger_online"
+                        repos.append(unified_data)
+                    except Exception as e:
+                        logger.warning(f"获取仓库 {repo_id} 在线数据失败: {e}")
+                        offline_repo = offline_map.get(repo_id)
+                        if offline_repo:
+                            repo_copy = dict(offline_repo)
+                            repo_copy["source"] = "offline_dataset"
+                            repos.append(repo_copy)
+                            used_offline = True
+                        else:
+                            logger.error(f"仓库 {repo_id} 在线和离线数据都不可用")
+                    if not used_offline:
+                        source = "online"
+                if any(r.get("source") == "offline_dataset" for r in repos):
+                    mode = "online_with_offline_fallback"
         else:
-            # 离线模式
             all_repos = load_offline_repos()
-
             if not all_repos:
                 raise HTTPException(
                     status_code=503,
                     detail="离线数据未挂载，请检查 top_300_metrics 目录",
                 )
-
             if repo_ids:
-                # 过滤指定的仓库
                 repo_id_set = set(repo_ids)
                 repos = [r for r in all_repos if r["repo_id"] in repo_id_set]
-                # 检查是否有无效的 repo_id
                 found_ids = {r["repo_id"] for r in repos}
                 missing_ids = repo_id_set - found_ids
                 if missing_ids:
@@ -248,18 +250,15 @@ async def get_repos(
                     )
             else:
                 repos = all_repos
-
-        # 按综合分数排序
+            repos = [dict(r, source="offline_dataset") for r in repos]
+            source = "offline_dataset"
         repos.sort(key=lambda x: x["composite_score"], reverse=True)
-
-        # 限制数量
         repos = repos[:limit]
-
         return {
             "mode": mode,
+            "source": source,
             "repos": repos,
         }
-
     except HTTPException:
         raise
     except Exception as e:
@@ -287,6 +286,8 @@ async def chat_greeting(request: 'GreetingRequest' = Body(...)):
             "greeting": greeting,
             "session_id": session_id,
             "language": handler.user_language,
+            "mode": "online",
+            "source": "ollama_online",
         }
     except Exception as e:
         logger.error(f"Greeting error: {e}", exc_info=True)
@@ -446,6 +447,8 @@ async def chat(request: ChatRequest = Body(...)):
             "confirmed": confirmed,
             "profile_updated": profile_updated,
             "session_id": session_id,
+            "mode": "online",
+            "source": "ollama_online",
             "auto_search": auto_search,
             "profile": {
                 "skills": skills,
@@ -679,31 +682,83 @@ async def search_repos(request: SearchRequest = Body(...)):
             user_id=request.user_id,
             target_count=request.limit or 10
         )
-        
-        if not result.is_sufficient:
-            return {
-                "mode": "online",
-                "repos": [],
-                "message": result.message
-            }
-        
+        mode = "online"
+        fallback_used = False
         repos = []
-        for repo_result in result.repositories:
-            repos.append({
-                "repo_id": repo_result.repo_id,
-                "name": repo_result.repo_id.split("/")[-1],
-                "description": repo_result.description or "No description",
-                "languages": repo_result.languages,
-                "active_score": repo_result.active_score,
-                "influence_score": repo_result.influence_score,
-                "demand_score": repo_result.demand_score,
-                "composite_score": repo_result.composite_score,
-                "raw_metrics": None
-            })
-        
+        if not result.is_sufficient or not result.repositories:
+            offline_repos = load_offline_repos()
+            if offline_repos:
+                handler, _ = get_conversation_handler(request.user_id)
+                profile = handler.get_current_profile()
+                scorer = get_match_scorer()
+                user_profile = UserProfile.from_dict(
+                    {
+                        "skills": profile.get("skills", []),
+                        "contribution_style": profile.get("contribution_styles", [None])[0],
+                        "experience_level": "intermediate",
+                    }
+                )
+                scored = []
+                for r in offline_repos:
+                    repo_data = RepoData(
+                        keywords=r.get("languages", []) + (r.get("description") or "").split(),
+                        active_days_last_30=30,
+                        issues_new_last_30=int(r.get("demand_score", 0) * 50),
+                        openrank=r.get("influence_score", 0) * 50,
+                        name=r.get("name"),
+                        full_name=r.get("repo_id"),
+                    )
+                    match = scorer.calculate(user_profile, repo_data)
+                    scored.append((r, match.match_score))
+                scored.sort(key=lambda x: x[1], reverse=True)
+                limit = request.limit or 10
+                for repo_dict, score in scored[:limit]:
+                    repo_copy = dict(repo_dict)
+                    repo_copy["source"] = "offline_dataset"
+                    repos.append(
+                        {
+                            "repo_id": repo_copy["repo_id"],
+                            "name": repo_copy["name"],
+                            "description": repo_copy.get("description") or "No description",
+                            "languages": repo_copy.get("languages") or [],
+                            "active_score": repo_copy.get("active_score", 0.0),
+                            "influence_score": repo_copy.get("influence_score", 0.0),
+                            "demand_score": repo_copy.get("demand_score", 0.0),
+                            "composite_score": repo_copy.get("composite_score", 0.0),
+                            "raw_metrics": None,
+                            "match_score": score,
+                            "source": repo_copy.get("source", "offline_dataset"),
+                        }
+                    )
+                mode = "online_with_offline_fallback"
+                fallback_used = True
+                message = result.message or "Using offline dataset as fallback."
+            else:
+                message = result.message or "No offline dataset available."
+        else:
+            for repo_result in result.repositories:
+                repos.append(
+                    {
+                        "repo_id": repo_result.repo_id,
+                        "name": repo_result.repo_id.split("/")[-1],
+                        "description": repo_result.description or "No description",
+                        "languages": repo_result.languages,
+                        "active_score": repo_result.active_score,
+                        "influence_score": repo_result.influence_score,
+                        "demand_score": repo_result.demand_score,
+                        "composite_score": repo_result.composite_score,
+                        "raw_metrics": None,
+                        "match_score": repo_result.match_score,
+                        "source": "github_opendigger_online",
+                    }
+                )
+            message = result.message
         return {
-            "mode": "online",
-            "repos": repos
+            "mode": mode,
+            "source": "github_opendigger_online" if not fallback_used else "offline_dataset",
+            "fallback_used": fallback_used,
+            "message": message,
+            "repos": repos,
         }
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
@@ -743,10 +798,15 @@ async def github_search_repos(
         resp = await client.get("https://api.github.com/search/repositories", params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
+        data["mode"] = "online"
+        data["source"] = "github_online"
         return data
+    except httpx.HTTPStatusError as e:
+        logger.error(f"GitHub search HTTP error: {e}", exc_info=True)
+        raise HTTPException(status_code=e.response.status_code, detail="GitHub search failed")
     except httpx.HTTPError as e:
-        logger.error(f"GitHub search error: {e}", exc_info=True)
-        raise HTTPException(status_code=502, detail="GitHub search failed")
+        logger.error(f"GitHub search network error: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="GitHub search unavailable")
     except Exception as e:
         logger.error(f"GitHub search unexpected error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")

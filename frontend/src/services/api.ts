@@ -1,5 +1,5 @@
 
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 import type { ReposResponse, ChatResponse, UserProfile, MatchResult } from '../types'
 import { 
   mockReposAPI, 
@@ -17,23 +17,47 @@ const api = axios.create({
   timeout: 30000
 })
 
-export const reposAPI = USE_MOCK ? mockReposAPI : {
-  get: async (params?: { mode?: string; repo_ids?: string[]; limit?: number }): Promise<ReposResponse> => {
-    const response = await api.get('/api/repos', { params })
+const isNetworkError = (error: unknown): error is AxiosError => {
+  return axios.isAxiosError(error) && (!!error.code || error.message === 'Network Error')
+}
+
+const unwrap = async <T>(promise: Promise<{ data: T }>): Promise<T> => {
+  try {
+    const response = await promise
     return response.data
+  } catch (err) {
+    if (isNetworkError(err) || (axios.isAxiosError(err) && !err.response)) {
+      const e = new Error('NETWORK_UNAVAILABLE')
+      ;(e as any).code = 'NETWORK_UNAVAILABLE'
+      throw e
+    }
+    if (axios.isAxiosError(err) && err.response) {
+      const e = new Error((err.response.data as any)?.detail || err.message)
+      ;(e as any).status = err.response.status
+      throw e
+    }
+    throw err
   }
 }
 
+export const reposAPI = USE_MOCK
+  ? mockReposAPI
+  : {
+      get: async (params?: { mode?: string; repo_ids?: string[]; limit?: number }): Promise<ReposResponse> => {
+        return unwrap(api.get('/api/repos', { params }))
+      }
+    }
+
 export const manualSearchAPI = {
   searchGithub: async (query: string, per_page: number = 20, page: number = 1) => {
-    const response = await api.get('/api/github/search_repos', {
-      params: { q: query, per_page, page }
-    })
-    return response.data
+    return unwrap(
+      api.get('/api/github/search_repos', {
+        params: { q: query, per_page, page }
+      })
+    )
   },
   bulkEnrich: async (repos: { repo_id: string; full_name: string }[]) => {
-    const response = await api.post('/api/repos/bulk_enrich', { repos })
-    return response.data as ReposResponse
+    return unwrap(api.post<ReposResponse>('/api/repos/bulk_enrich', { repos }))
   }
 }
 
@@ -114,23 +138,19 @@ export const chatAPI: typeof mockChatAPI | {
 
 export const profileAPI = USE_MOCK ? mockProfileAPI : {
   confirm: async (user_id: string): Promise<{ profile: any; skills: string[] }> => {
-    const response = await api.post('/api/profile/confirm', { user_id })
-    return response.data
+    return unwrap(api.post('/api/profile/confirm', { user_id }))
   },
   get: async (user_id: string): Promise<UserProfile> => {
-    const response = await api.get(`/api/profile/${user_id}`)
-    return response.data
+    return unwrap(api.get(`/api/profile/${user_id}`))
   },
   sync: async (user_id: string, skills: string[], preferences: string[], language?: string): Promise<{ status: string; message: string }> => {
-    const response = await api.post('/api/profile/sync', { user_id, skills, preferences, language })
-    return response.data
+    return unwrap(api.post('/api/profile/sync', { user_id, skills, preferences, language }))
   }
 }
 
 export const matchAPI = USE_MOCK ? mockMatchAPI : {
   calculate: async (user_id: string, repo_id: string): Promise<MatchResult> => {
-    const response = await api.post('/api/match', { user_id, repo_id })
-    return response.data
+    return unwrap(api.post('/api/match', { user_id, repo_id }))
   }
 }
 
@@ -143,12 +163,10 @@ export const searchAPI: SearchAPIType = USE_MOCK
   ? (mockSearchAPI as SearchAPIType)
   : {
       search: async (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal): Promise<ReposResponse> => {
-        const response = await api.post('/api/search', { user_id, limit, search_id }, { signal })
-        return response.data
+        return unwrap(api.post('/api/search', { user_id, limit, search_id }, { signal }))
       },
       cancel: async (search_id: string): Promise<{ status: string }> => {
-        const response = await api.post('/api/search/cancel', { search_id })
-        return response.data
+        return unwrap(api.post('/api/search/cancel', { search_id }))
       }
     }
 
