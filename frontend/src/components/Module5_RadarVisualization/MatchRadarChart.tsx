@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import React, { useState, useEffect, type FC } from 'react'
 import {
   Radar,
   RadarChart,
@@ -7,6 +7,8 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer
 } from 'recharts'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import { theme } from '../../styles/theme'
 import Modal from '../shared/Modal'
 
@@ -21,15 +23,42 @@ interface MatchRadarChartProps {
     matchScore: number
   } | null
   embedded?: boolean
+  baseWeights?: {
+    w_skill: number
+    w_activity: number
+    w_demand: number
+  }
+  dynamicWeights?: {
+    w_skill: number
+    w_activity: number
+    w_demand: number
+    c_data: number
+  }
+  onBaseWeightsChange?: (next: { w_skill: number; w_activity: number; w_demand: number }) => void
 }
 
 const MatchRadarChart: FC<MatchRadarChartProps> = ({ 
   isOpen, 
   onClose, 
   matchData, 
-  embedded = false 
+  embedded = false,
+  baseWeights,
+  dynamicWeights,
+  onBaseWeightsChange
 }) => {
   if (!matchData) return null
+
+  const defaultBase = {
+    w_skill: 0.5,
+    w_activity: 0.3,
+    w_demand: 0.2
+  }
+
+  const [localWeights, setLocalWeights] = useState(baseWeights || defaultBase)
+
+  useEffect(() => {
+    setLocalWeights(baseWeights || defaultBase)
+  }, [baseWeights?.w_skill, baseWeights?.w_activity, baseWeights?.w_demand])
 
   const data = [
     {
@@ -48,6 +77,54 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
       fullMark: 100
     }
   ]
+
+  const effectiveWeights = dynamicWeights || baseWeights || defaultBase
+
+  const applyWeights = (next: { w_skill: number; w_activity: number; w_demand: number }) => {
+    if (!onBaseWeightsChange) return
+    const sum = next.w_skill + next.w_activity + next.w_demand
+    if (sum <= 0) return
+    onBaseWeightsChange({
+      w_skill: next.w_skill / sum,
+      w_activity: next.w_activity / sum,
+      w_demand: next.w_demand / sum
+    })
+  }
+
+  const handleInputChange = (key: 'w_skill' | 'w_activity' | 'w_demand', raw: string) => {
+    const value = parseFloat(raw)
+    if (Number.isNaN(value)) {
+      setLocalWeights(prev => ({ ...prev, [key]: 0 }))
+      return
+    }
+    const clamped = Math.min(1, Math.max(0, value))
+    setLocalWeights(prev => ({ ...prev, [key]: clamped }))
+  }
+
+  const handleInputKeyDown = (key: 'w_skill' | 'w_activity' | 'w_demand', e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      applyWeights(localWeights)
+    } else if (e.key === 'Escape') {
+      setLocalWeights(defaultBase)
+      applyWeights(defaultBase)
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      const delta = e.key === 'ArrowUp' ? 0.1 : -0.1
+      setLocalWeights(prev => {
+        const next = {
+          ...prev,
+          [key]: Math.min(1, Math.max(0, parseFloat((prev[key] + delta).toFixed(1))))
+        }
+        applyWeights(next)
+        return next
+      })
+    }
+  }
+
+  const formulaHtml = katex.renderToString(
+    "\\mathrm{MatchScore} = w_1' \\cdot S_{\\mathrm{skill}} + w_2' \\cdot S_{\\mathrm{activity}} + w_3' \\cdot S_{\\mathrm{demand}}",
+    { displayMode: false, throwOnError: false }
+  )
 
   const chartContent = (
     <div style={{
@@ -97,24 +174,73 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         </ResponsiveContainer>
       </div>
       <div style={{
-        marginTop: '30px',
+        marginTop: '24px',
+        width: '100%',
         display: 'flex',
-        gap: '40px',
-        fontSize: '14px',
+        flexDirection: 'column',
+        gap: '12px',
+        fontSize: '13px',
         color: theme.text
       }}>
-        <div>
-          <span style={{ fontWeight: 600 }}>技能匹配度: </span>
-          {Math.round(matchData.skill * 100)}%
+        <div
+          style={{ lineHeight: 1.4 }}
+          dangerouslySetInnerHTML={{ __html: formulaHtml }}
+        />
+
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          <div>w1' = {Math.round(effectiveWeights.w_skill * 100) / 100}</div>
+          <div>w2' = {Math.round(effectiveWeights.w_activity * 100) / 100}</div>
+          <div>w3' = {Math.round(effectiveWeights.w_demand * 100) / 100}</div>
+          {dynamicWeights && (
+            <div>C_data = {Math.round(dynamicWeights.c_data * 100)}%</div>
+          )}
         </div>
-        <div>
-          <span style={{ fontWeight: 600 }}>项目活跃度: </span>
-          {Math.round(matchData.activity * 100)}%
-        </div>
-        <div>
-          <span style={{ fontWeight: 600 }}>社区需求热度: </span>
-          {Math.round(matchData.demand * 100)}%
-        </div>
+        {onBaseWeightsChange && (
+          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div>调整基础权重（w_skill, w_activity, w_demand）：</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '280px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>技能权重 w_skill</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={localWeights.w_skill.toFixed(1)}
+                  onChange={(e) => handleInputChange('w_skill', e.target.value)}
+                  onKeyDown={(e) => handleInputKeyDown('w_skill', e)}
+                  style={{ width: '80px', marginLeft: '12px' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>活跃度权重 w_activity</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={localWeights.w_activity.toFixed(1)}
+                  onChange={(e) => handleInputChange('w_activity', e.target.value)}
+                  onKeyDown={(e) => handleInputKeyDown('w_activity', e)}
+                  style={{ width: '80px', marginLeft: '12px' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>需求权重 w_demand</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={localWeights.w_demand.toFixed(1)}
+                  onChange={(e) => handleInputChange('w_demand', e.target.value)}
+                  onKeyDown={(e) => handleInputKeyDown('w_demand', e)}
+                  style={{ width: '80px', marginLeft: '12px' }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

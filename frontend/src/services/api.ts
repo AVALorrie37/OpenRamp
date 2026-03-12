@@ -149,8 +149,8 @@ export const profileAPI = USE_MOCK ? mockProfileAPI : {
 }
 
 export const matchAPI = USE_MOCK ? mockMatchAPI : {
-  calculate: async (user_id: string, repo_id: string): Promise<MatchResult> => {
-    return unwrap(api.post('/api/match', { user_id, repo_id }))
+  calculate: async (user_id: string, repo_id: string, weights?: { w_skill: number; w_activity: number; w_demand: number }): Promise<MatchResult> => {
+    return unwrap(api.post('/api/match', { user_id, repo_id, weights }))
   }
 }
 

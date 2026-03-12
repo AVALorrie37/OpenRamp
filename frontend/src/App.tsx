@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [showManualSearch, setShowManualSearch] = useState(false)
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
+  const [weights, setWeights] = useState({ w_skill: 0.5, w_activity: 0.3, w_demand: 0.2 })
   const [toast, setToast] = useState<string | null>(null)
   const { logs, clearLogs } = useDebugLogs(showDebug)
   const handleSearchComplete = useCallback((searchRepos: any[]) => {
@@ -117,12 +118,13 @@ const App: React.FC = () => {
     setSelectedRepo(repo)
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
       try {
-        const match = await matchAPI.calculate(username!, repo.repo_id)
+        const match = await matchAPI.calculate(username!, repo.repo_id, weights)
         setMatchData({
           match_score: match.match_score,
           breakdown: match.breakdown,
           repo_name: repo.name,
-          repo_full_name: repo.repo_id
+          repo_full_name: repo.repo_id,
+          dynamic_weights: match.dynamic_weights
         })
       } catch (error) {
         console.error('Match error:', error)
@@ -181,6 +183,24 @@ const App: React.FC = () => {
 
 
   const allLanguages = repos.flatMap(r => r.languages || [])
+
+  const handleWeightsChange = async (next: { w_skill: number; w_activity: number; w_demand: number }) => {
+    setWeights(next)
+    if (username && selectedRepo && isLoggedIn && profile?.skills && profile.skills.length > 0) {
+      try {
+        const match = await matchAPI.calculate(username, selectedRepo.repo_id, next)
+        setMatchData({
+          match_score: match.match_score,
+          breakdown: match.breakdown,
+          repo_name: selectedRepo.name,
+          repo_full_name: selectedRepo.repo_id,
+          dynamic_weights: match.dynamic_weights
+        })
+      } catch (error) {
+        console.error('Match error:', error)
+      }
+    }
+  }
 
   return (
     <div style={{
@@ -310,6 +330,8 @@ const App: React.FC = () => {
             <RadarPlaceholder 
               isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
               matchData={matchData}
+              baseWeights={weights}
+              onBaseWeightsChange={handleWeightsChange}
             />
           </div>
         </div>

@@ -48,6 +48,36 @@ const MOCK_REPOS: ReposResponse = {
         active_dates: '2024-01-01:15,2024-01-02:12',
         issues_new: '2024-01:20'
       }
+    },
+    {
+      repo_id: 'test/repo4',
+      name: 'repo4',
+      description: 'High-activity DevOps toolkit with strong demand but moderate influence',
+      languages: ['Go', 'Python'],
+      active_score: 0.92,
+      influence_score: 0.4,
+      demand_score: 0.9,
+      composite_score: 0.78,
+      raw_metrics: {
+        openrank: '2024-01-01:6,2024-01-02:9,2024-01-03:11,2024-01-04:13,2024-01-05:14',
+        active_dates: '2024-01-01:25,2024-01-02:24',
+        issues_new: '2024-01:25'
+      }
+    },
+    {
+      repo_id: 'test/repo5',
+      name: 'repo5',
+      description: 'Well-known library with high influence but relatively lower recent activity and demand',
+      languages: ['Rust'],
+      active_score: 0.4,
+      influence_score: 0.95,
+      demand_score: 0.35,
+      composite_score: 0.6,
+      raw_metrics: {
+        openrank: '2024-01-01:20,2024-01-02:22,2024-01-03:25,2024-01-04:27,2024-01-05:30',
+        active_dates: '2024-01-01:8,2024-01-02:6',
+        issues_new: '2024-01:5'
+      }
     }
   ]
 }
@@ -143,21 +173,43 @@ export const mockProfileAPI = {
 }
 
 export const mockMatchAPI = {
-  calculate: async (_user_id: string, repo_id: string): Promise<MatchResult> => {
+  calculate: async (_user_id: string, repo_id: string, weights?: { w_skill: number; w_activity: number; w_demand: number }): Promise<MatchResult> => {
     await new Promise(resolve => setTimeout(resolve, 500))
     
     const repo = MOCK_REPOS.repos.find(r => r.repo_id === repo_id)
     
+    let wSkill = 0.5
+    let wActivity = 0.3
+    let wDemand = 0.2
+    if (weights) {
+      const sum = (weights.w_skill || 0) + (weights.w_activity || 0) + (weights.w_demand || 0)
+      if (sum > 0) {
+        wSkill = (weights.w_skill || 0) / sum
+        wActivity = (weights.w_activity || 0) / sum
+        wDemand = (weights.w_demand || 0) / sum
+      }
+    }
+
     if (repo) {
+      const skill = repo.influence_score
+      const activity = repo.active_score
+      const demand = repo.demand_score
+      const matchScore = wSkill * skill + wActivity * activity + wDemand * demand
       return {
-        match_score: repo.composite_score,
+        match_score: matchScore,
         breakdown: {
-          skill: repo.influence_score,
-          activity: repo.active_score,
-          demand: repo.demand_score
+          skill,
+          activity,
+          demand
         },
         repo_name: repo.name,
-        repo_full_name: repo.repo_id
+        repo_full_name: repo.repo_id,
+        dynamic_weights: {
+          w_skill: wSkill,
+          w_activity: wActivity,
+          w_demand: wDemand,
+          c_data: 1.0
+        }
       }
     }
     

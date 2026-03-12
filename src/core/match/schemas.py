@@ -58,13 +58,6 @@ class RepoData:
     """
     仓库数据结构
     
-    Attributes:
-        keywords: 仓库关键词（来自描述、README、topics等）
-        active_days_last_30: 最近30天活跃天数
-        issues_new_last_30: 近30天新开 issue 数
-        openrank: 项目影响力分数（OpenDigger 指标）
-        name: 仓库名称（可选，用于结果展示）
-        full_name: 仓库全名 owner/repo（可选）
     """
     keywords: List[str] = field(default_factory=list)
     active_days_last_30: int = 0
@@ -72,6 +65,9 @@ class RepoData:
     openrank: float = 0.0
     name: Optional[str] = None
     full_name: Optional[str] = None
+    precomputed_activity_score: Optional[float] = None
+    precomputed_demand_score: Optional[float] = None
+    data_source: Optional[str] = None
     
     def __post_init__(self):
         """初始化后处理：标准化关键词"""
@@ -132,19 +128,14 @@ class MatchResult:
     """
     匹配结果数据结构
     
-    Attributes:
-        match_score: 总匹配分数 [0, 1]
-        breakdown: 各子维度评分细分
-        repo_name: 仓库名称（可选）
-        repo_full_name: 仓库全名（可选）
     """
     match_score: float
     breakdown: ScoreBreakdown
     repo_name: Optional[str] = None
     repo_full_name: Optional[str] = None
+    dynamic_weights: Optional[Dict[str, float]] = None
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
         result = {
             "match_score": round(self.match_score, 4),
             "breakdown": self.breakdown.to_dict()
@@ -153,4 +144,6 @@ class MatchResult:
             result["repo_name"] = self.repo_name
         if self.repo_full_name:
             result["repo_full_name"] = self.repo_full_name
+        if self.dynamic_weights is not None:
+            result["dynamic_weights"] = self.dynamic_weights
         return result

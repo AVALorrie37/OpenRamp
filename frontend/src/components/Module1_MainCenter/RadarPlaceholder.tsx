@@ -5,9 +5,15 @@ import MatchRadarChart from '../Module5_RadarVisualization/MatchRadarChart'
 interface RadarPlaceholderProps {
   isActive: boolean
   matchData?: any
+  baseWeights?: {
+    w_skill: number
+    w_activity: number
+    w_demand: number
+  }
+  onBaseWeightsChange?: (next: { w_skill: number; w_activity: number; w_demand: number }) => void
 }
 
-const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData }) => {
+const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData, baseWeights, onBaseWeightsChange }) => {
   if (!isActive && !matchData) {
     // 未登录状态
     return (
@@ -34,6 +40,9 @@ const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData
           repoName: matchData.repo_name || '',
           matchScore: matchData.match_score
         }}
+        baseWeights={baseWeights}
+        dynamicWeights={matchData.dynamic_weights}
+        onBaseWeightsChange={onBaseWeightsChange}
         embedded={true}  // 启用内嵌模式
       />
     )

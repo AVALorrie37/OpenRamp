@@ -60,6 +60,12 @@ export interface MatchResult {
   }
   repo_name: string
   repo_full_name: string
+  dynamic_weights?: {
+    w_skill: number
+    w_activity: number
+    w_demand: number
+    c_data: number
+  }
 }
 
 export interface LogEntry {

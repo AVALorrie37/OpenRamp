@@ -27,6 +27,7 @@ from src.data_layer.online.OpenDiggerAPI.client import OpenDiggerClient
 from src.data_layer.offline.loader import OfflineRepoLoader
 from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
+from src.core.match.config import MatchConfig, MatchWeights, DEFAULT_CONFIG
 from src.data_layer.online.integrated_search import IntegratedRepoSearch
 from typing import Optional
 import httpx
@@ -323,6 +324,7 @@ class SyncProfileRequest(BaseModel):
 class MatchRequest(BaseModel):
     user_id: str
     repo_id: str
+    weights: Optional[Dict[str, float]] = None
 
 
 class SearchRequest(BaseModel):
@@ -633,7 +635,32 @@ async def get_profile(user_id: str):
 async def calculate_match(request: MatchRequest = Body(...)):
     try:
         handler, _ = get_conversation_handler(request.user_id)
-        scorer = get_match_scorer()
+        base_config = DEFAULT_CONFIG
+        if request.weights:
+            w_skill = float(request.weights.get("w_skill", base_config.weights.w_skill))
+            w_activity = float(request.weights.get("w_activity", base_config.weights.w_activity))
+            w_demand = float(request.weights.get("w_demand", base_config.weights.w_demand))
+            total = w_skill + w_activity + w_demand
+            if total <= 0:
+                w_skill, w_activity, w_demand = (
+                    base_config.weights.w_skill,
+                    base_config.weights.w_activity,
+                    base_config.weights.w_demand,
+                )
+            else:
+                w_skill /= total
+                w_activity /= total
+                w_demand /= total
+            weights = MatchWeights(w_skill=w_skill, w_activity=w_activity, w_demand=w_demand)
+            config = MatchConfig(
+                weights=weights,
+                activity_weights=base_config.activity_weights,
+                activity_thresholds=base_config.activity_thresholds,
+                demand_config=base_config.demand_config,
+            )
+            scorer = MatchScorer(config)
+        else:
+            scorer = get_match_scorer()
         
         profile = handler.get_current_profile()
         if not profile.get('skills') and not profile.get('contribution_styles'):
@@ -662,7 +689,10 @@ async def calculate_match(request: MatchRequest = Body(...)):
             issues_new_last_30=int(repo_data_dict.get("demand_score", 0) * 50),
             openrank=repo_data_dict.get("influence_score", 0) * 50,
             name=repo_data_dict.get("name"),
-            full_name=repo_data_dict.get("repo_id")
+            full_name=repo_data_dict.get("repo_id"),
+            precomputed_activity_score=repo_data_dict.get("active_score"),
+            precomputed_demand_score=repo_data_dict.get("demand_score"),
+            data_source="opendigger+github" if repo_data_dict.get("source") == "opendigger_online" else "metadata_only",
         )
         
         match_result = scorer.calculate(user_profile, repo_data)
@@ -707,6 +737,9 @@ async def search_repos(request: SearchRequest = Body(...)):
                         openrank=r.get("influence_score", 0) * 50,
                         name=r.get("name"),
                         full_name=r.get("repo_id"),
+                        precomputed_activity_score=r.get("active_score"),
+                        precomputed_demand_score=r.get("demand_score"),
+                        data_source="opendigger+github" if r.get("source") == "opendigger_online" else "metadata_only",
                     )
                     match = scorer.calculate(user_profile, repo_data)
                     scored.append((r, match.match_score))

@@ -52,19 +52,26 @@ class MatchScorer:
         if isinstance(repo_data, dict):
             repo_data = RepoData.from_dict(repo_data)
         
-        # 计算各子维度评分
         s_skill = self._calculate_skill_score(user_profile.skills, repo_data.keywords)
         s_activity = self._calculate_activity_score(repo_data)
-        s_demand = self._calculate_demand_score(s_skill, repo_data.issues_new_last_30)
-        
-        # 获取权重
-        weights = self.config.weights
-        
-        # 计算总分
+        s_demand = self._calculate_demand_score(s_skill, repo_data.issues_new_last_30, repo_data)
+
+        base_w_skill = self.config.weights.w_skill
+        base_w_activity = self.config.weights.w_activity
+        base_w_demand = self.config.weights.w_demand
+
+        c_data = self._compute_data_confidence(repo_data)
+
+        w2_prime = base_w_activity * c_data
+        remain = 1.0 - w2_prime
+        denom = base_w_skill + base_w_demand if (base_w_skill + base_w_demand) > 0 else 1.0
+        w1_prime = remain * base_w_skill / denom
+        w3_prime = remain * base_w_demand / denom
+
         match_score = (
-            weights.w_skill * s_skill +
-            weights.w_activity * s_activity +
-            weights.w_demand * s_demand
+            w1_prime * s_skill +
+            w2_prime * s_activity +
+            w3_prime * s_demand
         )
         
         # 确保分数在 [0, 1] 范围内
@@ -76,12 +83,20 @@ class MatchScorer:
             activity=s_activity,
             demand=s_demand
         )
-        
+
+        dynamic_weights = {
+            "w_skill": round(w1_prime, 4),
+            "w_activity": round(w2_prime, 4),
+            "w_demand": round(w3_prime, 4),
+            "c_data": round(c_data, 4),
+        }
+
         result = MatchResult(
             match_score=match_score,
             breakdown=breakdown,
             repo_name=repo_data.name,
-            repo_full_name=repo_data.full_name
+            repo_full_name=repo_data.full_name,
+            dynamic_weights=dynamic_weights,
         )
         
         logger.debug(
@@ -147,6 +162,9 @@ class MatchScorer:
         Returns:
             活跃度匹配分数 [0, 1]
         """
+        if repo_data.precomputed_activity_score is not None:
+            return max(0.0, min(1.0, float(repo_data.precomputed_activity_score)))
+
         thresholds = self.config.activity_thresholds
         weights = self.config.activity_weights
         
@@ -192,7 +210,8 @@ class MatchScorer:
     def _calculate_demand_score(
         self,
         skill_score: float,
-        issues_new: int
+        issues_new: int,
+        repo_data: RepoData
     ) -> float:
         """
         计算社区需求匹配度 S_demand
@@ -206,6 +225,9 @@ class MatchScorer:
         Returns:
             社区需求匹配分数 [0, 1]
         """
+        if repo_data.precomputed_demand_score is not None:
+            return max(0.0, min(1.0, float(repo_data.precomputed_demand_score)))
+
         demand_config = self.config.demand_config
         
         # 计算 sigmoid
@@ -222,6 +244,22 @@ class MatchScorer:
         )
         
         return score
+
+    @staticmethod
+    def _compute_data_confidence(repo_data: RepoData) -> float:
+        if repo_data.data_source:
+            source = repo_data.data_source
+            if source == "opendigger+github":
+                return 1.0
+            if source == "github_only":
+                return 0.8
+            if source == "metadata_only":
+                return 0.5
+        if repo_data.openrank > 0:
+            return 1.0
+        if repo_data.active_days_last_30 > 0 or repo_data.issues_new_last_30 > 0:
+            return 0.8
+        return 0.5
     
     @staticmethod
     def _truncated_linear_map(value: float, v_min: float, v_max: float) -> float:

@@ -240,7 +240,6 @@ class IntegratedRepoSearch:
             # Convert user profile to UserProfile schema
             user_prof = UserProfile.from_dict(user_profile)
             
-            # Extract OpenDigger metrics
             metrics = repo_result.opendigger_metrics
             
             # Build RepoData
@@ -250,7 +249,10 @@ class IntegratedRepoSearch:
                 issues_new_last_30=metrics.get('issues_new_last_30', 0),
                 openrank=metrics.get('openrank', 0.0),
                 name=repo_result.repo_id.split('/')[-1],
-                full_name=repo_result.repo_id
+                full_name=repo_result.repo_id,
+                precomputed_activity_score=repo_result.active_score,
+                precomputed_demand_score=repo_result.demand_score,
+                data_source="opendigger+github",
             )
             
             # Calculate match
