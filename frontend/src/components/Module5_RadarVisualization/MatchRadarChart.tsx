@@ -126,6 +126,16 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
     { displayMode: false, throwOnError: false }
   )
 
+  const weightHtml = katex.renderToString(
+    `\\begin{aligned}
+    w_1' &= ${Math.round(effectiveWeights.w_skill * 100) / 100} \\quad
+    w_2' &= ${Math.round(effectiveWeights.w_activity * 100) / 100}  \\quad
+    w_3' &= ${Math.round(effectiveWeights.w_demand * 100) / 100} \\quad
+    ${dynamicWeights ? `C_{\\mathrm{data}} &= ${Math.round(dynamicWeights.c_data * 100)}\\%` : ''}
+    \\end{aligned}`,
+    { displayMode: false, throwOnError: false }
+  )
+
   const chartContent = (
     <div style={{
       display: 'flex',
@@ -183,61 +193,95 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         color: theme.text
       }}>
         <div
-          style={{ lineHeight: 1.4 }}
+          style={{ lineHeight: 3, fontSize: '18px', textAlign: 'center'}}
           dangerouslySetInnerHTML={{ __html: formulaHtml }}
         />
+        <div
+          style={{ lineHeight: 1.4, fontSize: '12px', textAlign: 'center' }}
+          dangerouslySetInnerHTML={{ __html: weightHtml }}
+        />
 
-        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-          <div>w1' = {Math.round(effectiveWeights.w_skill * 100) / 100}</div>
-          <div>w2' = {Math.round(effectiveWeights.w_activity * 100) / 100}</div>
-          <div>w3' = {Math.round(effectiveWeights.w_demand * 100) / 100}</div>
-          {dynamicWeights && (
-            <div>C_data = {Math.round(dynamicWeights.c_data * 100)}%</div>
-          )}
-        </div>
         {onBaseWeightsChange && (
-          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div>调整基础权重（w_skill, w_activity, w_demand）：</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '280px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>技能权重 w_skill</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={localWeights.w_skill.toFixed(1)}
-                  onChange={(e) => handleInputChange('w_skill', e.target.value)}
-                  onKeyDown={(e) => handleInputKeyDown('w_skill', e)}
-                  style={{ width: '80px', marginLeft: '12px' }}
-                />
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>活跃度权重 w_activity</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={localWeights.w_activity.toFixed(1)}
-                  onChange={(e) => handleInputChange('w_activity', e.target.value)}
-                  onKeyDown={(e) => handleInputKeyDown('w_activity', e)}
-                  style={{ width: '80px', marginLeft: '12px' }}
-                />
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>需求权重 w_demand</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={localWeights.w_demand.toFixed(1)}
-                  onChange={(e) => handleInputChange('w_demand', e.target.value)}
-                  onKeyDown={(e) => handleInputKeyDown('w_demand', e)}
-                  style={{ width: '80px', marginLeft: '12px' }}
-                />
-              </label>
+          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+            <div
+              style={{
+                padding: '14px 18px',
+                borderRadius: '10px',
+                border: `1px solid ${theme.border}`,
+                backgroundColor: theme.white,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                minWidth: '200px',
+                maxWidth: '320px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>
+                权重调节
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span
+                    dangerouslySetInnerHTML={{
+                      __html: katex.renderToString("w_{\\mathrm{skill}}", {
+                        displayMode: false,
+                        throwOnError: false
+                      })
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={localWeights.w_skill.toFixed(1)}
+                    onChange={(e) => handleInputChange('w_skill', e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown('w_skill', e)}
+                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span
+                    dangerouslySetInnerHTML={{
+                      __html: katex.renderToString("w_{\\mathrm{activity}}", {
+                        displayMode: false,
+                        throwOnError: false
+                      })
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={localWeights.w_activity.toFixed(1)}
+                    onChange={(e) => handleInputChange('w_activity', e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown('w_activity', e)}
+                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span
+                    dangerouslySetInnerHTML={{
+                      __html: katex.renderToString("w_{\\mathrm{demand}}", {
+                        displayMode: false,
+                        throwOnError: false
+                      })
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={localWeights.w_demand.toFixed(1)}
+                    onChange={(e) => handleInputChange('w_demand', e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown('w_demand', e)}
+                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
         )}
