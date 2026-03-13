@@ -3,7 +3,7 @@ import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
-import { searchAPI, matchAPI, manualSearchAPI } from './services/api'
+import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
 import { theme } from './styles/theme'
 import { storage } from './utils/storage'
 
@@ -122,6 +122,19 @@ const App: React.FC = () => {
     setActiveKeywords([])
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
       try {
+        if (isProfileModified && isProfileModified() && username && profile) {
+          try {
+            await profileAPI.sync(
+              username,
+              profile.skills || [],
+              profile.preferences || [],
+              profile.language
+            )
+            resetProfileModified()
+          } catch (error) {
+            console.error('Profile sync before match failed:', error)
+          }
+        }
         const match = await matchAPI.calculate(username!, repo.repo_id, weights)
         setMatchData({
           match_score: match.match_score,

@@ -101,7 +101,7 @@ def get_online_client() -> OpenDiggerClient:
     """获取在线客户端实例"""
     global _online_client
     if _online_client is None:
-        _online_client = OpenDiggerClient(timeout=10.0)
+        _online_client = OpenDiggerClient()
     return _online_client
 
 
@@ -200,8 +200,47 @@ async def startup_event():
     """启动时预加载离线数据"""
     try:
         load_offline_repos()
+        asyncio.create_task(_pending_enrich_worker())
     except Exception as e:
         logger.error(f"预加载离线数据失败: {e}")
+
+
+async def _pending_enrich_worker(interval_seconds: int = 3600):
+    """定时补全处于 pending 状态的仓库数据"""
+    global _offline_cache
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            if not _offline_cache:
+                continue
+            offline = _offline_cache
+            offline_map = {r.get("repo_id"): r for r in offline if r.get("repo_id")}
+            pending_ids = [rid for rid, r in offline_map.items() if r.get("status") == "pending"]
+            if not pending_ids:
+                continue
+            client = get_online_client()
+            gh_client = GitHubClient(use_cache=True)
+            for rid in pending_ids:
+                try:
+                    online_data = client.get_activity_data(rid)
+                    unified_data = convert_online_to_unified(online_data, rid)
+                    try:
+                        cached = gh_client.get_cached_repo(rid)
+                        if cached and not unified_data.get("keywords"):
+                            kws = cached.get("keywords") or []
+                            if kws:
+                                unified_data["keywords"] = kws
+                    except Exception:
+                        pass
+                    repo_dict = offline_map.get(rid)
+                    if repo_dict:
+                        repo_dict.update(unified_data)
+                        repo_dict.pop("status", None)
+                except Exception as e:
+                    logger.warning(f"定时补全仓库 {rid} 失败: {e}")
+                    continue
+        except Exception as e:
+            logger.error(f"pending 仓库定时补全任务出错: {e}")
 
 
 @app.get("/api/repos", response_model=ReposResponse)
@@ -221,7 +260,7 @@ async def get_repos(
                 if not offline_repos:
                     raise HTTPException(
                         status_code=400,
-                        detail="在线模式必须提供 repo_ids 参数，且当前无离线数据可用",
+                        detail="REPOS_ONLINE_MISSING_IDS_OR_OFFLINE_DATA: 在线模式必须提供 repo_ids 参数，且当前无离线数据可用",
                     )
                 repos = offline_repos
                 source = "offline"
@@ -266,7 +305,7 @@ async def get_repos(
             if not all_repos:
                 raise HTTPException(
                     status_code=503,
-                    detail="离线数据未挂载，请检查 top_300_metrics 目录",
+                    detail="REPOS_OFFLINE_DATA_NOT_MOUNTED: 离线数据未挂载，请检查 top_300_metrics 目录",
                 )
             if repo_ids:
                 repo_id_set = set(repo_ids)
@@ -276,7 +315,7 @@ async def get_repos(
                 if missing_ids:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"以下仓库ID未找到: {list(missing_ids)}",
+                        detail=f"REPOS_OFFLINE_REPO_NOT_FOUND: 以下仓库ID未找到: {list(missing_ids)}",
                     )
             else:
                 repos = all_repos
@@ -292,8 +331,8 @@ async def get_repos(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"处理请求失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+        logger.error(f"REPOS_UNEXPECTED_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"REPOS_INTERNAL_ERROR: 服务器内部错误: {str(e)}")
 
 
 @app.get("/health")
@@ -320,8 +359,8 @@ async def chat_greeting(request: 'GreetingRequest' = Body(...)):
             "source": "ollama_online",
         }
     except Exception as e:
-        logger.error(f"Greeting error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"CHAT_GREETING_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CHAT_GREETING_ERROR: {str(e)}")
 
 
 class ChatRequest(BaseModel):
@@ -488,8 +527,8 @@ async def chat(request: ChatRequest = Body(...)):
             } if (confirmed or profile_updated) else None
         }
     except Exception as e:
-        logger.error(f"Chat error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"CHAT_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CHAT_ERROR: {str(e)}")
 
 
 def _chat_result_to_response(result: Dict[str, Any], session_id: str, agent_type: str) -> Dict[str, Any]:
@@ -608,8 +647,8 @@ async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Confirm profile error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"PROFILE_CONFIRM_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PROFILE_CONFIRM_ERROR: {str(e)}")
 
 
 @app.post("/api/profile/sync")
@@ -627,8 +666,8 @@ async def sync_profile(request: SyncProfileRequest = Body(...)):
             "message": "Profile synced successfully"
         }
     except Exception as e:
-        logger.error(f"Sync profile error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"PROFILE_SYNC_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PROFILE_SYNC_ERROR: {str(e)}")
 
 
 @app.get("/api/profile/{user_id}")
@@ -656,8 +695,8 @@ async def get_profile(user_id: str):
             "language": user_language or 'chinese'
         }
     except Exception as e:
-        logger.error(f"Get profile error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"PROFILE_GET_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PROFILE_GET_ERROR: {str(e)}")
 
 
 @app.post("/api/match")
@@ -693,7 +732,7 @@ async def calculate_match(request: MatchRequest = Body(...)):
         
         profile = handler.get_current_profile()
         if not profile.get('skills') and not profile.get('contribution_styles'):
-            raise HTTPException(status_code=404, detail="User profile not found")
+            raise HTTPException(status_code=404, detail="MATCH_USER_PROFILE_NOT_FOUND: User profile not found")
         
         user_profile_dict = {
             "skills": profile.get("skills", []),
@@ -710,7 +749,7 @@ async def calculate_match(request: MatchRequest = Body(...)):
                 break
         
         if not repo_data_dict:
-            raise HTTPException(status_code=404, detail="Repository not found")
+            raise HTTPException(status_code=404, detail="MATCH_REPOSITORY_NOT_FOUND: Repository not found")
         
         repo_keywords = repo_data_dict.get("keywords") or []
         if not repo_keywords:
@@ -732,8 +771,8 @@ async def calculate_match(request: MatchRequest = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Match calculation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"MATCH_CALCULATION_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"MATCH_CALCULATION_ERROR: {str(e)}")
 
 
 @app.post("/api/search")
@@ -831,8 +870,8 @@ async def search_repos(request: SearchRequest = Body(...)):
             "repos": repos,
         }
     except Exception as e:
-        logger.error(f"Search error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"SEARCH_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"SEARCH_ERROR: {str(e)}")
 
 
 @app.post("/api/search/cancel")
@@ -841,8 +880,8 @@ async def cancel_search(request: SearchCancelRequest = Body(...)):
         logger.info(f"Received search cancel request for search_id={request.search_id}")
         return {"status": "ok"}
     except Exception as e:
-        logger.error(f"Search cancel error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"SEARCH_CANCEL_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"SEARCH_CANCEL_ERROR: {str(e)}")
 
 
 class GithubSearchRequest(BaseModel):
@@ -872,14 +911,14 @@ async def github_search_repos(
         data["source"] = "github_online"
         return data
     except httpx.HTTPStatusError as e:
-        logger.error(f"GitHub search HTTP error: {e}", exc_info=True)
-        raise HTTPException(status_code=e.response.status_code, detail="GitHub search failed")
+        logger.error(f"GITHUB_SEARCH_HTTP_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=e.response.status_code, detail="GITHUB_SEARCH_HTTP_ERROR: GitHub search failed")
     except httpx.HTTPError as e:
-        logger.error(f"GitHub search network error: {e}", exc_info=True)
-        raise HTTPException(status_code=503, detail="GitHub search unavailable")
+        logger.error(f"GITHUB_SEARCH_NETWORK_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="GITHUB_SEARCH_NETWORK_ERROR: GitHub search unavailable")
     except Exception as e:
-        logger.error(f"GitHub search unexpected error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"GITHUB_SEARCH_UNEXPECTED_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="GITHUB_SEARCH_UNEXPECTED_ERROR: Internal server error")
 
 
 @app.post("/api/repos/bulk_enrich")
@@ -888,21 +927,28 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
         repo_ids = [r.get("repo_id") or r.get("full_name") for r in request.repos]
         repo_ids = [r for r in repo_ids if r]
         if not repo_ids:
-            raise HTTPException(status_code=400, detail="No valid repo ids")
+            raise HTTPException(status_code=400, detail="BULK_ENRICH_NO_VALID_REPO_IDS: No valid repo ids")
         offline = load_offline_repos()
         enriched = []
         offline_map = {r["repo_id"]: r for r in offline}
         for rid in repo_ids:
-            if rid in offline_map:
-                enriched.append(offline_map[rid])
+            existing = offline_map.get(rid)
+            if existing and existing.get("status") != "pending":
+                enriched.append(existing)
                 continue
             try:
                 client = get_online_client()
                 online_data = client.get_activity_data(rid)
                 unified = convert_online_to_unified(online_data, rid)
                 enriched.append(unified)
+                if existing:
+                    existing.update(unified)
+                    existing.pop("status", None)
+                else:
+                    offline.append(unified)
+                    offline_map[rid] = unified
             except Exception as e:
-                logger.warning(f"bulk_enrich failed for {rid}, using zero scores: {e}")
+                logger.warning(f"bulk_enrich failed for {rid}, marking as pending: {e}")
                 parts = rid.split("/")
                 repo_name = parts[1] if len(parts) == 2 else rid
                 placeholder = {
@@ -914,10 +960,11 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
                     "influence_score": 0.0,
                     "demand_score": 0.0,
                     "composite_score": 0.0,
-                    "raw_metrics": {"note": "no OpenDigger data"}
+                    "raw_metrics": {"note": "no OpenDigger data"},
+                    "status": "pending",
                 }
                 enriched.append(placeholder)
-                if rid not in offline_map:
+                if not existing:
                     offline.append(placeholder)
                     offline_map[rid] = placeholder
         return {
@@ -927,8 +974,8 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"bulk_enrich error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"BULK_ENRICH_UNEXPECTED_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="BULK_ENRICH_UNEXPECTED_ERROR: Internal server error")
 
 
 @app.get("/api/logs/stream")
