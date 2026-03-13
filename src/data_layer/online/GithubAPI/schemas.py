@@ -4,8 +4,10 @@ from dataclasses import dataclass
 @dataclass
 class RepoMetadata:
     """仓库元数据（精简版，首期仅保留必要字段）"""
-    stars: int
-    last_updated: str  # ISO8601格式
+    stars: int = 0
+    last_updated: str = ""  # ISO8601格式
+    forks: int = 0
+    open_issues: int = 0
 
 @dataclass
 class SearchResult:

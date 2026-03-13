@@ -13,6 +13,8 @@ Features:
 import sys
 import os
 import json
+import math
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -220,6 +222,66 @@ class IntegratedRepoSearch:
             "composite_score": round(composite_score, 4),
             "languages": list(github_keywords) if github_keywords else [],
         }
+
+    @staticmethod
+    def _robust_min_max(value: float, v_min: float, v_max: float) -> float:
+        if value <= v_min:
+            return 0.0
+        if value >= v_max:
+            return 1.0
+        return (value - v_min) / (v_max - v_min)
+
+    def _compute_github_only_scores(self, metadata: RepoMetadata, github_keywords: List[str]) -> Dict[str, Any]:
+        """
+        当没有 OpenDigger 数据时，仅基于 GitHub 原生指标估算各子分。
+        参考 design_text/match_algorithm.md 中的 GitHub 校准公式。
+        """
+        stars = max(0, int(getattr(metadata, "stars", 0)))
+        forks = max(0, int(getattr(metadata, "forks", 0)))
+        open_issues = max(0, int(getattr(metadata, "open_issues", 0)))
+
+        # 估算近30天提交活跃度：根据最近更新时间粗略映射
+        recent_commits_30d = 0
+        try:
+            if metadata.last_updated:
+                dt = datetime.fromisoformat(metadata.last_updated.replace("Z", "+00:00"))
+                days = max(0, (datetime.now(timezone.utc) - dt).days)
+                if days <= 30:
+                    recent_commits_30d = 30 - days
+        except Exception:
+            recent_commits_30d = 0
+
+        # 活跃度原始指标 A_raw
+        a_raw = (
+            math.log2(1.0 + stars)
+            + 2.0 * math.log2(1.0 + recent_commits_30d)
+            + 0.5 * math.log2(1.0 + forks)
+        )
+        # 使用经验阈值做鲁棒 Min-Max 归一化（可后续在线学习更新）
+        s_activity = self._robust_min_max(a_raw, v_min=0.5, v_max=10.0)
+
+        # 需求分：open_issues 和 open_issues / recent_commits_30d
+        issues_norm = self._robust_min_max(
+            math.log2(1.0 + open_issues), v_min=0.0, v_max=8.0
+        )
+        ratio = open_issues / max(1.0, float(recent_commits_30d)) if open_issues > 0 else 0.0
+        ratio_norm = self._robust_min_max(
+            math.log2(1.0 + ratio), v_min=0.0, v_max=4.0
+        )
+        s_demand = 0.6 * issues_norm + 0.4 * ratio_norm
+
+        active_score = round(s_activity, 4)
+        demand_score = round(s_demand, 4)
+        influence_score = 0.0
+        composite_score = 0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score
+
+        return {
+            "active_score": round(active_score, 4),
+            "influence_score": round(influence_score, 4),
+            "demand_score": round(demand_score, 4),
+            "composite_score": round(composite_score, 4),
+            "languages": list(github_keywords) if github_keywords else [],
+        }
     
     def _calculate_match_score(
         self,
@@ -240,7 +302,8 @@ class IntegratedRepoSearch:
             # Convert user profile to UserProfile schema
             user_prof = UserProfile.from_dict(user_profile)
             
-            metrics = repo_result.opendigger_metrics
+            metrics = repo_result.opendigger_metrics or {}
+            has_opendigger = bool(metrics)
             
             # Build RepoData
             repo_data = RepoData(
@@ -252,7 +315,7 @@ class IntegratedRepoSearch:
                 full_name=repo_result.repo_id,
                 precomputed_activity_score=repo_result.active_score,
                 precomputed_demand_score=repo_result.demand_score,
-                data_source="opendigger+github",
+                data_source="opendigger+github" if has_opendigger else "github_only",
             )
             
             # Calculate match
@@ -360,7 +423,7 @@ class IntegratedRepoSearch:
                 metrics = self._fetch_opendigger_metrics(result.repo_id)
                 
                 if metrics is not None:
-                    # Success! Create integrated result
+                    # 有 OpenDigger 数据：使用 OpenDigger + GitHub 统一指标
                     unified = self._compute_unified_scores(metrics, result.keywords)
                     integrated_result = IntegratedRepoResult(
                         repo_id=result.repo_id,
@@ -375,10 +438,25 @@ class IntegratedRepoSearch:
                         languages=unified["languages"],
                     )
                     qualified_repos.append(integrated_result)
-                    print(f"✓ Valid ({len(qualified_repos)}/{target_count})")
+                    print(f"✓ Valid with OpenDigger ({len(qualified_repos)}/{target_count})")
                 else:
+                    # 无 OpenDigger 数据：退化为基于 GitHub 指标的估算，但仍参与后续匹配计算
+                    unified = self._compute_github_only_scores(result.metadata, result.keywords)
+                    integrated_result = IntegratedRepoResult(
+                        repo_id=result.repo_id,
+                        github_keywords=result.keywords,
+                        description=result.description,
+                        metadata=result.metadata,
+                        opendigger_metrics={},
+                        active_score=unified["active_score"],
+                        influence_score=unified["influence_score"],
+                        demand_score=unified["demand_score"],
+                        composite_score=unified["composite_score"],
+                        languages=unified["languages"],
+                    )
+                    qualified_repos.append(integrated_result)
                     skipped_count += 1
-                    print("✗ No OpenDigger data")
+                    print(f"✓ No OpenDigger data, used GitHub-only metrics ({len(qualified_repos)}/{target_count})")
         
         # Determine if search was sufficient
         is_sufficient = len(qualified_repos) >= target_count

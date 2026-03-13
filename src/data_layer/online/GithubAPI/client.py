@@ -257,7 +257,9 @@ class GitHubClient:
             for item in items:
                 repo_metadata = RepoMetadata(
                     stars=item.get("stargazers_count", 0),
-                    last_updated=item.get("pushed_at", "")
+                    last_updated=item.get("pushed_at", ""),
+                    forks=item.get("forks_count", 0),
+                    open_issues=item.get("open_issues_count", 0),
                 )
                 search_result = SearchResult(
                     repo_id=f"{item['owner']['login']}/{item['name']}",
