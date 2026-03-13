@@ -648,9 +648,9 @@ async def calculate_match(request: MatchRequest = Body(...)):
                     base_config.weights.w_demand,
                 )
             else:
-                w_skill /= total
-                w_activity /= total
-                w_demand /= total
+                w_skill = round(w_skill / total, 4)
+                w_activity = round(w_activity / total, 4)
+                w_demand = round(w_demand / total, 4)
             weights = MatchWeights(w_skill=w_skill, w_activity=w_activity, w_demand=w_demand)
             config = MatchConfig(
                 weights=weights,

@@ -82,12 +82,17 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
 
   const applyWeights = (next: { w_skill: number; w_activity: number; w_demand: number }) => {
     if (!onBaseWeightsChange) return
-    const sum = next.w_skill + next.w_activity + next.w_demand
+    const rounded = {
+      w_skill: Math.round(next.w_skill * 10) / 10,
+      w_activity: Math.round(next.w_activity * 10) / 10,
+      w_demand: Math.round(next.w_demand * 10) / 10
+    }
+    const sum = rounded.w_skill + rounded.w_activity + rounded.w_demand
     if (sum <= 0) return
     onBaseWeightsChange({
-      w_skill: next.w_skill / sum,
-      w_activity: next.w_activity / sum,
-      w_demand: next.w_demand / sum
+      w_skill: rounded.w_skill / sum,
+      w_activity: rounded.w_activity / sum,
+      w_demand: rounded.w_demand / sum
     })
   }
 
@@ -115,7 +120,6 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
           ...prev,
           [key]: Math.min(1, Math.max(0, parseFloat((prev[key] + delta).toFixed(1))))
         }
-        applyWeights(next)
         return next
       })
     }
