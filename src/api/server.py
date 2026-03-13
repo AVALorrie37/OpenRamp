@@ -131,8 +131,8 @@ def load_offline_repos() -> List[dict]:
             repo = repo_dir.name
             repo_id = f"{owner}/{repo}"
             repo_data = loader.load(repo_id)
-                if repo_data:
-                    repos.append(repo_data)
+            if repo_data:
+                repos.append(repo_data)
 
     if repos:
         try:
