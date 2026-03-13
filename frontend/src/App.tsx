@@ -237,6 +237,12 @@ const App: React.FC = () => {
     setActiveKeywords([])
   }
 
+  const handleRepoBackgroundClick = () => {
+    setSelectedRepo(null)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
+  }
+
   return (
     <div style={{
       width: '100%',
@@ -321,6 +327,7 @@ const App: React.FC = () => {
             <RepoList
               repos={repos}
               onRepoClick={handleRepoClick}
+              onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
               onOpenManualSearch={() => setShowManualSearch(true)}
             />

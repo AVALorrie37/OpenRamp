@@ -7,11 +7,12 @@ interface RepoListProps {
   onRepoClick: (repo: RepoResponse) => void
   onOpenManualSearch?: () => void
   highlightedRepoIds?: string[]
+  onBackgroundClick?: () => void
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick }) => {
   const [sortType, setSortType] = useState<SortType>('match')
 
   const sortedRepos = [...repos].sort((a, b) => {
@@ -102,17 +103,23 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
           </button>
         )}
       </div>
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '12px'
-      }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '12px'
+        }}
+        onClick={onBackgroundClick}
+      >
         {sortedRepos.map((repo) => {
           const isHighlighted = highlightedRepoIds?.includes(repo.repo_id)
           return (
           <div
             key={repo.repo_id}
-            onClick={() => onRepoClick(repo)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onRepoClick(repo)
+            }}
             style={{
               padding: '16px',
               marginBottom: '12px',
@@ -128,8 +135,8 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               e.currentTarget.style.boxShadow = `0 4px 12px ${theme.primaryLight}40`
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = theme.border
-              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.borderColor = isHighlighted ? theme.primary : theme.border
+              e.currentTarget.style.boxShadow = isHighlighted ? `0 0 0 2px ${theme.primaryLight}` : 'none'
             }}
           >
             <div style={{
