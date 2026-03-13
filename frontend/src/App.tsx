@@ -35,6 +35,8 @@ const App: React.FC = () => {
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [weights, setWeights] = useState({ w_skill: 0.5, w_activity: 0.3, w_demand: 0.2 })
   const [toast, setToast] = useState<string | null>(null)
+  const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
+  const [activeKeywords, setActiveKeywords] = useState<string[]>([])
   const { logs, clearLogs } = useDebugLogs(showDebug)
   const handleSearchComplete = useCallback((searchRepos: any[]) => {
     if (searchRepos && searchRepos.length > 0) {
@@ -116,6 +118,8 @@ const App: React.FC = () => {
 
   const handleRepoClick = async (repo: RepoResponse) => {
     setSelectedRepo(repo)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
       try {
         const match = await matchAPI.calculate(username!, repo.repo_id, weights)
@@ -171,6 +175,9 @@ const App: React.FC = () => {
 
   const handleTagClick = () => {
     refresh()
+    setSelectedRepo(null)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
   }
 
   const handleSendMessage = async (message: string) => {
@@ -200,6 +207,34 @@ const App: React.FC = () => {
         console.error('Match error:', error)
       }
     }
+  }
+
+  const handleKeywordClick = (keyword: string) => {
+    setSelectedRepo(null)
+    setActiveKeywords(prev => {
+      const exists = prev.includes(keyword)
+      const next = exists ? prev.filter(k => k !== keyword) : [...prev, keyword]
+      const lowered = new Set(next.map(k => k.toLowerCase()))
+      const matchedIds = repos
+        .filter(r => {
+          const repoKeywords = (r.keywords && r.keywords.length > 0 ? r.keywords : [])
+            .map(k => k.toLowerCase())
+          if (repoKeywords.length > 0) {
+            return repoKeywords.some(k => lowered.has(k))
+          }
+          const descWords = (r.description || '').toLowerCase().split(/\W+/)
+          return descWords.some(w => lowered.has(w))
+        })
+        .map(r => r.repo_id)
+      setHighlightedRepoIds(matchedIds)
+      return next
+    })
+  }
+
+  const handleKeywordAreaClick = () => {
+    setSelectedRepo(null)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
   }
 
   return (
@@ -267,14 +302,14 @@ const App: React.FC = () => {
           <TechStackCloud languages={allLanguages} onTagClick={handleTagClick} />
         </div>
 
-        <div style={{
+          <div style={{
           flex: 1,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr',
           gap: '20px',
           padding: '20px',
           overflow: 'hidden'
-        }}>
+          }}>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -286,6 +321,7 @@ const App: React.FC = () => {
             <RepoList
               repos={repos}
               onRepoClick={handleRepoClick}
+              highlightedRepoIds={highlightedRepoIds}
               onOpenManualSearch={() => setShowManualSearch(true)}
             />
           </div>
@@ -306,15 +342,23 @@ const App: React.FC = () => {
             }}>
               <OpenRankChart repo={selectedRepo || repos[0]} />
             </div>
-            <div style={{
+            <div
+              style={{
               backgroundColor: theme.white,
               borderRadius: '8px',
               border: `1px solid ${theme.border}`,
               minHeight: '200px',
               flex:1,
               position: 'relative'
-            }}>
-              <KeywordCloud repos={repos} />
+            }}
+              onClick={handleKeywordAreaClick}
+            >
+              <KeywordCloud
+                repos={repos}
+                selectedRepo={selectedRepo}
+                onKeywordClick={handleKeywordClick}
+                activeKeywords={activeKeywords}
+              />
             </div>
           </div>
 

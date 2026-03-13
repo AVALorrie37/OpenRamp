@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      fs: {
+        allow: ['..']
+      },
       // 核心：根据环境变量动态配置代理
       proxy: isMock 
         ? undefined  // Mock 模式：不启用代理，前端完全独立

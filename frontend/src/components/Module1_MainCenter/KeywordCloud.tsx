@@ -5,13 +5,20 @@ import type { RepoResponse } from '../../types'
 
 interface KeywordCloudProps {
   repos: RepoResponse[]
+  selectedRepo: RepoResponse | null
+  onKeywordClick: (keyword: string) => void
+  activeKeywords: string[]
 }
 
-const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos }) => {
+const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos, selectedRepo, onKeywordClick, activeKeywords }) => {
   const keywordData = useMemo(() => {
     const allKeywords: string[] = []
-    repos.forEach(repo => {
-      if (repo.description) {
+    const sourceRepos = selectedRepo ? [selectedRepo] : repos
+    sourceRepos.forEach(repo => {
+      const fromBackend = repo.keywords && repo.keywords.length > 0 ? repo.keywords : []
+      if (fromBackend.length > 0) {
+        allKeywords.push(...fromBackend)
+      } else if (repo.description) {
         allKeywords.push(...extractKeywords(repo.description))
       }
     })
@@ -25,7 +32,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos }) => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30)
       .map(([word, count]) => ({ word, count }))
-  }, [repos])
+  }, [repos, selectedRepo])
 
   const getFontSize = (count: number, maxCount: number) => {
     const minSize = 12
@@ -45,21 +52,28 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos }) => {
       alignItems: 'center',
       minHeight: '200px'
     }}>
-      {keywordData.map(({ word, count }) => (
+      {keywordData.map(({ word, count }) => {
+        const isActive = activeKeywords.includes(word)
+        return (
         <span
           key={word}
           style={{
             fontSize: `${getFontSize(count, maxCount)}px`,
-            color: theme.primary,
+            color: isActive ? theme.white : theme.primary,
             fontWeight: count > maxCount * 0.5 ? 600 : 400,
             padding: '4px 8px',
-            backgroundColor: theme.primaryLight + '40',
-            borderRadius: '4px'
+            backgroundColor: isActive ? theme.primary : theme.primaryLight + '40',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onKeywordClick(word)
           }}
         >
           {word}
         </span>
-      ))}
+      )})}
     </div>
   )
 }

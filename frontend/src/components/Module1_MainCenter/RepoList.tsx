@@ -6,11 +6,12 @@ interface RepoListProps {
   repos: RepoResponse[]
   onRepoClick: (repo: RepoResponse) => void
   onOpenManualSearch?: () => void
+  highlightedRepoIds?: string[]
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds }) => {
   const [sortType, setSortType] = useState<SortType>('match')
 
   const sortedRepos = [...repos].sort((a, b) => {
@@ -106,7 +107,9 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
         overflowY: 'auto',
         padding: '12px'
       }}>
-        {sortedRepos.map((repo) => (
+        {sortedRepos.map((repo) => {
+          const isHighlighted = highlightedRepoIds?.includes(repo.repo_id)
+          return (
           <div
             key={repo.repo_id}
             onClick={() => onRepoClick(repo)}
@@ -115,9 +118,10 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               marginBottom: '12px',
               backgroundColor: theme.white,
               borderRadius: '8px',
-              border: `1px solid ${theme.border}`,
+              border: `2px solid ${isHighlighted ? theme.primary : theme.border}`,
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              boxShadow: isHighlighted ? `0 0 0 2px ${theme.primaryLight}` : 'none'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = theme.primary
@@ -190,7 +194,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               {repo.description || 'No description'}
             </p>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   )

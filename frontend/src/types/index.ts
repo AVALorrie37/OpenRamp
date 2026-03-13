@@ -13,6 +13,7 @@ export interface RepoResponse {
     issues_new?: string
   }
   is_favorited?: boolean
+  keywords?: string[]
 }
 
 export interface ReposResponse {

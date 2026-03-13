@@ -24,6 +24,7 @@ except ImportError:
     )
 
 from src.data_layer.online.OpenDiggerAPI.client import OpenDiggerClient
+from src.data_layer.online.GithubAPI.client import GitHubClient
 from src.data_layer.offline.loader import OfflineRepoLoader
 from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
@@ -79,6 +80,7 @@ class RepoResponse(BaseModel):
     demand_score: float
     composite_score: float
     raw_metrics: Optional[dict] = None
+    keywords: Optional[List[str]] = None
 
 
 class ReposResponse(BaseModel):
@@ -129,9 +131,25 @@ def load_offline_repos() -> List[dict]:
             repo = repo_dir.name
             repo_id = f"{owner}/{repo}"
             repo_data = loader.load(repo_id)
-            if repo_data:
-                repos.append(repo_data)
+                if repo_data:
+                    repos.append(repo_data)
 
+    if repos:
+        try:
+            client = GitHubClient(use_cache=True)
+            for r in repos:
+                if r.get("keywords"):
+                    continue
+                repo_id = r.get("repo_id")
+                if not repo_id:
+                    continue
+                cached = client.get_cached_repo(repo_id)
+                if cached:
+                    kws = cached.get("keywords") or []
+                    if kws:
+                        r["keywords"] = kws
+        except Exception:
+            pass
     logger.info(f"预加载完成，共 {len(repos)} 个仓库")
     _offline_cache = repos
     return repos
@@ -173,6 +191,7 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         "demand_score": round(demand_score, 4),
         "composite_score": round(composite_score, 4),
         "raw_metrics": None,  # 在线模式不返回 raw_metrics
+        "keywords": [],  # 关键词后续可由 GitHub 缓存补全
     }
 
 
@@ -217,6 +236,16 @@ async def get_repos(
                         online_data = client.get_activity_data(repo_id)
                         unified_data = convert_online_to_unified(online_data, repo_id)
                         unified_data["source"] = "opendigger_online"
+                        # 尝试使用 GitHub 缓存补全关键词
+                        try:
+                            gh_client = GitHubClient(use_cache=True)
+                            cached = gh_client.get_cached_repo(repo_id)
+                            if cached and not unified_data.get("keywords"):
+                                kws = cached.get("keywords") or []
+                                if kws:
+                                    unified_data["keywords"] = kws
+                        except Exception:
+                            pass
                         repos.append(unified_data)
                     except Exception as e:
                         logger.warning(f"获取仓库 {repo_id} 在线数据失败: {e}")
@@ -683,8 +712,11 @@ async def calculate_match(request: MatchRequest = Body(...)):
         if not repo_data_dict:
             raise HTTPException(status_code=404, detail="Repository not found")
         
+        repo_keywords = repo_data_dict.get("keywords") or []
+        if not repo_keywords:
+            repo_keywords = repo_data_dict.get("languages", []) + (repo_data_dict.get("description", "") or "").split()
         repo_data = RepoData(
-            keywords=repo_data_dict.get("languages", []) + (repo_data_dict.get("description", "") or "").split(),
+            keywords=repo_keywords,
             active_days_last_30=30,
             issues_new_last_30=int(repo_data_dict.get("demand_score", 0) * 50),
             openrank=repo_data_dict.get("influence_score", 0) * 50,
@@ -730,8 +762,11 @@ async def search_repos(request: SearchRequest = Body(...)):
                 )
                 scored = []
                 for r in offline_repos:
+                    repo_keywords = r.get("keywords") or []
+                    if not repo_keywords:
+                        repo_keywords = r.get("languages", []) + (r.get("description") or "").split()
                     repo_data = RepoData(
-                        keywords=r.get("languages", []) + (r.get("description") or "").split(),
+                        keywords=repo_keywords,
                         active_days_last_30=30,
                         issues_new_last_30=int(r.get("demand_score", 0) * 50),
                         openrank=r.get("influence_score", 0) * 50,
@@ -761,6 +796,7 @@ async def search_repos(request: SearchRequest = Body(...)):
                             "raw_metrics": None,
                             "match_score": score,
                             "source": repo_copy.get("source", "offline_dataset"),
+                            "keywords": repo_copy.get("keywords") or [],
                         }
                     )
                 mode = "online_with_offline_fallback"
@@ -783,6 +819,7 @@ async def search_repos(request: SearchRequest = Body(...)):
                         "raw_metrics": None,
                         "match_score": repo_result.match_score,
                         "source": "github_opendigger_online",
+                        "keywords": repo_result.github_keywords,
                     }
                 )
             message = result.message

@@ -17,7 +17,8 @@ const MOCK_REPOS: ReposResponse = {
         openrank: '2024-01-01:10,2024-01-02:15,2024-01-03:12,2024-01-04:18,2024-01-05:20',
         active_dates: '2024-01-01:23,2024-01-02:18',
         issues_new: '2024-01:12'
-      }
+      },
+      keywords: ['python', 'javascript', 'development']
     },
     {
       repo_id: 'test/repo2',
@@ -32,7 +33,8 @@ const MOCK_REPOS: ReposResponse = {
         openrank: '2024-01-01:8,2024-01-02:12,2024-01-03:10,2024-01-04:14,2024-01-05:16',
         active_dates: '2024-01-01:20,2024-01-02:15',
         issues_new: '2024-01:15'
-      }
+      },
+      keywords: ['machine-learning', 'tensorflow', 'pytorch', 'framework']
     },
     {
       repo_id: 'test/repo3',
@@ -47,7 +49,8 @@ const MOCK_REPOS: ReposResponse = {
         openrank: '2024-01-01:5,2024-01-02:7,2024-01-03:6,2024-01-04:8,2024-01-05:9',
         active_dates: '2024-01-01:15,2024-01-02:12',
         issues_new: '2024-01:20'
-      }
+      },
+      keywords: ['react', 'nodejs', 'web-app', 'beginners']
     },
     {
       repo_id: 'test/repo4',
@@ -62,7 +65,8 @@ const MOCK_REPOS: ReposResponse = {
         openrank: '2024-01-01:6,2024-01-02:9,2024-01-03:11,2024-01-04:13,2024-01-05:14',
         active_dates: '2024-01-01:25,2024-01-02:24',
         issues_new: '2024-01:25'
-      }
+      },
+      keywords: ['devops', 'toolkit', 'high-activity']
     },
     {
       repo_id: 'test/repo5',
@@ -77,7 +81,8 @@ const MOCK_REPOS: ReposResponse = {
         openrank: '2024-01-01:20,2024-01-02:22,2024-01-03:25,2024-01-04:27,2024-01-05:30',
         active_dates: '2024-01-01:8,2024-01-02:6',
         issues_new: '2024-01:5'
-      }
+      },
+      keywords: ['rust', 'library', 'popular']
     }
   ]
 }
