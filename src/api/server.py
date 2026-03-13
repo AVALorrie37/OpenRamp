@@ -747,9 +747,29 @@ async def calculate_match(request: MatchRequest = Body(...)):
             if repo["repo_id"] == request.repo_id:
                 repo_data_dict = repo
                 break
-        
+
         if not repo_data_dict:
-            raise HTTPException(status_code=404, detail="MATCH_REPOSITORY_NOT_FOUND: Repository not found")
+            try:
+                client = get_online_client()
+                online_data = client.get_activity_data(request.repo_id)
+                unified = convert_online_to_unified(online_data, request.repo_id)
+                try:
+                    gh_client = GitHubClient(use_cache=True)
+                    cached = gh_client.get_cached_repo(request.repo_id)
+                    if cached and not unified.get("keywords"):
+                        kws = cached.get("keywords") or []
+                        if kws:
+                            unified["keywords"] = kws
+                except Exception:
+                    pass
+                global _offline_cache
+                if _offline_cache is None:
+                    _offline_cache = []
+                _offline_cache.append(unified)
+                repo_data_dict = unified
+            except Exception as e:
+                logger.error(f"MATCH_REPOSITORY_ONLINE_FETCH_FAILED: {e}", exc_info=True)
+                raise HTTPException(status_code=404, detail="MATCH_REPOSITORY_NOT_FOUND: Repository not found")
         
         repo_keywords = repo_data_dict.get("keywords") or []
         if not repo_keywords:

@@ -1,9 +1,13 @@
+// frontend/src/utils/storage.ts
+
 const STORAGE_PREFIX = 'user_'
 const CHAT_MESSAGES_PREFIX = 'chat_messages_'
 const _reposSuffix = () => (import.meta.env.VITE_USE_MOCK === 'true' ? '_mock' : '_live')
 const _presetReposKey = () => `preset_repos${_reposSuffix()}`
 const _userReposKey = (username: string) => `user_repos_${username}${_reposSuffix()}`
-const _userFavoritesKey = (username: string) => `user_repos_${username}_favorites${_reposSuffix()}`
+
+// 收藏仓库的 key 去掉环境后缀，线上/本地共用
+const _userFavoritesKey = (username: string) => `user_repos_${username}_favorites`
 
 export const storage = {
   getUserData: (username: string): any => {
