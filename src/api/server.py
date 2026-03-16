@@ -181,10 +181,10 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
     parts = repo_id.split("/")
     repo_name = parts[1] if len(parts) == 2 else repo_id
 
-    return {
+    base = {
         "repo_id": repo_id,
         "name": repo_name,
-        "description": "No description (online mode)",
+        "description": "",
         "languages": ["unknown"],
         "active_score": round(active_score, 4),
         "influence_score": round(influence_score, 4),
@@ -193,6 +193,39 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         "raw_metrics": None,  # 在线模式不返回 raw_metrics
         "keywords": [],  # 关键词后续可由 GitHub 缓存补全
     }
+
+    # 优先使用 GitHub 仓库实时数据补全描述和关键词
+    try:
+        gh_resp = httpx.get(
+            f"https://api.github.com/repos/{repo_id}",
+            headers={"Accept": "application/vnd.github+json"},
+            timeout=5.0,
+        )
+        gh_resp.raise_for_status()
+        gh_data = gh_resp.json()
+        gh_desc = (gh_data.get("description") or "").strip()
+        if gh_desc:
+            base["description"] = gh_desc
+        gh_topics = gh_data.get("topics") or []
+        if gh_topics:
+            base["keywords"] = gh_topics
+    except Exception:
+        # 回退到 GitHub 缓存（如果存在）
+        try:
+            gh_client = GitHubClient(use_cache=True)
+            cached = gh_client.get_cached_repo(repo_id)
+            if cached:
+                cached_desc = (cached.get("description") or "").strip()
+                if cached_desc:
+                    base["description"] = cached_desc
+                cached_kws = cached.get("keywords") or cached.get("topics") or []
+                if cached_kws:
+                    base["keywords"] = cached_kws
+        except Exception:
+            # 最终回退：保持空描述，交给前端处理
+            pass
+
+    return base
 
 
 @app.on_event("startup")
