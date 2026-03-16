@@ -142,6 +142,22 @@ export const useRepos = (username: string | null) => {
     loadPreset()
   }, [loadPreset])
 
+  const updateRepoMatchScore = useCallback((repoId: string, score: number) => {
+    setRepos((prev) => {
+      const next = prev.map((r) =>
+        r.repo_id === repoId ? { ...r, match_score: score } : r
+      )
+      if (username) {
+        const userRepos = storage.getUserRepos(username) || []
+        const nextUserRepos = userRepos.map((r: any) =>
+          r.repo_id === repoId ? { ...r, match_score: score } : r
+        )
+        storage.saveUserRepos(username, nextUserRepos)
+      }
+      return next
+    })
+  }, [username])
+
   const deleteRepo = useCallback((repoId: string) => {
     setRepos((prev) => {
       const next = prev.filter((r) => r.repo_id !== repoId)
@@ -164,6 +180,7 @@ export const useRepos = (username: string | null) => {
     fetchRepos,
     refresh: refreshToPreset,
     refreshRepos,
-    deleteRepo
+    deleteRepo,
+    updateRepoMatchScore
   }
 }

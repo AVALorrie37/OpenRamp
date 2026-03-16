@@ -25,7 +25,7 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos, deleteRepo } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos, deleteRepo, updateRepoMatchScore } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -147,6 +147,9 @@ const App: React.FC = () => {
           repo_full_name: repo.repo_id,
           dynamic_weights: match.dynamic_weights
         })
+        if (typeof match.match_score === 'number') {
+          updateRepoMatchScore(repo.repo_id, match.match_score)
+        }
       } catch (error) {
         console.error('Match error:', error)
       }
@@ -239,6 +242,9 @@ const App: React.FC = () => {
           repo_full_name: selectedRepo.repo_id,
           dynamic_weights: match.dynamic_weights
         })
+        if (typeof match.match_score === 'number') {
+          updateRepoMatchScore(selectedRepo.repo_id, match.match_score)
+        }
       } catch (error) {
         console.error('Match error:', error)
       }
