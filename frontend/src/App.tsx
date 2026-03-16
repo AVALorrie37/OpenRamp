@@ -21,11 +21,11 @@ import DebugLogWindow from './components/Module4_DebugWindow/DebugLogWindow'
 import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
-import type { RepoResponse, MatchResult } from './types'
+import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refresh } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -97,8 +97,11 @@ const App: React.FC = () => {
       });
       setToast(uiLanguage === 'english' ? 'Skills updated' : '技能标签已更新');
       resetProfileModified();
+      if (username) {
+        await refreshRepos();
+      }
     }
-  
+
     if (response?.action === 'SEARCH') {
       await handleSearch()
       setToast('搜索完成，请查看主页')
@@ -131,6 +134,7 @@ const App: React.FC = () => {
               profile.language
             )
             resetProfileModified()
+            await refreshRepos()
           } catch (error) {
             console.error('Profile sync before match failed:', error)
           }
@@ -169,8 +173,7 @@ const App: React.FC = () => {
         const hasZeroScores = enriched.repos.some((r: any) =>
           (r.active_score === 0 || r.active_score === 0.0) &&
           (r.influence_score === 0 || r.influence_score === 0.0) &&
-          (r.demand_score === 0 || r.demand_score === 0.0) &&
-          (r.composite_score === 0 || r.composite_score === 0.0)
+          (r.demand_score === 0 || r.demand_score === 0.0)
         )
         if (hasZeroScores) {
           setToast(uiLanguage === 'english'
@@ -191,6 +194,20 @@ const App: React.FC = () => {
     setSelectedRepo(null)
     setHighlightedRepoIds([])
     setActiveKeywords([])
+  }
+
+  const handleProfileUpdateFromPanel = (partial: Partial<UserProfile>) => {
+    if (!username || !profile) return
+    updateProfile(partial)
+    const merged = { ...profile, ...partial }
+    const skills = merged.skills ?? profile.skills ?? []
+    const prefs = merged.preferences ?? profile.preferences ?? []
+    if (skills.length > 0 || prefs.length > 0) {
+      profileAPI.sync(username, skills, prefs, merged.language ?? profile.language).then(() => {
+        refreshRepos()
+        resetProfileModified()
+      }).catch((e) => console.error('Profile sync failed:', e))
+    }
   }
 
   const handleSendMessage = async (message: string) => {
@@ -300,7 +317,7 @@ const App: React.FC = () => {
           <UserDropdown
             username={username}
             profile={profile}
-            onUpdate={updateProfile}
+            onUpdate={handleProfileUpdateFromPanel}
             onLogout={handleLogout}
             onLogin={() => setShowLoginModal(true)}
           />
@@ -342,6 +359,7 @@ const App: React.FC = () => {
               onRepoClick={handleRepoClick}
               onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
+            canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
               onOpenManualSearch={() => setShowManualSearch(true)}
             />
           </div>

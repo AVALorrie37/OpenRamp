@@ -7,6 +7,7 @@ export interface RepoResponse {
   influence_score: number
   demand_score: number
   composite_score: number
+  match_score?: number
   raw_metrics?: {
     active_dates?: string
     openrank?: string

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { theme } from '../../styles/theme'
 import type { RepoResponse } from '../../types'
 
@@ -8,20 +8,40 @@ interface RepoListProps {
   onOpenManualSearch?: () => void
   highlightedRepoIds?: string[]
   onBackgroundClick?: () => void
+  canUseMatchSort?: boolean
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort }) => {
   const [sortType, setSortType] = useState<SortType>('match')
+
+  const hasMatchScore = repos.some(r => typeof r.match_score === 'number')
+  const canUseMatch = !!canUseMatchSort && hasMatchScore
+
+  useEffect(() => {
+    if (!canUseMatch && sortType === 'match') {
+      setSortType('active')
+    }
+  }, [canUseMatch, sortType])
+
+  const getPrimaryScore = (repo: RepoResponse) => {
+    if (canUseMatch && typeof repo.match_score === 'number') {
+      return repo.match_score
+    }
+    return repo.composite_score
+  }
 
   const sortedRepos = [...repos].sort((a, b) => {
     if (sortType === 'match') {
-      return b.composite_score - a.composite_score
+      if (!canUseMatch) {
+        return b.active_score - a.active_score
+      }
+      return getPrimaryScore(b) - getPrimaryScore(a)
     } else if (sortType === 'active') {
       return b.active_score - a.active_score
     } else { // friendly
-      return b.composite_score - a.composite_score
+      return getPrimaryScore(b) - getPrimaryScore(a)
     }
   })
 
@@ -39,20 +59,22 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
         borderBottom: `1px solid ${theme.border}`
       }}>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => setSortType('match')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: sortType === 'match' ? theme.primary : theme.background,
-              color: sortType === 'match' ? theme.white : theme.text,
-              border: `1px solid ${theme.primary}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
-          >
-            匹配总分
-          </button>
+          {canUseMatch && (
+            <button
+              onClick={() => setSortType('match')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: sortType === 'match' ? theme.primary : theme.background,
+                color: sortType === 'match' ? theme.white : theme.text,
+                border: `1px solid ${theme.primary}`,
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              匹配总分
+            </button>
+          )}
           <button
             onClick={() => setSortType('active')}
             style={{
@@ -157,16 +179,18 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                 )}
               </h3>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{
-                  padding: '4px 8px',
-                  backgroundColor: theme.primary,
-                  color: theme.white,
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 500
-                }}>
-                  匹配{Math.round(repo.composite_score * 100)}%
-                </span>
+                {canUseMatch && (
+                  <span style={{
+                    padding: '4px 8px',
+                    backgroundColor: theme.primary,
+                    color: theme.white,
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 500
+                  }}>
+                    匹配{Math.round(getPrimaryScore(repo) * 100)}%
+                  </span>
+                )}
                 <span style={{
                   padding: '4px 8px',
                   backgroundColor: theme.primaryLight,
@@ -177,7 +201,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                 }}>
                   活跃度{Math.round(repo.active_score * 100)}%
                 </span>
-                {repo.composite_score > 0.7 && (
+                {canUseMatch && getPrimaryScore(repo) > 0.7 && (
                   <span style={{
                     padding: '4px 8px',
                     backgroundColor: theme.accent,

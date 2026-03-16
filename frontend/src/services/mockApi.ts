@@ -13,6 +13,7 @@ const MOCK_REPOS: ReposResponse = {
       influence_score: 0.23,
       demand_score: 0.75,
       composite_score: 0.55,
+      match_score: 0.55,
       raw_metrics: {
         openrank: '2024-01-01:10,2024-01-02:15,2024-01-03:12,2024-01-04:18,2024-01-05:20',
         active_dates: '2024-01-01:23,2024-01-02:18',
@@ -29,6 +30,7 @@ const MOCK_REPOS: ReposResponse = {
       influence_score: 0.88,
       demand_score: 0.82,
       composite_score: 0.81,
+      match_score: 0.81,
       raw_metrics: {
         openrank: '2024-01-01:8,2024-01-02:12,2024-01-03:10,2024-01-04:14,2024-01-05:16',
         active_dates: '2024-01-01:20,2024-01-02:15',
@@ -45,6 +47,7 @@ const MOCK_REPOS: ReposResponse = {
       influence_score: 0.45,
       demand_score: 0.88,
       composite_score: 0.77,
+      match_score: 0.77,
       raw_metrics: {
         openrank: '2024-01-01:5,2024-01-02:7,2024-01-03:6,2024-01-04:8,2024-01-05:9',
         active_dates: '2024-01-01:15,2024-01-02:12',
@@ -61,6 +64,7 @@ const MOCK_REPOS: ReposResponse = {
       influence_score: 0.4,
       demand_score: 0.9,
       composite_score: 0.78,
+      match_score: 0.78,
       raw_metrics: {
         openrank: '2024-01-01:6,2024-01-02:9,2024-01-03:11,2024-01-04:13,2024-01-05:14',
         active_dates: '2024-01-01:25,2024-01-02:24',
@@ -77,6 +81,7 @@ const MOCK_REPOS: ReposResponse = {
       influence_score: 0.95,
       demand_score: 0.35,
       composite_score: 0.6,
+      match_score: 0.6,
       raw_metrics: {
         openrank: '2024-01-01:20,2024-01-02:22,2024-01-03:25,2024-01-04:27,2024-01-05:30',
         active_dates: '2024-01-01:8,2024-01-02:6',

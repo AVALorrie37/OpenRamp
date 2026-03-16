@@ -124,6 +124,12 @@ export const useRepos = (username: string | null) => {
         }
       }
       setRepos(merged)
+      if (username && merged.length > 0) {
+        const favorites = merged.filter(r => r.is_favorited)
+        if (favorites.length > 0) {
+          storage.saveUserFavorites(username, favorites)
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch repos')
       console.error('Fetch repos error:', err)

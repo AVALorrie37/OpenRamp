@@ -5,7 +5,7 @@
         "dev-all": "cross-env VITE_USE_MOCK=false concurrently -n \"Ollama,Backend,Frontend\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\"",
         "dev": "cross-env VITE_USE_MOCK=false concurrently -n \"Backend,Frontend\" -c \"bgBlue.bold,bgGreen.bold\" \"npm run backend\" \"npm run frontend:dev\"",
         "mock": "cross-env VITE_USE_MOCK=true npm --prefix frontend run dev",
-        "backend": "python -m src.api.server",
+        "backend": "cross-env PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python -m src.api.server",
         "frontend:dev": "npm --prefix frontend run dev",
         "ollama": "ollama serve"
     },
