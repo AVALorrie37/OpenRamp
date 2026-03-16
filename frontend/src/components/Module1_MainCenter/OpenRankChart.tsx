@@ -57,8 +57,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
           data,
           borderColor: theme.primary,
           backgroundColor: `${theme.primary}40`,
-          tension: 0.4,
-          fill: true
+          tension: 0.4
         }
       ]
     }

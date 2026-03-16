@@ -142,12 +142,28 @@ export const useRepos = (username: string | null) => {
     loadPreset()
   }, [loadPreset])
 
+  const deleteRepo = useCallback((repoId: string) => {
+    setRepos((prev) => {
+      const next = prev.filter((r) => r.repo_id !== repoId)
+      if (username) {
+        const userRepos = storage.getUserRepos(username) || []
+        const nextUserRepos = userRepos.filter((r: any) => r.repo_id !== repoId)
+        storage.saveUserRepos(username, nextUserRepos)
+        const favorites = storage.getUserFavorites(username) || []
+        const nextFavorites = favorites.filter((r: any) => r.repo_id !== repoId)
+        storage.saveUserFavorites(username, nextFavorites)
+      }
+      return next
+    })
+  }, [username])
+
   return {
     repos,
     loading,
     error,
     fetchRepos,
     refresh: refreshToPreset,
-    refreshRepos
+    refreshRepos,
+    deleteRepo
   }
 }

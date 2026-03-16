@@ -25,7 +25,7 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos, deleteRepo } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -167,7 +167,13 @@ const App: React.FC = () => {
       )
       if (enriched && enriched.repos && enriched.repos.length > 0) {
         if (username) {
-          storage.saveUserFavorites(username, enriched.repos)
+          const existingFavorites = storage.getUserFavorites(username) || []
+          const existingIds = new Set(existingFavorites.map((r: any) => r.repo_id))
+          const mergedFavorites = [
+            ...existingFavorites,
+            ...enriched.repos.filter((r: any) => r.repo_id && !existingIds.has(r.repo_id))
+          ]
+          storage.saveUserFavorites(username, mergedFavorites)
         }
         fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
         const hasZeroScores = enriched.repos.some((r: any) =>
@@ -359,8 +365,16 @@ const App: React.FC = () => {
               onRepoClick={handleRepoClick}
               onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
-            canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
+              canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
               onOpenManualSearch={() => setShowManualSearch(true)}
+              onDeleteRepo={(repoId) => {
+                deleteRepo(repoId)
+                if (selectedRepo && selectedRepo.repo_id === repoId) {
+                  setSelectedRepo(null)
+                  setMatchData(null)
+                }
+                setHighlightedRepoIds((prev) => prev.filter((id) => id !== repoId))
+              }}
             />
           </div>
 

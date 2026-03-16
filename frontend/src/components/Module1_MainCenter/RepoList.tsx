@@ -9,12 +9,14 @@ interface RepoListProps {
   highlightedRepoIds?: string[]
   onBackgroundClick?: () => void
   canUseMatchSort?: boolean
+  onDeleteRepo?: (repoId: string) => void
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo }) => {
   const [sortType, setSortType] = useState<SortType>('match')
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const hasMatchScore = repos.some(r => typeof r.match_score === 'number')
   const canUseMatch = !!canUseMatchSort && hasMatchScore
@@ -133,7 +135,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
         }}
         onClick={onBackgroundClick}
       >
-        {sortedRepos.map((repo) => {
+        {sortedRepos.map((repo: RepoResponse) => {
           const isHighlighted = highlightedRepoIds?.includes(repo.repo_id)
           return (
           <div
@@ -141,6 +143,11 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
             onClick={(e) => {
               e.stopPropagation()
               onRepoClick(repo)
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setDeleteTargetId(repo.repo_id)
             }}
             style={{
               padding: '16px',
@@ -215,6 +222,58 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                 )}
               </div>
             </div>
+            {deleteTargetId === repo.repo_id && onDeleteRepo && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: theme.primaryLight,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '12px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>删除这个仓库？</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: `1px solid ${theme.error}`,
+                      backgroundColor: theme.error,
+                      color: '#fff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteRepo(repo.repo_id)
+                      setDeleteTargetId(null)
+                    }}
+                  >
+                    删除
+                  </button>
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: `1px solid ${theme.border}`,
+                      backgroundColor: theme.white,
+                      color: theme.text,
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeleteTargetId(null)
+                    }}
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
             <p style={{
               margin: '8px 0 0 0',
               fontSize: '13px',
