@@ -875,13 +875,31 @@ async def search_repos(request: SearchRequest = Body(...)):
                 for repo_dict, score in scored[:limit]:
                     repo_copy = dict(repo_dict)
                     repo_copy["source"] = "offline_dataset"
+                    # 重新构造 RepoData 以拿到 breakdown.activity 作为 active_score
+                    repo_keywords = repo_copy.get("keywords") or []
+                    if not repo_keywords:
+                        repo_keywords = repo_copy.get("languages", []) + (repo_copy.get("description") or "").split()
+                    repo_data_for_breakdown = RepoData(
+                        keywords=repo_keywords,
+                        active_days_last_30=30,
+                        issues_new_last_30=int(repo_copy.get("demand_score", 0) * 50),
+                        openrank=repo_copy.get("influence_score", 0) * 50,
+                        name=repo_copy.get("name"),
+                        full_name=repo_copy.get("repo_id"),
+                        precomputed_activity_score=repo_copy.get("active_score"),
+                        precomputed_demand_score=repo_copy.get("demand_score"),
+                        data_source="opendigger+github" if repo_copy.get("source") == "opendigger_online" else "metadata_only",
+                    )
+                    match_with_breakdown = scorer.calculate(user_profile, repo_data_for_breakdown)
+                    activity_score = match_with_breakdown.breakdown.activity
+
                     repos.append(
                         {
                             "repo_id": repo_copy["repo_id"],
                             "name": repo_copy["name"],
                             "description": repo_copy.get("description") or "No description",
                             "languages": repo_copy.get("languages") or [],
-                            "active_score": repo_copy.get("active_score", 0.0),
+                            "active_score": activity_score,
                             "influence_score": repo_copy.get("influence_score", 0.0),
                             "demand_score": repo_copy.get("demand_score", 0.0),
                             "composite_score": repo_copy.get("composite_score", 0.0),
@@ -898,13 +916,19 @@ async def search_repos(request: SearchRequest = Body(...)):
                 message = result.message or "No offline dataset available."
         else:
             for repo_result in result.repositories:
+                activity_score = None
+                if repo_result.match_breakdown and "activity" in repo_result.match_breakdown:
+                    activity_score = repo_result.match_breakdown["activity"]
+                else:
+                    activity_score = repo_result.active_score
+
                 repos.append(
                     {
                         "repo_id": repo_result.repo_id,
                         "name": repo_result.repo_id.split("/")[-1],
                         "description": repo_result.description or "No description",
                         "languages": repo_result.languages,
-                        "active_score": repo_result.active_score,
+                        "active_score": activity_score,
                         "influence_score": repo_result.influence_score,
                         "demand_score": repo_result.demand_score,
                         "composite_score": repo_result.composite_score,

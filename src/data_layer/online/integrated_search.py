@@ -123,6 +123,11 @@ class IntegratedRepoSearch:
         self._github = github_client or GitHubClient()
         self._opendigger = opendigger_client or OpenDiggerClient(use_cache=use_cache)
         self._scorer = MatchScorer()
+
+        # Online-learning stats for GitHub-only activity normalization (A_raw -> [0,1])
+        self._activity_a_raw_samples: List[float] = []
+        self._activity_p1: float = 0.5
+        self._activity_p99: float = 3000.0
         
         # Setup profile cache directory
         if profile_cache_dir:
@@ -231,6 +236,49 @@ class IntegratedRepoSearch:
             return 1.0
         return (value - v_min) / (v_max - v_min)
 
+    def _update_activity_quantiles(self, a_raw: float) -> None:
+        """
+        Update running estimates of p1/p99 for activity A_raw using a sliding window.
+        """
+        self._activity_a_raw_samples.append(a_raw)
+        # Keep a sliding window to bound memory and adapt to new data
+        max_window = 1000
+        if len(self._activity_a_raw_samples) > max_window:
+            self._activity_a_raw_samples = self._activity_a_raw_samples[-max_window:]
+
+        # Need enough samples for stable quantiles
+        if len(self._activity_a_raw_samples) < 50:
+            return
+
+        sorted_vals = sorted(self._activity_a_raw_samples)
+        n = len(sorted_vals)
+        idx1 = max(0, int(0.01 * n) - 1)
+        idx99 = min(n - 1, int(0.99 * n) - 1)
+        p1 = sorted_vals[idx1]
+        p99 = sorted_vals[idx99]
+
+        # Guard against degenerate ranges
+        if p99 <= p1:
+            return
+
+        self._activity_p1 = p1
+        self._activity_p99 = p99
+
+    def _normalize_activity_a_raw(self, a_raw: float) -> float:
+        """
+        Normalize A_raw to [0,1] using robust Min-Max with online-learned p1/p99.
+        """
+        # Update quantile estimates before using them
+        self._update_activity_quantiles(a_raw)
+        v_min = self._activity_p1
+        v_max = self._activity_p99
+
+        # Fallback if estimates are still default or too close
+        if v_max <= v_min + 1e-6:
+            v_min, v_max = 0.5, 300.0
+
+        return self._robust_min_max(a_raw, v_min=v_min, v_max=v_max)
+
     def _compute_github_only_scores(self, metadata: RepoMetadata, github_keywords: List[str]) -> Dict[str, Any]:
         """
         当没有 OpenDigger 数据时，仅基于 GitHub 原生指标估算各子分。
@@ -257,8 +305,8 @@ class IntegratedRepoSearch:
             + 2.0 * math.log2(1.0 + recent_commits_30d)
             + 0.5 * math.log2(1.0 + forks)
         )
-        # 使用经验阈值做鲁棒 Min-Max 归一化（可后续在线学习更新）
-        s_activity = self._robust_min_max(a_raw, v_min=0.5, v_max=10.0)
+        # 使用分位数在线学习得到的 p1/p99 做鲁棒 Min-Max 归一化
+        s_activity = self._normalize_activity_a_raw(a_raw)
 
         # 需求分：open_issues 和 open_issues / recent_commits_30d
         issues_norm = self._robust_min_max(
