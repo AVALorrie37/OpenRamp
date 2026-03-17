@@ -126,7 +126,7 @@ class IntegratedRepoSearch:
 
         # Online-learning stats for GitHub-only activity normalization (A_raw -> [0,1])
         self._activity_a_raw_samples: List[float] = []
-        self._activity_p1: float = 0.5
+        self._activity_p1: float = 1
         self._activity_p99: float = 3000.0
         
         # Setup profile cache directory
@@ -275,7 +275,7 @@ class IntegratedRepoSearch:
 
         # Fallback if estimates are still default or too close
         if v_max <= v_min + 1e-6:
-            v_min, v_max = 0.5, 300.0
+            v_min, v_max = 0.5, 500.0
 
         return self._robust_min_max(a_raw, v_min=v_min, v_max=v_max)
 

@@ -48,15 +48,6 @@ const App: React.FC = () => {
   }, [username, fetchRepos, uiLanguage])
   const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
-  useEffect(() => {
-    if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
-      const lastSearch = localStorage.getItem(`last_search_${username}`)
-      if (!lastSearch) {
-        handleSearch()
-      }
-    }
-  }, [isLoggedIn, profile])
-
   const handleLogin = (user: string, language: 'chinese' | 'english') => {
     setSelectedRepo(null)
     setMatchData(null)
@@ -108,7 +99,31 @@ const App: React.FC = () => {
   }
 
   const handleSearch = async () => {
-    if (!username) return
+    if (!isLoggedIn) {
+      setToast(uiLanguage === 'english'
+        ? 'Cannot auto-search: please log in first.'
+        : '无法自动搜索：请先登录。')
+      return
+    }
+    if (!username) {
+      setToast(uiLanguage === 'english'
+        ? 'Cannot auto-search: missing username.'
+        : '无法自动搜索：缺少用户名。')
+      return
+    }
+    if (!profile?.skills || profile.skills.length === 0) {
+      setToast(uiLanguage === 'english'
+        ? 'Cannot auto-search: please add at least one skill tag.'
+        : '无法自动搜索：请先添加至少一个技能标签。')
+      return
+    }
+    const lastSearch = localStorage.getItem(`last_search_${username}`)
+    if (lastSearch) {
+      setToast(uiLanguage === 'english'
+        ? 'Cannot auto-search: search has already been run for this user.'
+        : '无法自动搜索：该用户已执行过自动搜索。')
+      return
+    }
     try {
       const result = await searchAPI.search(username, 10)
       fetchRepos({ repo_ids: result.repos.map(r => r.repo_id), limit: 10 })
