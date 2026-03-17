@@ -441,6 +441,11 @@ class SearchRequest(BaseModel):
     limit: Optional[int] = 10
 
 
+class KeywordSearchRequest(BaseModel):
+    keywords: List[str]
+    limit: Optional[int] = 10
+
+
 class SearchCancelRequest(BaseModel):
     search_id: str
 
@@ -964,6 +969,60 @@ async def search_repos(request: SearchRequest = Body(...)):
         raise HTTPException(status_code=500, detail=f"SEARCH_ERROR: {str(e)}")
 
 
+@app.post("/api/search/keywords")
+async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
+    """
+    使用关键词组合进行多轮在线搜索（不依赖用户画像）。
+    """
+    try:
+        keywords = [k.strip() for k in (request.keywords or []) if k and k.strip()]
+        if not keywords:
+            raise HTTPException(status_code=400, detail="KEYWORD_SEARCH_NO_KEYWORDS: No valid keywords provided")
+        searcher = get_integrated_search()
+        result = searcher.search_with_metrics(
+            keywords=keywords,
+            target_count=request.limit or 10,
+            max_iterations=10,
+            github_batch_size=15,
+        )
+        repos = []
+        for r in result.repositories:
+            parts = r.repo_id.split("/", 1)
+            owner = parts[0] if len(parts) == 2 else ""
+            name = parts[1] if len(parts) == 2 else r.repo_id
+            html_url = f"https://github.com/{r.repo_id}"
+            repos.append({
+                "repo_id": r.repo_id,
+                "name": name,
+                "full_name": r.repo_id,
+                "description": r.description or "",
+                "languages": r.languages or [],
+                "active_score": r.active_score,
+                "influence_score": r.influence_score,
+                "demand_score": r.demand_score,
+                "composite_score": r.composite_score,
+                "match_score": r.match_score,
+                "match_breakdown": r.match_breakdown,
+                "source": "online_keywords",
+                "html_url": html_url,
+                "stargazers_count": getattr(r.metadata, "stars", 0),
+                "updated_at": getattr(r.metadata, "last_updated", None),
+                "owner": {
+                    "login": owner,
+                },
+            })
+        return {
+            "mode": "online_keywords",
+            "fallback_used": False,
+            "repos": repos,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"KEYWORD_SEARCH_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"KEYWORD_SEARCH_ERROR: {str(e)}")
+
+
 @app.post("/api/search/cancel")
 async def cancel_search(request: SearchCancelRequest = Body(...)):
     try:
@@ -1087,28 +1146,14 @@ async def github_issue_trend(
         if token:
             headers["Authorization"] = f"token {token}"
         since_dt = datetime.utcnow() - timedelta(days=days)
-        params = {"state": "all", "since": since_dt.isoformat() + "Z", "per_page": 100}
-        url = f"https://api.github.com/repos/{repo_id}/issues"
-        all_issues: List[Dict[str, Any]] = []
-        while True:
-            resp = await client.get(url, headers=headers, params=params)
-            resp.raise_for_status()
-            batch = resp.json() or []
-            all_issues.extend(batch)
-            link = resp.headers.get("Link", "")
-            next_url = None
-            if link:
-                parts = link.split(",")
-                for part in parts:
-                    if 'rel="next"' in part:
-                        seg = part.split(";")[0].strip()
-                        if seg.startswith("<") and seg.endswith(">"):
-                            next_url = seg[1:-1]
-                        break
-            if not next_url:
-                break
-            url = next_url
-            params = {}
+        since_str = since_dt.strftime("%Y-%m-%d")
+        query = f"repo:{repo_id} type:issue created:>={since_str}"
+        url = "https://api.github.com/search/issues"
+        params = {"q": query, "sort": "created", "order": "asc", "per_page": 100}
+        resp = await client.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        body = resp.json() or {}
+        all_issues: List[Dict[str, Any]] = body.get("items") or []
 
         counter: Dict[str, int] = {}
         for issue in all_issues:

@@ -38,6 +38,7 @@ const getDefaultPushedDate = () => {
 const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, onClose }) => {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [autoLoading, setAutoLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<ManualSearchRepo[]>([])
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
@@ -278,7 +279,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
               />
               <button
                 onClick={() => void handleSearch()}
-                disabled={loading}
+                disabled={loading || autoLoading}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '8px',
@@ -291,6 +292,49 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                 }}
               >
                 {loading ? '搜索中...' : '搜索'}
+              </button>
+              <button
+                onClick={async () => {
+                  const selected = selectedKeywords.length > 0 ? selectedKeywords : hotKeywords
+                  const keywords = selected.map(k => k.replace(/\s+/g, '-'))
+                  if (!keywords || keywords.length === 0) return
+                  setAutoLoading(true)
+                  setError(null)
+                  try {
+                    const data: any = await manualSearchAPI.autoMultiRoundSearch(keywords, perPage)
+                    const repos: ManualSearchRepo[] = ((data as any).repos || []).map((item: any) => ({
+                      repo_id: item.repo_id || item.full_name,
+                      full_name: item.full_name || item.repo_id,
+                      html_url: item.html_url || `https://github.com/${item.repo_id}`,
+                      description: item.description || '',
+                      stargazers_count: item.stargazers_count || 0,
+                      updated_at: item.updated_at,
+                      owner: {
+                        login: item.owner?.login || (item.repo_id ? (item.repo_id.split('/')[0] || '') : ''),
+                        avatar_url: item.owner?.avatar_url
+                      }
+                    }))
+                    setResults(repos)
+                    setTotalCount(repos.length)
+                  } catch (e: any) {
+                    setError(e?.message || 'Multi-round search error')
+                  } finally {
+                    setAutoLoading(false)
+                  }
+                }}
+                disabled={loading || autoLoading}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: autoLoading ? theme.primaryLight : theme.primary,
+                  color: theme.white,
+                  fontSize: '14px',
+                  cursor: loading || autoLoading ? 'default' : 'pointer',
+                  opacity: loading || autoLoading ? 0.7 : 1
+                }}
+              >
+                {autoLoading ? '多轮搜索中...' : '一键多轮搜索'}
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>

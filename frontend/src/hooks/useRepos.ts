@@ -27,7 +27,14 @@ export const useRepos = (username: string | null) => {
       const base: RepoResponse = existing || fav
       map.set(repoId, { ...base, ...fav, is_favorited: true })
     })
-    return Array.from(map.values())
+    return Array.from(map.values()).map((r) => {
+      if (r.name && r.name.trim().length > 0) return r
+      const full = (r as any).full_name || r.repo_id || ''
+      const parts = String(full).split('/')
+      const repoName = parts.length === 2 ? parts[1] : (parts[0] || '')
+      if (!repoName) return r
+      return { ...r, name: repoName }
+    })
   }, [])
 
   const loadPreset = useCallback(async () => {
@@ -108,8 +115,8 @@ export const useRepos = (username: string | null) => {
   }, [username, loadPreset, mergeWithFavorites])
 
   useEffect(() => {
-    refreshRepos()
-  }, [refreshRepos])
+    loadPreset()
+  }, [loadPreset])
 
   const fetchRepos = useCallback(async (params?: { mode?: string; repo_ids?: string[]; limit?: number }) => {
     setLoading(true)
