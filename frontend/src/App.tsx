@@ -7,7 +7,6 @@ import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api
 import { theme } from './styles/theme'
 import { storage } from './utils/storage'
 
-import TechStackCloud from './components/Module1_MainCenter/TechStackCloud'
 import RepoList from './components/Module1_MainCenter/RepoList'
 import OpenRankChart from './components/Module1_MainCenter/OpenRankChart'
 import KeywordCloud from './components/Module1_MainCenter/KeywordCloud'
@@ -123,6 +122,7 @@ const App: React.FC = () => {
     setSelectedRepo(repo)
     setHighlightedRepoIds([])
     setActiveKeywords([])
+
     if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
       try {
         if (isProfileModified && isProfileModified() && username && profile) {
@@ -162,6 +162,15 @@ const App: React.FC = () => {
       return
     }
     try {
+      if (username) {
+        const existingFavorites = storage.getUserFavorites(username) || []
+        const existingIds = new Set(existingFavorites.map((r: any) => r.repo_id))
+        const mergedFavorites = [
+          ...existingFavorites,
+          ...favorited.filter((r) => r.repo_id && !existingIds.has(r.repo_id))
+        ]
+        storage.saveUserFavorites(username, mergedFavorites)
+      }
       const enriched = await manualSearchAPI.bulkEnrich(
         favorited.map((r) => ({
           repo_id: r.repo_id,
@@ -169,15 +178,6 @@ const App: React.FC = () => {
         }))
       )
       if (enriched && enriched.repos && enriched.repos.length > 0) {
-        if (username) {
-          const existingFavorites = storage.getUserFavorites(username) || []
-          const existingIds = new Set(existingFavorites.map((r: any) => r.repo_id))
-          const mergedFavorites = [
-            ...existingFavorites,
-            ...enriched.repos.filter((r: any) => r.repo_id && !existingIds.has(r.repo_id))
-          ]
-          storage.saveUserFavorites(username, mergedFavorites)
-        }
         fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
         const hasZeroScores = enriched.repos.some((r: any) =>
           (r.active_score === 0 || r.active_score === 0.0) &&
@@ -344,13 +344,6 @@ const App: React.FC = () => {
         padding: showDebug ? '0 0 300px 0' : '0'
       }}>
         <div style={{
-          padding: '20px',
-          borderBottom: `1px solid ${theme.border}`
-        }}>
-          <TechStackCloud languages={allLanguages} onTagClick={handleTagClick} />
-        </div>
-
-          <div style={{
           flex: 1,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr',
@@ -381,6 +374,19 @@ const App: React.FC = () => {
                 }
                 setHighlightedRepoIds((prev) => prev.filter((id) => id !== repoId))
               }}
+              onDescriptionRefresh={async (repo) => {
+                try {
+                  const enriched = await manualSearchAPI.bulkEnrich([
+                    { repo_id: repo.repo_id, full_name: repo.repo_id }
+                  ])
+                  if (enriched && enriched.repos && enriched.repos.length > 0) {
+                    const updated = enriched.repos[0]
+                    fetchRepos({ repo_ids: [updated.repo_id], limit: 1 })
+                  }
+                } catch (e) {
+                  console.error('Description refresh failed:', e)
+                }
+              }}
             />
           </div>
 
@@ -395,10 +401,28 @@ const App: React.FC = () => {
               borderRadius: '8px',
               border: `1px solid ${theme.border}`,
               minHeight: '200px',
-              flex:1,
+              flex:0.8,
               position: 'relative'
             }}>
-              <OpenRankChart repo={selectedRepo || repos[0]} />
+              <OpenRankChart
+                repo={selectedRepo || repos[0]}
+                onRefreshRepo={async (target) => {
+                  try {
+                    const enriched = await manualSearchAPI.bulkEnrich([
+                      { repo_id: target.repo_id, full_name: target.repo_id }
+                    ])
+                    if (enriched && enriched.repos && enriched.repos.length > 0) {
+                      const updated = enriched.repos[0]
+                      fetchRepos({ repo_ids: [updated.repo_id], limit: 1 })
+                      if (selectedRepo && selectedRepo.repo_id === updated.repo_id) {
+                        setSelectedRepo(updated as RepoResponse)
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Refresh OpenDigger data failed:', e)
+                  }
+                }}
+              />
             </div>
             <div
               style={{
@@ -406,7 +430,7 @@ const App: React.FC = () => {
               borderRadius: '8px',
               border: `1px solid ${theme.border}`,
               minHeight: '200px',
-              flex:1,
+              flex:1.2,
               position: 'relative'
             }}
               onClick={handleKeywordAreaClick}
@@ -436,34 +460,34 @@ const App: React.FC = () => {
               onBaseWeightsChange={handleWeightsChange}
             />
           </div>
-        </div>
-
-        <div style={{
-          padding: '12px 20px',
-          backgroundColor: theme.primaryLight + '40',
-          borderTop: `1px solid ${theme.border}`,
-          fontSize: '13px',
-          color: theme.text,
-          textAlign: 'center',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap'
-        }}>
-          <div style={{
-            display: 'inline-block',
-            animation: 'scroll 20s linear infinite'
-          }}>
-            {uiLanguage === 'english'
-              ? 'Tip: Log in to get personalized recommendations | Click a repo to view match details | Chat with the AI assistant to confirm your skills'
-              : '提示：登录获取个性化推荐 | 点击仓库查看匹配详情 | 与AI助手对话确认技能'}
           </div>
-          <style>{`
-            @keyframes scroll {
-              0% { transform: translateX(100%); }
-              100% { transform: translateX(-100%); }
-            }
-          `}</style>
-        </div>
       </main>
+
+      <div style={{
+        padding: '12px 20px',
+        backgroundColor: theme.primaryLight + '40',
+        borderTop: `1px solid ${theme.border}`,
+        fontSize: '13px',
+        color: theme.text,
+        textAlign: 'center',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap'
+      }}>
+        <div style={{
+          display: 'inline-block',
+          animation: 'scroll 20s linear infinite'
+        }}>
+          {uiLanguage === 'english'
+            ? 'Tip: Log in to get personalized recommendations | Click a repo to view match details | Chat with the AI assistant to confirm your skills'
+            : '提示：登录获取个性化推荐 | 点击仓库查看匹配详情 | 与AI助手对话确认技能'}
+        </div>
+        <style>{`
+          @keyframes scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+          }
+        `}</style>
+      </div>
 
       <AIButton language={uiLanguage} onClick={() => {
         if (!isLoggedIn) {

@@ -25,9 +25,10 @@ ChartJS.register(
 
 interface OpenRankChartProps {
   repo: RepoResponse | null
+  onRefreshRepo?: (repo: RepoResponse) => void
 }
 
-const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
+const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, onRefreshRepo }) => {
   const chartData = useMemo(() => {
     if (!repo?.raw_metrics?.openrank) {
       return {
@@ -63,20 +64,16 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
     }
   }, [repo])
 
-  if (!repo || !chartData.labels.length) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '200px',
-        color: theme.text,
-        opacity: 0.5
-      }}>
-        暂无数据
-      </div>
-    )
-  }
+  const hasData = chartData.labels.length > 0
+  const rawNote = (repo?.raw_metrics as any)?.note as string | undefined
+  const statusText =
+    !repo
+      ? '暂无数据'
+      : rawNote === 'no OpenDigger data'
+        ? '暂无 OpenDigger 数据'
+        : !hasData
+          ? '暂无数据'
+          : null
 
   return (
     <div style={{ 
@@ -88,41 +85,78 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
       justifyContent: 'center',
       alignItems: 'center'
       }}>
-      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: theme.text }}>
-        OpenRank活跃度图（近30天）
-      </h4>
-      <Line
-        data={chartData}
-        options={{
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {
+      <div style={{ 
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: '16px'
+      }}>
+        <h4 style={{ margin: 0, fontSize: '14px', color: theme.text }}>
+          OpenRank活跃度图（近30天）
+        </h4>
+        {repo && onRefreshRepo && (
+          <button
+            onClick={() => onRefreshRepo(repo)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '12px',
+              borderRadius: '4px',
+              border: `1px solid ${theme.primary}`,
               backgroundColor: theme.white,
-              borderColor: theme.primary,
-              borderWidth: 1,
-              titleColor: theme.text,
-              bodyColor: theme.text,
-              padding: 12
-            }
-          },
-          scales: {
-            x: {
-              ticks: {
-                maxRotation: 45,
-                minRotation: 45,
-                font: { size: 10 }
+              color: theme.primary,
+              cursor: 'pointer'
+            }}
+          >
+            刷新
+          </button>
+        )}
+      </div>
+      {statusText ? (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '200px',
+          color: theme.text,
+          opacity: 0.5
+        }}>
+          {statusText}
+        </div>
+      ) : (
+        <Line
+          data={chartData}
+          options={{
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: theme.white,
+                borderColor: theme.primary,
+                borderWidth: 1,
+                titleColor: theme.text,
+                bodyColor: theme.text,
+                padding: 12
               }
             },
-            y: {
-              beginAtZero: true
+            scales: {
+              x: {
+                ticks: {
+                  maxRotation: 45,
+                  minRotation: 45,
+                  font: { size: 10 }
+                }
+              },
+              y: {
+                beginAtZero: true
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+      )}
     </div>
   )
 }

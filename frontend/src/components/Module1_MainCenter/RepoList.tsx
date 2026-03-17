@@ -10,11 +10,12 @@ interface RepoListProps {
   onBackgroundClick?: () => void
   canUseMatchSort?: boolean
   onDeleteRepo?: (repoId: string) => void
+  onDescriptionRefresh?: (repo: RepoResponse) => void
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo, onDescriptionRefresh }) => {
   const [sortType, setSortType] = useState<SortType>('match')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
@@ -131,7 +132,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '12px'
+          padding: '12px 12px 32px 12px'
         }}
         onClick={onBackgroundClick}
       >
@@ -274,14 +275,26 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                 </div>
               </div>
             )}
-            <p style={{
-              margin: '8px 0 0 0',
-              fontSize: '13px',
-              color: theme.text,
-              opacity: 0.7,
-              lineHeight: '1.5'
-            }}>
-              {repo.description || 'No description'}
+            <p
+              style={{
+                margin: '8px 0 0 0',
+                fontSize: '13px',
+                color: theme.text,
+                opacity: 0.7,
+                lineHeight: '1.5',
+                cursor: !repo.description ? 'pointer' : 'default',
+                textDecoration: !repo.description ? 'underline dotted' : 'none'
+              }}
+              onClick={(e) => {
+                if (!repo.description && onDescriptionRefresh) {
+                  e.stopPropagation()
+                  onDescriptionRefresh(repo)
+                }
+              }}
+            >
+              {repo.description && repo.description.includes('暂无 OpenDigger 数据（使用 GitHub 指标兜底）')
+                ? 'No description'
+                : (repo.description || 'No description')}
             </p>
           </div>
         )})}

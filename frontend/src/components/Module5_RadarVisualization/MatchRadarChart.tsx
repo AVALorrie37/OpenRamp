@@ -157,47 +157,48 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         {matchData.repoName}
       </h2>
       <div style={{
-        marginBottom: '20px',
+        marginBottom: '15px',
         fontSize: '18px',
         color: theme.primary,
         fontWeight: 600
       }}>
         匹配总分: {Math.round(matchData.matchScore * 100)}%
       </div>
-      <div style={{ width: '100%', height: embedded ? '300px' : '500px' }}>
+      <div style={{ width: '100%', height: embedded ? '200px' : '300px' }}>
         <ResponsiveContainer>
-          <RadarChart data={data}>
+          <RadarChart data={data}
+          cx="52%"
+          cy="60%"
+          outerRadius="90%"
+          innerRadius="20%"
+          margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+
             <PolarGrid />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fill: theme.text, fontSize: 14 }}
-            />
-            <PolarRadiusAxis
-              angle={90}
-              domain={[0, 100]}
-              tick={{ fill: theme.text, fontSize: 12 }}
+              tick={{ fill: theme.text, fontSize: 14}}
             />
             <Radar
               name="匹配度"
               dataKey="value"
               stroke={theme.primary}
               fill={theme.primary}
-              fillOpacity={0.6}
+              fillOpacity={0.5}
             />
           </RadarChart>
         </ResponsiveContainer>
       </div>
       <div style={{
-        marginTop: '24px',
+        marginTop: '6px',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        fontSize: '13px',
+        fontSize: '12px',
         color: theme.text
       }}>
         <div
-          style={{ lineHeight: 3, fontSize: '18px', textAlign: 'center'}}
+          style={{ lineHeight: 2, fontSize: '16px', textAlign: 'center'}}
           dangerouslySetInnerHTML={{ __html: formulaHtml }}
         />
         <div

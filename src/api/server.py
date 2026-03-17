@@ -1025,25 +1025,63 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
                     offline.append(unified)
                     offline_map[rid] = unified
             except Exception as e:
-                logger.warning(f"bulk_enrich failed for {rid}, marking as pending: {e}")
+                # 区分 OpenDigger 永久无数据（404）与其它错误：
+                # - 对于 404：直接视为终态，无需 pending，占位说明仅提示“暂无 OpenDigger 数据”
+                # - 对于其它错误：保留 pending 状态，交由定时任务重试
+                logger.warning(f"bulk_enrich failed for {rid}, marking as pending or no-opendigger: {e}")
+                error_msg = str(e)
                 parts = rid.split("/")
                 repo_name = parts[1] if len(parts) == 2 else rid
-                placeholder = {
-                    "repo_id": rid,
-                    "name": repo_name,
-                    "description": "仓库信息补全中（暂无 OpenDigger 数据）",
-                    "languages": ["unknown"],
-                    "active_score": 0.0,
-                    "influence_score": 0.0,
-                    "demand_score": 0.0,
-                    "composite_score": 0.0,
-                    "raw_metrics": {"note": "no OpenDigger data"},
-                    "status": "pending",
-                }
-                enriched.append(placeholder)
-                if not existing:
-                    offline.append(placeholder)
-                    offline_map[rid] = placeholder
+                if "status code 404" in error_msg or "OpenDigger has no data" in error_msg:
+                    # 终态：确认无 OpenDigger 数据，尽量补全 GitHub 描述和关键词
+                    placeholder = {
+                        "repo_id": rid,
+                        "name": repo_name,
+                        "description": "暂无 OpenDigger 数据（使用 GitHub 指标兜底）",
+                        "languages": ["unknown"],
+                        "active_score": 0.0,
+                        "influence_score": 0.0,
+                        "demand_score": 0.0,
+                        "composite_score": 0.0,
+                        "raw_metrics": {"note": "no OpenDigger data"},
+                    }
+                    try:
+                        gh_client = GitHubClient(use_cache=True)
+                        cached = gh_client.get_cached_repo(rid)
+                        if cached:
+                            cached_desc = (cached.get("description") or "").strip()
+                            if cached_desc:
+                                placeholder["description"] = cached_desc
+                            cached_kws = cached.get("keywords") or cached.get("topics") or []
+                            if cached_kws:
+                                placeholder["keywords"] = cached_kws
+                    except Exception:
+                        pass
+                    enriched.append(placeholder)
+                    if existing:
+                        existing.update(placeholder)
+                        existing.pop("status", None)
+                    else:
+                        offline.append(placeholder)
+                        offline_map[rid] = placeholder
+                else:
+                    # 非 404 错误：保留 pending 状态，等待定时任务重试
+                    placeholder = {
+                        "repo_id": rid,
+                        "name": repo_name,
+                        "description": "仓库信息补全中（等待 OpenDigger 和 GitHub 数据）",
+                        "languages": ["unknown"],
+                        "active_score": 0.0,
+                        "influence_score": 0.0,
+                        "demand_score": 0.0,
+                        "composite_score": 0.0,
+                        "raw_metrics": {"note": "pending"},
+                        "status": "pending",
+                    }
+                    enriched.append(placeholder)
+                    if not existing:
+                        offline.append(placeholder)
+                        offline_map[rid] = placeholder
         return {
             "mode": "mixed",
             "repos": enriched,
