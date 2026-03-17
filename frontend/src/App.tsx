@@ -8,7 +8,7 @@ import { theme } from './styles/theme'
 import { storage } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
-import OpenRankChart from './components/Module1_MainCenter/OpenRankChart'
+import RepoActivityTabs from './components/Module1_MainCenter/RepoActivityTabs'
 import KeywordCloud from './components/Module1_MainCenter/KeywordCloud'
 import RadarPlaceholder from './components/Module1_MainCenter/RadarPlaceholder'
 import ManualSearchModal from './components/Module6_ManualSearch/ManualSearchModal'
@@ -404,25 +404,7 @@ const App: React.FC = () => {
               flex:0.8,
               position: 'relative'
             }}>
-              <OpenRankChart
-                repo={selectedRepo || repos[0]}
-                onRefreshRepo={async (target) => {
-                  try {
-                    const enriched = await manualSearchAPI.bulkEnrich([
-                      { repo_id: target.repo_id, full_name: target.repo_id }
-                    ])
-                    if (enriched && enriched.repos && enriched.repos.length > 0) {
-                      const updated = enriched.repos[0]
-                      fetchRepos({ repo_ids: [updated.repo_id], limit: 1 })
-                      if (selectedRepo && selectedRepo.repo_id === updated.repo_id) {
-                        setSelectedRepo(updated as RepoResponse)
-                      }
-                    }
-                  } catch (e) {
-                    console.error('Refresh OpenDigger data failed:', e)
-                  }
-                }}
-              />
+              <RepoActivityTabs repo={selectedRepo || repos[0]} />
             </div>
             <div
               style={{

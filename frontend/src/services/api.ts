@@ -61,6 +61,15 @@ export const manualSearchAPI = {
   }
 }
 
+export const activityAPI = {
+  getCommitTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
+    return unwrap(api.get('/api/github/commit_trend', { params: { repo_id } }))
+  },
+  getIssueTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
+    return unwrap(api.get('/api/github/issue_trend', { params: { repo_id } }))
+  }
+}
+
 type ChatGreetingResponse = { greeting: string; session_id: string; language: string }
 
 export const chatAPI: typeof mockChatAPI | {

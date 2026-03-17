@@ -25,10 +25,9 @@ ChartJS.register(
 
 interface OpenRankChartProps {
   repo: RepoResponse | null
-  onRefreshRepo?: (repo: RepoResponse) => void
 }
 
-const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, onRefreshRepo }) => {
+const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
   const chartData = useMemo(() => {
     if (!repo?.raw_metrics?.openrank) {
       return {
@@ -85,33 +84,9 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, onRefreshRepo }) =>
       justifyContent: 'center',
       alignItems: 'center'
       }}>
-      <div style={{ 
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        marginBottom: '16px'
-      }}>
-        <h4 style={{ margin: 0, fontSize: '14px', color: theme.text }}>
-          OpenRank活跃度图（近30天）
-        </h4>
-        {repo && onRefreshRepo && (
-          <button
-            onClick={() => onRefreshRepo(repo)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '12px',
-              borderRadius: '4px',
-              border: `1px solid ${theme.primary}`,
-              backgroundColor: theme.white,
-              color: theme.primary,
-              cursor: 'pointer'
-            }}
-          >
-            刷新
-          </button>
-        )}
-      </div>
+      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: theme.text }}>
+        OpenRank活跃度图（近30天）
+      </h4>
       {statusText ? (
         <div style={{
           display: 'flex',

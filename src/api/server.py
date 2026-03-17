@@ -5,13 +5,16 @@ FastAPI 服务器，提供统一的仓库数据接口。
 import logging
 import sys
 import json
+import os
 import asyncio
 import time
 import queue
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Dict, Any, Tuple
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
+from dotenv import load_dotenv
 
 try:
     from fastapi import FastAPI, HTTPException, Query, Body
@@ -32,6 +35,11 @@ from src.core.match.config import MatchConfig, MatchWeights, DEFAULT_CONFIG
 from src.data_layer.online.integrated_search import IntegratedRepoSearch
 from typing import Optional
 import httpx
+
+current_file = Path(__file__)
+project_root = current_file.parent.parent.parent
+env_path = project_root / ".env"
+load_dotenv(dotenv_path=env_path)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -442,6 +450,7 @@ _session_to_handler: Dict[str, str] = {}
 _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
 _http_client: Optional[httpx.AsyncClient] = None
+_github_activity_cache: Dict[str, Dict[str, Any]] = {}
 
 
 def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
@@ -505,6 +514,10 @@ def get_http_client() -> httpx.AsyncClient:
     if _http_client is None:
         _http_client = httpx.AsyncClient(timeout=10.0)
     return _http_client
+
+
+def _github_activity_cache_key(kind: str, repo_id: str, date_key: str) -> str:
+    return f"{kind}:{repo_id}:{date_key}"
 
 
 @app.post("/api/chat")
@@ -981,6 +994,9 @@ async def github_search_repos(
         client = get_http_client()
         params = {"q": q, "per_page": per_page, "page": page}
         headers = {"Accept": "application/vnd.github+json"}
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
         resp = await client.get("https://api.github.com/search/repositories", params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -996,6 +1012,137 @@ async def github_search_repos(
     except Exception as e:
         logger.error(f"GITHUB_SEARCH_UNEXPECTED_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="GITHUB_SEARCH_UNEXPECTED_ERROR: Internal server error")
+
+
+class TrendPoint(BaseModel):
+    date: str
+    count: int
+
+
+class TrendResponse(BaseModel):
+    repo_id: str
+    points: List[TrendPoint]
+
+
+def _today_key() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%d")
+
+
+@app.get("/api/github/commit_trend", response_model=TrendResponse)
+async def github_commit_trend(
+    repo_id: str = Query(..., description="owner/repo")
+):
+    try:
+        today_key = _today_key()
+        cache_key = _github_activity_cache_key("commit", repo_id, today_key)
+        cached = _github_activity_cache.get(cache_key)
+        if cached:
+            return cached
+
+        client = get_http_client()
+        headers = {"Accept": "application/vnd.github+json"}
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        resp = await client.get(f"https://api.github.com/repos/{repo_id}/stats/commit_activity", headers=headers)
+        resp.raise_for_status()
+        weeks = resp.json() or []
+        points: List[TrendPoint] = []
+        for w in weeks[-12:]:
+          week_ts = w.get("week")
+          total = w.get("total", 0)
+          if week_ts is None:
+              continue
+          date_str = datetime.utcfromtimestamp(week_ts).strftime("%Y-%m-%d")
+          points.append(TrendPoint(date=date_str, count=int(total)))
+        result = TrendResponse(repo_id=repo_id, points=points)
+        _github_activity_cache[cache_key] = json.loads(result.json())
+        return result
+    except httpx.HTTPStatusError as e:
+        logger.error(f"GITHUB_COMMIT_TREND_HTTP_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=e.response.status_code, detail="GITHUB_COMMIT_TREND_HTTP_ERROR: GitHub stats failed")
+    except httpx.HTTPError as e:
+        logger.error(f"GITHUB_COMMIT_TREND_NETWORK_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="GITHUB_COMMIT_TREND_NETWORK_ERROR: GitHub stats unavailable")
+    except Exception as e:
+        logger.error(f"GITHUB_COMMIT_TREND_UNEXPECTED_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="GITHUB_COMMIT_TREND_UNEXPECTED_ERROR: Internal server error")
+
+
+@app.get("/api/github/issue_trend", response_model=TrendResponse)
+async def github_issue_trend(
+    repo_id: str = Query(..., description="owner/repo"),
+    days: int = Query(30, ge=1, le=90)
+):
+    try:
+        today_key = _today_key()
+        cache_key = _github_activity_cache_key("issue", repo_id, today_key)
+        cached = _github_activity_cache.get(cache_key)
+        if cached:
+            return cached
+
+        client = get_http_client()
+        headers = {"Accept": "application/vnd.github+json"}
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        since_dt = datetime.utcnow() - timedelta(days=days)
+        params = {"state": "all", "since": since_dt.isoformat() + "Z", "per_page": 100}
+        url = f"https://api.github.com/repos/{repo_id}/issues"
+        all_issues: List[Dict[str, Any]] = []
+        while True:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            batch = resp.json() or []
+            all_issues.extend(batch)
+            link = resp.headers.get("Link", "")
+            next_url = None
+            if link:
+                parts = link.split(",")
+                for part in parts:
+                    if 'rel="next"' in part:
+                        seg = part.split(";")[0].strip()
+                        if seg.startswith("<") and seg.endswith(">"):
+                            next_url = seg[1:-1]
+                        break
+            if not next_url:
+                break
+            url = next_url
+            params = {}
+
+        counter: Dict[str, int] = {}
+        for issue in all_issues:
+            if "pull_request" in issue:
+                continue
+            created_at = issue.get("created_at")
+            if not created_at:
+                continue
+            try:
+                dt = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                continue
+            if dt < since_dt:
+                continue
+            key = dt.strftime("%Y-%m-%d")
+            counter[key] = counter.get(key, 0) + 1
+
+        dates = [
+            (since_dt + timedelta(days=i)).strftime("%Y-%m-%d")
+            for i in range(days)
+        ]
+        points = [TrendPoint(date=d, count=counter.get(d, 0)) for d in dates]
+        result = TrendResponse(repo_id=repo_id, points=points)
+        _github_activity_cache[cache_key] = json.loads(result.json())
+        return result
+    except httpx.HTTPStatusError as e:
+        logger.error(f"GITHUB_ISSUE_TREND_HTTP_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=e.response.status_code, detail="GITHUB_ISSUE_TREND_HTTP_ERROR: GitHub issues failed")
+    except httpx.HTTPError as e:
+        logger.error(f"GITHUB_ISSUE_TREND_NETWORK_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="GITHUB_ISSUE_TREND_NETWORK_ERROR: GitHub issues unavailable")
+    except Exception as e:
+        logger.error(f"GITHUB_ISSUE_TREND_UNEXPECTED_ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="GITHUB_ISSUE_TREND_UNEXPECTED_ERROR: Internal server error")
 
 
 @app.post("/api/repos/bulk_enrich")
