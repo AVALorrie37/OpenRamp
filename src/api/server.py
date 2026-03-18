@@ -33,8 +33,24 @@ from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
 from src.core.match.config import MatchConfig, MatchWeights, DEFAULT_CONFIG
 from src.data_layer.online.integrated_search import IntegratedRepoSearch
-from typing import Optional
+import re
 import httpx
+
+_REPO_ID_RE = re.compile(r'^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$')
+_USER_ID_RE = re.compile(r'^[A-Za-z0-9_.\-@]{1,128}$')
+
+
+def _validate_repo_id(repo_id: str) -> str:
+    if not _REPO_ID_RE.match(repo_id):
+        raise HTTPException(status_code=400, detail="Invalid repo_id format, expected 'owner/repo'")
+    return repo_id
+
+
+def _validate_user_id(user_id: str) -> str:
+    if not _USER_ID_RE.match(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+    return user_id
+
 
 current_file = Path(__file__)
 project_root = current_file.parent.parent.parent
@@ -48,8 +64,8 @@ app = FastAPI(title="OpenDigger API Server", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -157,7 +173,7 @@ def load_offline_repos() -> List[dict]:
                     if kws:
                         r["keywords"] = kws
         except Exception:
-            pass
+            logger.warning("Failed to enrich offline repos with GitHub keywords", exc_info=True)
     logger.info(f"预加载完成，共 {len(repos)} 个仓库")
     _offline_cache = repos
     return repos
@@ -189,6 +205,11 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
     parts = repo_id.split("/")
     repo_name = parts[1] if len(parts) == 2 else repo_id
 
+    openrank_str = ""
+    if isinstance(openrank_data, dict) and openrank_data:
+        sorted_entries = sorted(openrank_data.items())[-30:]
+        openrank_str = ",".join(f"{k}:{v}" for k, v in sorted_entries)
+
     base = {
         "repo_id": repo_id,
         "name": repo_name,
@@ -198,17 +219,37 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         "influence_score": round(influence_score, 4),
         "demand_score": round(demand_score, 4),
         "composite_score": round(composite_score, 4),
-        "raw_metrics": None,  # 在线模式不返回 raw_metrics
-        "keywords": [],  # 关键词后续可由 GitHub 缓存补全
+        "raw_metrics": {"openrank": openrank_str} if openrank_str else None,
+        "keywords": [],
     }
 
-    # 优先使用 GitHub 仓库实时数据补全描述和关键词
     try:
-        gh_resp = httpx.get(
-            f"https://api.github.com/repos/{repo_id}",
-            headers={"Accept": "application/vnd.github+json"},
-            timeout=5.0,
-        )
+        gh_client = GitHubClient(use_cache=True)
+        cached = gh_client.get_cached_repo(repo_id)
+        if cached:
+            cached_desc = (cached.get("description") or "").strip()
+            if cached_desc:
+                base["description"] = cached_desc
+            cached_kws = cached.get("keywords") or cached.get("topics") or []
+            if cached_kws:
+                base["keywords"] = cached_kws
+    except Exception:
+        logger.debug(f"Failed to get cached repo info for {repo_id}", exc_info=True)
+
+    return base
+
+
+async def convert_online_to_unified_async(online_data: dict, repo_id: str) -> dict:
+    base = convert_online_to_unified(online_data, repo_id)
+    if base.get("description"):
+        return base
+    try:
+        client = get_http_client()
+        headers = {"Accept": "application/vnd.github+json"}
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        gh_resp = await client.get(f"https://api.github.com/repos/{repo_id}", headers=headers)
         gh_resp.raise_for_status()
         gh_data = gh_resp.json()
         gh_desc = (gh_data.get("description") or "").strip()
@@ -218,40 +259,25 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         if gh_topics:
             base["keywords"] = gh_topics
     except Exception:
-        # 回退到 GitHub 缓存（如果存在）
-        try:
-            gh_client = GitHubClient(use_cache=True)
-            cached = gh_client.get_cached_repo(repo_id)
-            if cached:
-                cached_desc = (cached.get("description") or "").strip()
-                if cached_desc:
-                    base["description"] = cached_desc
-                cached_kws = cached.get("keywords") or cached.get("topics") or []
-                if cached_kws:
-                    base["keywords"] = cached_kws
-        except Exception:
-            # 最终回退：保持空描述，交给前端处理
-            pass
-
+        logger.debug(f"Async GitHub fetch failed for {repo_id}", exc_info=True)
     return base
 
 
 @app.on_event("startup")
 async def startup_event():
-    """启动时预加载离线数据"""
     try:
-        load_offline_repos()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, load_offline_repos)
         asyncio.create_task(_pending_enrich_worker())
     except Exception as e:
         logger.error(f"预加载离线数据失败: {e}")
 
 
 async def _pending_enrich_worker(interval_seconds: int = 3600):
-    """定时补全处于 pending 状态的仓库数据"""
     global _offline_cache
     while True:
-        await asyncio.sleep(interval_seconds)
         try:
+            await asyncio.sleep(interval_seconds)
             if not _offline_cache:
                 continue
             offline = _offline_cache
@@ -272,7 +298,7 @@ async def _pending_enrich_worker(interval_seconds: int = 3600):
                             if kws:
                                 unified_data["keywords"] = kws
                     except Exception:
-                        pass
+                        logger.debug(f"Failed to get cached keywords for {rid}", exc_info=True)
                     repo_dict = offline_map.get(rid)
                     if repo_dict:
                         repo_dict.update(unified_data)
@@ -280,8 +306,10 @@ async def _pending_enrich_worker(interval_seconds: int = 3600):
                 except Exception as e:
                     logger.warning(f"定时补全仓库 {rid} 失败: {e}")
                     continue
+        except asyncio.CancelledError:
+            break
         except Exception as e:
-            logger.error(f"pending 仓库定时补全任务出错: {e}")
+            logger.error(f"pending 仓库定时补全任务出错: {e}", exc_info=True)
 
 
 @app.get("/api/repos", response_model=ReposResponse)
@@ -439,6 +467,7 @@ class MatchRequest(BaseModel):
 class SearchRequest(BaseModel):
     user_id: str
     limit: Optional[int] = 10
+    search_id: Optional[str] = None
 
 
 class KeywordSearchRequest(BaseModel):
@@ -456,6 +485,7 @@ _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
 _http_client: Optional[httpx.AsyncClient] = None
 _github_activity_cache: Dict[str, Dict[str, Any]] = {}
+_running_searches: Dict[str, asyncio.Event] = {}
 
 
 def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
@@ -489,15 +519,21 @@ def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_lang
     return handler, session_id
 
 def _get_user_language_from_profile(user_id: str) -> Optional[str]:
-    """从用户profile获取语言偏好"""
     try:
         handler = ConversationHandler(user_id=user_id)
         cached = handler._load_profile_from_cache()
         if cached and cached.get('language'):
             return cached.get('language')
-    except:
-        pass
+    except Exception:
+        logger.debug(f"Failed to load language from profile for user {user_id}", exc_info=True)
     return None
+
+
+def _get_experience_level(profile: dict) -> str:
+    level = profile.get("experience_level") or profile.get("experience")
+    if level in ("beginner", "intermediate", "advanced"):
+        return level
+    return "intermediate"
 
 
 def get_match_scorer() -> MatchScorer:
@@ -574,7 +610,7 @@ async def chat(request: ChatRequest = Body(...)):
             "profile": {
                 "skills": skills,
                 "contribution_types": preferences,
-                "experience_level": "intermediate"
+                "experience_level": _get_experience_level(data)
             } if (confirmed or profile_updated) else None
         }
     except Exception as e:
@@ -610,7 +646,7 @@ def _chat_result_to_response(result: Dict[str, Any], session_id: str, agent_type
         "profile": {
             "skills": skills,
             "contribution_types": preferences,
-            "experience_level": "intermediate"
+            "experience_level": _get_experience_level(data)
         } if (confirmed or profile_updated) else None
     }
 
@@ -684,13 +720,12 @@ async def confirm_profile(request: ProfileConfirmRequest = Body(...)):
         profile = handler.get_current_profile()
         
         if profile.get('skills') or profile.get('contribution_styles'):
-            # 触发确认保存，使用handler的user_language
             result = handler._handle_confirm(handler.user_language)
             return {
                 "profile": {
                     "skills": profile.get("skills", []),
                     "contribution_types": profile.get("contribution_styles", []),
-                    "experience_level": "intermediate"
+                    "experience_level": _get_experience_level(profile)
                 },
                 "skills": profile.get("skills", [])
             }
@@ -723,6 +758,7 @@ async def sync_profile(request: SyncProfileRequest = Body(...)):
 
 @app.get("/api/profile/{user_id}")
 async def get_profile(user_id: str):
+    _validate_user_id(user_id)
     try:
         handler, _ = get_conversation_handler(user_id)
         profile = handler.get_current_profile()
@@ -735,14 +771,14 @@ async def get_profile(user_id: str):
             return {
                 "skills": profile.get("skills", []),
                 "preferences": profile.get("contribution_styles", []),
-                "experience": "intermediate",
+                "experience": _get_experience_level(profile),
                 "language": user_language or 'chinese'
             }
         
         return {
             "skills": [],
             "preferences": [],
-            "experience": "intermediate",
+            "experience": _get_experience_level(profile),
             "language": user_language or 'chinese'
         }
     except Exception as e:
@@ -788,7 +824,7 @@ async def calculate_match(request: MatchRequest = Body(...)):
         user_profile_dict = {
             "skills": profile.get("skills", []),
             "contribution_style": profile.get("contribution_styles", [])[0] if profile.get("contribution_styles") else None,
-            "experience_level": "intermediate"
+            "experience_level": _get_experience_level(profile)
         }
         user_profile = UserProfile.from_dict(user_profile_dict)
         
@@ -848,7 +884,12 @@ async def calculate_match(request: MatchRequest = Body(...)):
 
 @app.post("/api/search")
 async def search_repos(request: SearchRequest = Body(...)):
+    search_id = request.search_id or f"search_{request.user_id}_{int(time.time()*1000)}"
+    cancel_event = asyncio.Event()
+    _running_searches[search_id] = cancel_event
     try:
+        if cancel_event.is_set():
+            return {"mode": "cancelled", "repos": [], "message": "Search cancelled"}
         searcher = get_integrated_search()
         result = searcher.search_with_profile_matching(
             user_id=request.user_id,
@@ -867,7 +908,7 @@ async def search_repos(request: SearchRequest = Body(...)):
                     {
                         "skills": profile.get("skills", []),
                         "contribution_style": profile.get("contribution_styles", [None])[0],
-                        "experience_level": "intermediate",
+                        "experience_level": _get_experience_level(profile),
                     }
                 )
                 scored = []
@@ -957,6 +998,8 @@ async def search_repos(request: SearchRequest = Body(...)):
                     }
                 )
             message = result.message
+        if cancel_event.is_set():
+            return {"mode": "cancelled", "repos": [], "message": "Search cancelled"}
         return {
             "mode": mode,
             "source": "github_opendigger_online" if not fallback_used else "offline_dataset",
@@ -967,6 +1010,8 @@ async def search_repos(request: SearchRequest = Body(...)):
     except Exception as e:
         logger.error(f"SEARCH_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"SEARCH_ERROR: {str(e)}")
+    finally:
+        _running_searches.pop(search_id, None)
 
 
 @app.post("/api/search/keywords")
@@ -1026,7 +1071,12 @@ async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
 @app.post("/api/search/cancel")
 async def cancel_search(request: SearchCancelRequest = Body(...)):
     try:
-        logger.info(f"Received search cancel request for search_id={request.search_id}")
+        cancel_event = _running_searches.get(request.search_id)
+        if cancel_event:
+            cancel_event.set()
+            logger.info(f"Search cancelled: search_id={request.search_id}")
+        else:
+            logger.info(f"No running search found for search_id={request.search_id}")
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"SEARCH_CANCEL_ERROR: {e}", exc_info=True)
@@ -1084,13 +1134,14 @@ class TrendResponse(BaseModel):
 
 
 def _today_key() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d")
+    return datetime.now().strftime("%Y-%m-%d")
 
 
 @app.get("/api/github/commit_trend", response_model=TrendResponse)
 async def github_commit_trend(
     repo_id: str = Query(..., description="owner/repo")
 ):
+    _validate_repo_id(repo_id)
     try:
         today_key = _today_key()
         cache_key = _github_activity_cache_key("commit", repo_id, today_key)
@@ -1112,7 +1163,7 @@ async def github_commit_trend(
           total = w.get("total", 0)
           if week_ts is None:
               continue
-          date_str = datetime.utcfromtimestamp(week_ts).strftime("%Y-%m-%d")
+          date_str = datetime.fromtimestamp(week_ts).strftime("%Y-%m-%d")
           points.append(TrendPoint(date=date_str, count=int(total)))
         result = TrendResponse(repo_id=repo_id, points=points)
         _github_activity_cache[cache_key] = json.loads(result.json())
@@ -1133,9 +1184,10 @@ async def github_issue_trend(
     repo_id: str = Query(..., description="owner/repo"),
     days: int = Query(30, ge=1, le=90)
 ):
+    _validate_repo_id(repo_id)
     try:
         today_key = _today_key()
-        cache_key = _github_activity_cache_key("issue", repo_id, today_key)
+        cache_key = _github_activity_cache_key("issue", repo_id, f"{today_key}:{days}")
         cached = _github_activity_cache.get(cache_key)
         if cached:
             return cached
@@ -1145,15 +1197,25 @@ async def github_issue_trend(
         token = os.getenv("GITHUB_TOKEN")
         if token:
             headers["Authorization"] = f"token {token}"
-        since_dt = datetime.utcnow() - timedelta(days=days)
+        since_dt = datetime.now(tz=None) - timedelta(days=days)
         since_str = since_dt.strftime("%Y-%m-%d")
         query = f"repo:{repo_id} type:issue created:>={since_str}"
         url = "https://api.github.com/search/issues"
-        params = {"q": query, "sort": "created", "order": "asc", "per_page": 100}
-        resp = await client.get(url, headers=headers, params=params)
-        resp.raise_for_status()
-        body = resp.json() or {}
-        all_issues: List[Dict[str, Any]] = body.get("items") or []
+
+        all_issues: List[Dict[str, Any]] = []
+        page = 1
+        while True:
+            params = {"q": query, "sort": "created", "order": "asc", "per_page": 100, "page": page}
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            body = resp.json() or {}
+            items = body.get("items") or []
+            all_issues.extend(items)
+            if len(items) < 100 or len(all_issues) >= body.get("total_count", 0):
+                break
+            page += 1
+            if page > 10:
+                break
 
         counter: Dict[str, int] = {}
         for issue in all_issues:

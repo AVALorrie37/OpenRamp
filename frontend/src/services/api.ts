@@ -10,7 +10,7 @@ import {
 } from './mockApi'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -181,14 +181,3 @@ export const searchAPI: SearchAPIType = USE_MOCK
         return unwrap(api.post('/api/search/cancel', { search_id }))
       }
     }
-
-export const intentAPI = {
-  queryStatus: async (user_id: string) => {
-    // TODO: 对接意图 query_status 的后端接口
-    return chatAPI.send(user_id, 'show my profile')
-  },
-  submitProfileUpdate: async (user_id: string, message: string, session_id?: string, language?: string) => {
-    // TODO: 对接意图 update_profile 的后端接口
-    return chatAPI.send(user_id, message, session_id, 'agent1', language)
-  }
-}

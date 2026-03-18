@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
@@ -24,7 +24,7 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refresh, refreshRepos, deleteRepo, updateRepoMatchScore } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refreshRepos, deleteRepo, updateRepoMatchScore } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -213,13 +213,6 @@ const App: React.FC = () => {
     }
   }
 
-  const handleTagClick = () => {
-    refresh()
-    setSelectedRepo(null)
-    setHighlightedRepoIds([])
-    setActiveKeywords([])
-  }
-
   const handleProfileUpdateFromPanel = (partial: Partial<UserProfile>) => {
     if (!username || !profile) return
     updateProfile(partial)
@@ -242,8 +235,6 @@ const App: React.FC = () => {
     return response
   }
 
-
-  const allLanguages = repos.flatMap(r => r.languages || [])
 
   const handleWeightsChange = async (next: { w_skill: number; w_activity: number; w_demand: number }) => {
     setWeights(next)

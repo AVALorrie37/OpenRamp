@@ -120,7 +120,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
 
     const state = activeTab === 'commits' ? commitTrend : issueTrend
     const label = activeTab === 'commits' ? '提交次数' : 'Issue 数量'
-    const title = activeTab === 'commits' ? 'Commit 趋势图' : 'Issue 趋势图）'
+    const title = activeTab === 'commits' ? 'Commit 趋势图' : 'Issue 趋势图'
 
     if (state.loading) {
       return (
