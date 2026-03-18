@@ -1166,7 +1166,7 @@ async def github_commit_trend(
           date_str = datetime.fromtimestamp(week_ts).strftime("%Y-%m-%d")
           points.append(TrendPoint(date=date_str, count=int(total)))
         result = TrendResponse(repo_id=repo_id, points=points)
-        _github_activity_cache[cache_key] = json.loads(result.json())
+        _github_activity_cache[cache_key] = json.loads(result.model_dump_json())
         return result
     except httpx.HTTPStatusError as e:
         logger.error(f"GITHUB_COMMIT_TREND_HTTP_ERROR: {e}", exc_info=True)
@@ -1239,7 +1239,7 @@ async def github_issue_trend(
         ]
         points = [TrendPoint(date=d, count=counter.get(d, 0)) for d in dates]
         result = TrendResponse(repo_id=repo_id, points=points)
-        _github_activity_cache[cache_key] = json.loads(result.json())
+        _github_activity_cache[cache_key] = json.loads(result.model_dump_json())
         return result
     except httpx.HTTPStatusError as e:
         logger.error(f"GITHUB_ISSUE_TREND_HTTP_ERROR: {e}", exc_info=True)
