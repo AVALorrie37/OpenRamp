@@ -6,12 +6,15 @@ interface SearchBubbleProps {
   onCancel: () => void
   language?: 'chinese' | 'english'
   progressSeconds?: number | null
+  searchStage?: string | null
 }
 
-const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chinese', progressSeconds = null }) => {
-  const progressText = progressSeconds != null
-    ? (language === 'chinese' ? `正在搜索... ${progressSeconds}s` : `Searching... ${progressSeconds}s`)
-    : (language === 'chinese' ? '🔍 正在搜索匹配的开源项目...' : '🔍 Searching for matching open source projects...')
+const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chinese', progressSeconds = null, searchStage = null }) => {
+  const progressText = searchStage
+    ? `🔍 ${searchStage}`
+    : progressSeconds != null
+      ? (language === 'chinese' ? `正在搜索... ${progressSeconds}s` : `Searching... ${progressSeconds}s`)
+      : (language === 'chinese' ? '🔍 正在搜索匹配的开源项目...' : '🔍 Searching for matching open source projects...')
   return (
     <div style={{
       display: 'flex',

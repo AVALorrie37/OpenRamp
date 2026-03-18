@@ -887,131 +887,179 @@ async def search_repos(request: SearchRequest = Body(...)):
     search_id = request.search_id or f"search_{request.user_id}_{int(time.time()*1000)}"
     cancel_event = asyncio.Event()
     _running_searches[search_id] = cancel_event
-    try:
-        if cancel_event.is_set():
-            return {"mode": "cancelled", "repos": [], "message": "Search cancelled"}
-        searcher = get_integrated_search()
-        result = searcher.search_with_profile_matching(
-            user_id=request.user_id,
-            target_count=request.limit or 10
-        )
-        mode = "online"
-        fallback_used = False
-        repos = []
-        if not result.is_sufficient or not result.repositories:
-            offline_repos = load_offline_repos()
-            if offline_repos:
+
+    async def event_stream():
+        sync_q: queue.Queue = queue.Queue()
+
+        def on_progress(stage: str, data: Dict[str, Any]):
+            sync_q.put({"type": "stage", "stage": stage, "data": data})
+
+        def run():
+            try:
+                if cancel_event.is_set():
+                    sync_q.put({"type": "result", "data": {"mode": "cancelled", "repos": [], "message": "Search cancelled"}})
+                    return
                 handler, _ = get_conversation_handler(request.user_id)
-                profile = handler.get_current_profile()
-                scorer = get_match_scorer()
-                user_profile = UserProfile.from_dict(
-                    {
-                        "skills": profile.get("skills", []),
-                        "contribution_style": profile.get("contribution_styles", [None])[0],
-                        "experience_level": _get_experience_level(profile),
-                    }
+                mem_profile = handler.get_current_profile()
+                user_profile = {
+                    'skills': mem_profile.get('skills', []),
+                    'contribution_styles': mem_profile.get('contribution_styles', []),
+                }
+                searcher = get_integrated_search()
+                result = searcher.search_with_profile_matching(
+                    user_profile=user_profile if user_profile.get('skills') else None,
+                    user_id=request.user_id,
+                    target_count=request.limit or 10,
+                    on_progress=on_progress,
                 )
-                scored = []
-                for r in offline_repos:
-                    repo_keywords = r.get("keywords") or []
-                    if not repo_keywords:
-                        repo_keywords = r.get("languages", []) + (r.get("description") or "").split()
-                    repo_data = RepoData(
-                        keywords=repo_keywords,
-                        active_days_last_30=30,
-                        issues_new_last_30=int(r.get("demand_score", 0) * 50),
-                        openrank=r.get("influence_score", 0) * 50,
-                        name=r.get("name"),
-                        full_name=r.get("repo_id"),
-                        precomputed_activity_score=r.get("active_score"),
-                        precomputed_demand_score=r.get("demand_score"),
-                        data_source="opendigger+github" if r.get("source") == "opendigger_online" else "metadata_only",
-                    )
-                    match = scorer.calculate(user_profile, repo_data)
-                    scored.append((r, match.match_score))
-                scored.sort(key=lambda x: x[1], reverse=True)
-                limit = request.limit or 10
-                for repo_dict, score in scored[:limit]:
-                    repo_copy = dict(repo_dict)
-                    repo_copy["source"] = "offline_dataset"
-                    # 重新构造 RepoData 以拿到 breakdown.activity 作为 active_score
-                    repo_keywords = repo_copy.get("keywords") or []
-                    if not repo_keywords:
-                        repo_keywords = repo_copy.get("languages", []) + (repo_copy.get("description") or "").split()
-                    repo_data_for_breakdown = RepoData(
-                        keywords=repo_keywords,
-                        active_days_last_30=30,
-                        issues_new_last_30=int(repo_copy.get("demand_score", 0) * 50),
-                        openrank=repo_copy.get("influence_score", 0) * 50,
-                        name=repo_copy.get("name"),
-                        full_name=repo_copy.get("repo_id"),
-                        precomputed_activity_score=repo_copy.get("active_score"),
-                        precomputed_demand_score=repo_copy.get("demand_score"),
-                        data_source="opendigger+github" if repo_copy.get("source") == "opendigger_online" else "metadata_only",
-                    )
-                    match_with_breakdown = scorer.calculate(user_profile, repo_data_for_breakdown)
-                    activity_score = match_with_breakdown.breakdown.activity
-
-                    repos.append(
-                        {
-                            "repo_id": repo_copy["repo_id"],
-                            "name": repo_copy["name"],
-                            "description": repo_copy.get("description") or "No description",
-                            "languages": repo_copy.get("languages") or [],
-                            "active_score": activity_score,
-                            "influence_score": repo_copy.get("influence_score", 0.0),
-                            "demand_score": repo_copy.get("demand_score", 0.0),
-                            "composite_score": repo_copy.get("composite_score", 0.0),
-                            "raw_metrics": None,
-                            "match_score": score,
-                            "source": repo_copy.get("source", "offline_dataset"),
-                            "keywords": repo_copy.get("keywords") or [],
-                        }
-                    )
-                mode = "online_with_offline_fallback"
-                fallback_used = True
-                message = result.message or "Using offline dataset as fallback."
-            else:
-                message = result.message or "No offline dataset available."
-        else:
-            for repo_result in result.repositories:
-                activity_score = None
-                if repo_result.match_breakdown and "activity" in repo_result.match_breakdown:
-                    activity_score = repo_result.match_breakdown["activity"]
+                mode = "online"
+                fallback_used = False
+                repos = []
+                if not result.is_sufficient or not result.repositories:
+                    offline_repos = load_offline_repos()
+                    if offline_repos:
+                        on_progress("fallback_scoring", {"total": len(offline_repos)})
+                        handler, _ = get_conversation_handler(request.user_id)
+                        profile = handler.get_current_profile()
+                        scorer = get_match_scorer()
+                        user_profile_obj = UserProfile.from_dict(
+                            {
+                                "skills": profile.get("skills", []),
+                                "contribution_style": profile.get("contribution_styles", [None])[0],
+                                "experience_level": _get_experience_level(profile),
+                            }
+                        )
+                        scored = []
+                        for r in offline_repos:
+                            repo_keywords = r.get("keywords") or []
+                            if not repo_keywords:
+                                repo_keywords = r.get("languages", []) + (r.get("description") or "").split()
+                            repo_data = RepoData(
+                                keywords=repo_keywords,
+                                active_days_last_30=30,
+                                issues_new_last_30=int(r.get("demand_score", 0) * 50),
+                                openrank=r.get("influence_score", 0) * 50,
+                                name=r.get("name"),
+                                full_name=r.get("repo_id"),
+                                precomputed_activity_score=r.get("active_score"),
+                                precomputed_demand_score=r.get("demand_score"),
+                                data_source="opendigger+github" if r.get("source") == "opendigger_online" else "metadata_only",
+                            )
+                            match = scorer.calculate(user_profile_obj, repo_data)
+                            scored.append((r, match.match_score))
+                        scored.sort(key=lambda x: x[1], reverse=True)
+                        limit = request.limit or 10
+                        for repo_dict, score in scored[:limit]:
+                            repo_copy = dict(repo_dict)
+                            repo_copy["source"] = "offline_dataset"
+                            repo_keywords = repo_copy.get("keywords") or []
+                            if not repo_keywords:
+                                repo_keywords = repo_copy.get("languages", []) + (repo_copy.get("description") or "").split()
+                            repo_data_for_breakdown = RepoData(
+                                keywords=repo_keywords,
+                                active_days_last_30=30,
+                                issues_new_last_30=int(repo_copy.get("demand_score", 0) * 50),
+                                openrank=repo_copy.get("influence_score", 0) * 50,
+                                name=repo_copy.get("name"),
+                                full_name=repo_copy.get("repo_id"),
+                                precomputed_activity_score=repo_copy.get("active_score"),
+                                precomputed_demand_score=repo_copy.get("demand_score"),
+                                data_source="opendigger+github" if repo_copy.get("source") == "opendigger_online" else "metadata_only",
+                            )
+                            match_with_breakdown = scorer.calculate(user_profile_obj, repo_data_for_breakdown)
+                            activity_score = match_with_breakdown.breakdown.activity
+                            repos.append(
+                                {
+                                    "repo_id": repo_copy["repo_id"],
+                                    "name": repo_copy["name"],
+                                    "description": repo_copy.get("description") or "No description",
+                                    "languages": repo_copy.get("languages") or [],
+                                    "active_score": activity_score,
+                                    "influence_score": repo_copy.get("influence_score", 0.0),
+                                    "demand_score": repo_copy.get("demand_score", 0.0),
+                                    "composite_score": repo_copy.get("composite_score", 0.0),
+                                    "raw_metrics": None,
+                                    "match_score": score,
+                                    "source": repo_copy.get("source", "offline_dataset"),
+                                    "keywords": repo_copy.get("keywords") or [],
+                                }
+                            )
+                        mode = "online_with_offline_fallback"
+                        fallback_used = True
+                        message = result.message or "Using offline dataset as fallback."
+                    else:
+                        message = result.message or "No offline dataset available."
                 else:
-                    activity_score = repo_result.active_score
+                    for repo_result in result.repositories:
+                        activity_score = None
+                        if repo_result.match_breakdown and "activity" in repo_result.match_breakdown:
+                            activity_score = repo_result.match_breakdown["activity"]
+                        else:
+                            activity_score = repo_result.active_score
+                        repos.append(
+                            {
+                                "repo_id": repo_result.repo_id,
+                                "name": repo_result.repo_id.split("/")[-1],
+                                "description": repo_result.description or "No description",
+                                "languages": repo_result.languages,
+                                "active_score": activity_score,
+                                "influence_score": repo_result.influence_score,
+                                "demand_score": repo_result.demand_score,
+                                "composite_score": repo_result.composite_score,
+                                "raw_metrics": None,
+                                "match_score": repo_result.match_score,
+                                "source": "github_opendigger_online",
+                                "keywords": repo_result.github_keywords,
+                            }
+                        )
+                    message = result.message
+                if cancel_event.is_set():
+                    sync_q.put({"type": "result", "data": {"mode": "cancelled", "repos": [], "message": "Search cancelled"}})
+                    return
+                sync_q.put({"type": "result", "data": {
+                    "mode": mode,
+                    "source": "github_opendigger_online" if not fallback_used else "offline_dataset",
+                    "fallback_used": fallback_used,
+                    "message": message,
+                    "repos": repos,
+                }})
+            except Exception as e:
+                logger.error(f"SEARCH_ERROR: {e}", exc_info=True)
+                sync_q.put({"type": "error", "detail": str(e)})
 
-                repos.append(
-                    {
-                        "repo_id": repo_result.repo_id,
-                        "name": repo_result.repo_id.split("/")[-1],
-                        "description": repo_result.description or "No description",
-                        "languages": repo_result.languages,
-                        "active_score": activity_score,
-                        "influence_score": repo_result.influence_score,
-                        "demand_score": repo_result.demand_score,
-                        "composite_score": repo_result.composite_score,
-                        "raw_metrics": None,
-                        "match_score": repo_result.match_score,
-                        "source": "github_opendigger_online",
-                        "keywords": repo_result.github_keywords,
-                    }
-                )
-            message = result.message
-        if cancel_event.is_set():
-            return {"mode": "cancelled", "repos": [], "message": "Search cancelled"}
-        return {
-            "mode": mode,
-            "source": "github_opendigger_online" if not fallback_used else "offline_dataset",
-            "fallback_used": fallback_used,
-            "message": message,
-            "repos": repos,
-        }
-    except Exception as e:
-        logger.error(f"SEARCH_ERROR: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"SEARCH_ERROR: {str(e)}")
-    finally:
-        _running_searches.pop(search_id, None)
+        try:
+            loop = asyncio.get_event_loop()
+            _stream_executor.submit(run)
+            while True:
+                try:
+                    item = await asyncio.wait_for(
+                        loop.run_in_executor(None, sync_q.get),
+                        timeout=600.0
+                    )
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'stage': 'error', 'detail': 'timeout'})}\n\n"
+                    break
+                if cancel_event.is_set() and item["type"] == "stage":
+                    yield f"data: {json.dumps({'stage': 'cancelled'})}\n\n"
+                    break
+                if item["type"] == "stage":
+                    yield f"data: {json.dumps({'stage': item['stage'], **item['data']})}\n\n"
+                elif item["type"] == "result":
+                    result_data = item["data"]
+                    result_data["stage"] = "result"
+                    yield f"data: {json.dumps(result_data)}\n\n"
+                    break
+                elif item["type"] == "error":
+                    yield f"data: {json.dumps({'stage': 'error', 'detail': item.get('detail', 'unknown')})}\n\n"
+                    break
+        finally:
+            _running_searches.pop(search_id, None)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
+    )
 
 
 @app.post("/api/search/keywords")

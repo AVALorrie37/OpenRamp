@@ -3,7 +3,29 @@ import { chatAPI, profileAPI, searchAPI } from '../services/api'
 import { storage } from '../utils/storage'
 import type { ChatMessage, ChatResponse, UserProfile } from '../types'
 
-const DEV_SEARCH_DURATION_SECONDS = 30
+function searchStageToText(stage: string, data: Record<string, unknown>, lang: string): string {
+  const kw = (data.keywords as string[])?.join(', ') ?? ''
+  if (lang === 'chinese') {
+    switch (stage) {
+      case 'loading_profile': return '加载用户画像...'
+      case 'generating_keywords': return `生成搜索关键词 (${data.combinations ?? ''}个组合)...`
+      case 'search_round': return `第${data.round ?? ''}/${data.total_rounds ?? ''}轮搜索: ${kw}...`
+      case 'checking_repos': return `检查仓库数据 (已找到${data.found ?? 0}/${data.target ?? ''}个)...`
+      case 'scoring': return `计算匹配度评分 (${data.total ?? ''}个仓库)...`
+      case 'fallback_scoring': return '使用离线数据评分中...'
+      default: return '搜索中...'
+    }
+  }
+  switch (stage) {
+    case 'loading_profile': return 'Loading profile...'
+    case 'generating_keywords': return `Generating keywords (${data.combinations ?? ''} combinations)...`
+    case 'search_round': return `Round ${data.round ?? ''}/${data.total_rounds ?? ''}: ${kw}...`
+    case 'checking_repos': return `Checking repos (found ${data.found ?? 0}/${data.target ?? ''})...`
+    case 'scoring': return `Scoring ${data.total ?? ''} repositories...`
+    case 'fallback_scoring': return 'Scoring offline data...'
+    default: return 'Searching...'
+  }
+}
 
 export const useAIChat = (user_id: string | null, profile: UserProfile | null = null, isProfileModified?: () => boolean, resetProfileModified?: () => void, onSearchComplete?: (repos: any[]) => void) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -11,6 +33,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const [loadingStage, setLoadingStage] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchProgressSeconds, setSearchProgressSeconds] = useState<number | null>(null)
+  const [searchStage, setSearchStage] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | undefined>()
   const searchAbortControllerRef = useRef<AbortController | null>(null)
   const searchStartTimeRef = useRef<number>(0)
@@ -69,10 +92,16 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   }, [user_id, profile?.language])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
+    if (profile?.skills && profile.skills.length > 0) {
+      try {
+        await profileAPI.sync(user_id, profile.skills, profile.preferences || [], profile.language)
+      } catch {}
+    }
     const searchId = `${user_id}-${Date.now()}`
     searchIdRef.current = searchId
     setIsSearching(true)
     setSearchProgressSeconds(null)
+    setSearchStage(null)
     const searchMessage: ChatMessage = {
       role: 'assistant',
       content: '',
@@ -95,27 +124,16 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     const cancelMessage = (sec: number) => lang === 'chinese' ? `搜索已终止，已进行 ${sec} 秒` : `Search cancelled after ${sec} seconds`
 
     try {
-      if (import.meta.env.DEV) {
-        for (let s = 0; s < DEV_SEARCH_DURATION_SECONDS; s++) {
-          if (abortController.signal.aborted) {
-            const e = new Error('canceled') as Error & { name: string }
-            e.name = 'CanceledError'
-            throw e
-          }
-          setSearchProgressSeconds(s)
-          await new Promise(r => setTimeout(r, 1000))
-        }
-        setSearchProgressSeconds(null)
-      }
-      const searchResult = await (import.meta.env.DEV
-        ? searchAPI.search(user_id, 10, searchId)
-        : searchAPI.search(user_id, 10, searchId, abortController.signal))
+      const searchResult = await searchAPI.search(user_id, 10, searchId, abortController.signal, (stage, data) => {
+        setSearchStage(searchStageToText(stage, data, lang))
+      })
       setIsSearching(false)
       setSearchProgressSeconds(null)
+      setSearchStage(null)
       setMessages(prev => {
         const updated = prev.map((msg, idx) => 
           idx === prev.length - 1 && msg.isSearching 
-            ? { ...msg, isSearching: false, content: searchResult.repos.length > 0 ? `找到 ${searchResult.repos.length} 个匹配的项目` : '未找到匹配的项目' }
+            ? { ...msg, isSearching: false, content: searchResult.repos.length > 0 ? (lang === 'chinese' ? `找到 ${searchResult.repos.length} 个匹配的项目` : `Found ${searchResult.repos.length} matching projects`) : (lang === 'chinese' ? '未找到匹配的项目' : 'No matching projects found') }
             : msg
         )
         storage.saveChatMessages(user_id, updated)
@@ -130,6 +148,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
         const text = cancelMessage(elapsed)
         setIsSearching(false)
         setSearchProgressSeconds(null)
+        setSearchStage(null)
         setMessages(prev => {
           const updated = prev.map((msg, idx) => 
             idx === prev.length - 1 && msg.isSearching 
@@ -142,10 +161,11 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       } else {
         setIsSearching(false)
         setSearchProgressSeconds(null)
+        setSearchStage(null)
         setMessages(prev => {
           const updated = prev.map((msg, idx) => 
             idx === prev.length - 1 && msg.isSearching 
-              ? { ...msg, isSearching: false, content: '搜索失败，请稍后再试' }
+              ? { ...msg, isSearching: false, content: lang === 'chinese' ? '搜索失败，请稍后再试' : 'Search failed, please try again later' }
               : msg
           )
           storage.saveChatMessages(user_id, updated)
@@ -156,7 +176,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       searchAbortControllerRef.current = null
       searchIdRef.current = null
     }
-  }, [onSearchComplete, profile?.language])
+  }, [onSearchComplete, profile])
 
   const sendMessage = useCallback(async (content: string): Promise<ChatResponse | null> => {
     if (!user_id || !content.trim()) return null
@@ -262,6 +282,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     setSessionId(undefined)
     setIsSearching(false)
     setSearchProgressSeconds(null)
+    setSearchStage(null)
     if (searchAbortControllerRef.current) {
       searchAbortControllerRef.current.abort()
       searchAbortControllerRef.current = null
@@ -278,6 +299,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     loadingStage,
     isSearching,
     searchProgressSeconds,
+    searchStage,
     sendMessage,
     clearMessages,
     cancelSearch

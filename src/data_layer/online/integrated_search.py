@@ -380,7 +380,8 @@ class IntegratedRepoSearch:
         keywords: List[str],
         target_count: int = 5,
         max_iterations: int = 10,
-        github_batch_size: int = 15
+        github_batch_size: int = 15,
+        on_progress=None,
     ) -> IntegratedSearchResult:
         """
         Search for repositories with both GitHub metadata and OpenDigger metrics.
@@ -430,6 +431,12 @@ class IntegratedRepoSearch:
             print(f"\n--- Iteration {iteration}/{max_iterations} ---")
             print(f"Currently have {len(qualified_repos)}/{target_count} qualified repos")
             print(f"Requesting {request_count} repos from GitHub...")
+            if on_progress:
+                on_progress("checking_repos", {
+                    "checked": total_github_checked,
+                    "found": len(qualified_repos),
+                    "target": target_count,
+                })
             
             # Search GitHub for repositories
             try:
@@ -464,6 +471,12 @@ class IntegratedRepoSearch:
                 
                 checked_repo_ids.add(result.repo_id)
                 total_github_checked += 1
+                if on_progress and total_github_checked % 5 == 0:
+                    on_progress("checking_repos", {
+                        "checked": total_github_checked,
+                        "found": len(qualified_repos),
+                        "target": target_count,
+                    })
                 
                 print(f"  Checking [{total_github_checked}]: {result.repo_id}...", end=" ")
                 
@@ -614,7 +627,8 @@ class IntegratedRepoSearch:
         target_count: int = 10,
         max_rounds: int = 5,
         min_skill_combination: int = 2,
-        max_skill_combination: int = 3
+        max_skill_combination: int = 3,
+        on_progress=None,
     ) -> IntegratedSearchResult:
         """
         使用用户画像进行多轮组合搜索并按匹配度排序。
@@ -663,6 +677,8 @@ class IntegratedRepoSearch:
         
         # Normalize skills to lowercase
         skills = [s.lower().strip() for s in skills]
+        if on_progress:
+            on_progress("loading_profile", {"skills": skills})
         
         print(f" User Skills: {skills}")
         print(f" Target: {target_count} repositories with match scores\n")
@@ -678,6 +694,8 @@ class IntegratedRepoSearch:
         if len(keyword_combinations) > 5:
             print(f"   ... and {len(keyword_combinations) - 5} more")
         print()
+        if on_progress:
+            on_progress("generating_keywords", {"combinations": len(keyword_combinations)})
         
         # Step 3: Multi-round search
         all_repos: Dict[str, IntegratedRepoResult] = {}  # Use dict to avoid duplicates
@@ -688,6 +706,14 @@ class IntegratedRepoSearch:
             print(f"\n--- Round {round_num}/{min(max_rounds, len(keyword_combinations))} ---")
             print(f" Keywords: {keywords}")
             print(f" Currently have {len(all_repos)} unique repositories")
+            if on_progress:
+                on_progress("search_round", {
+                    "round": round_num,
+                    "total_rounds": min(max_rounds, len(keyword_combinations)),
+                    "keywords": keywords,
+                    "found": len(all_repos),
+                    "target": target_count,
+                })
             
             # Calculate how many more repos we want to collect
             repos_needed = max(target_count * 2 - len(all_repos), 5)
@@ -698,7 +724,8 @@ class IntegratedRepoSearch:
                     keywords=keywords,
                     target_count=repos_needed,
                     max_iterations=3,
-                    github_batch_size=10
+                    github_batch_size=10,
+                    on_progress=on_progress,
                 )
                 
                 # Add to collection (avoid duplicates)
@@ -724,6 +751,8 @@ class IntegratedRepoSearch:
         print(f"\n{'='*70}")
         print(f"📊 Calculating Match Scores for {len(all_repos)} repositories...")
         print(f"{'='*70}\n")
+        if on_progress:
+            on_progress("scoring", {"total": len(all_repos)})
         
         scored_repos: List[IntegratedRepoResult] = []
         

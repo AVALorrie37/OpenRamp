@@ -12,6 +12,7 @@ interface AIChatWindowProps {
   loading: boolean
   loadingStage: string | null
   searchProgressSeconds?: number | null
+  searchStage?: string | null
   onSendMessage: (message: string) => Promise<any>
   onCancelSearch?: () => void
   language?: 'chinese' | 'english'
@@ -38,6 +39,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   loading,
   loadingStage = null,
   searchProgressSeconds = null,
+  searchStage = null,
   onSendMessage,
   onCancelSearch,
   language = 'chinese'
@@ -150,7 +152,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
           )}
           {messages.map((msg, index) => {
             if (msg.isSearching && onCancelSearch) {
-              return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} />
+              return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
             }
             return <ChatMessage key={index} message={msg} />
           })}

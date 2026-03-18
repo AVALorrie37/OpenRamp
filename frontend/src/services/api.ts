@@ -167,15 +167,51 @@ export const matchAPI = USE_MOCK ? mockMatchAPI : {
 }
 
 type SearchAPIType = {
-  search: (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal) => Promise<ReposResponse>
+  search: (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal, onStage?: (stage: string, data: Record<string, unknown>) => void) => Promise<ReposResponse>
   cancel: (search_id: string) => Promise<{ status: string }>
 }
 
 export const searchAPI: SearchAPIType = USE_MOCK
   ? (mockSearchAPI as SearchAPIType)
   : {
-      search: async (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal): Promise<ReposResponse> => {
-        return unwrap(api.post('/api/search', { user_id, limit, search_id }, { signal }))
+      search: async (user_id: string, limit?: number, search_id?: string, signal?: AbortSignal, onStage?: (stage: string, data: Record<string, unknown>) => void): Promise<ReposResponse> => {
+        const res = await fetch(`${API_BASE}/api/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id, limit, search_id }),
+          signal
+        })
+        if (!res.ok) throw new Error(res.statusText)
+        const reader = res.body?.getReader()
+        if (!reader) throw new Error('No body')
+        const dec = new TextDecoder()
+        let buf = ''
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buf += dec.decode(value, { stream: true })
+          const lines = buf.split('\n\n')
+          buf = lines.pop() ?? ''
+          for (const chunk of lines) {
+            const m = chunk.match(/^data:\s*(.+)$/m)
+            if (!m) continue
+            try {
+              const payload = JSON.parse(m[1].trim()) as Record<string, unknown>
+              const stage = payload.stage as string
+              if (stage === 'result') return payload as unknown as ReposResponse
+              if (stage === 'error') throw new Error((payload.detail as string) || 'Search failed')
+              if (stage === 'cancelled') {
+                const e = new Error('canceled') as Error & { name: string }
+                e.name = 'CanceledError'
+                throw e
+              }
+              onStage?.(stage, payload)
+            } catch (e) {
+              if (e instanceof Error && !(e instanceof SyntaxError)) throw e
+            }
+          }
+        }
+        throw new Error('Stream ended without result')
       },
       cancel: async (search_id: string): Promise<{ status: string }> => {
         return unwrap(api.post('/api/search/cancel', { search_id }))

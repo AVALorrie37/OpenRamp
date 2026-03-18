@@ -46,7 +46,7 @@ const App: React.FC = () => {
       setToast(uiLanguage === 'english' ? 'Search completed, check the home page' : '搜索完成，请查看主页')
     }
   }, [username, fetchRepos, uiLanguage])
-  const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
+  const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, searchStage, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   const handleLogin = (user: string, language: 'chinese' | 'english') => {
     setSelectedRepo(null)
@@ -213,17 +213,21 @@ const App: React.FC = () => {
     }
   }
 
-  const handleProfileUpdateFromPanel = (partial: Partial<UserProfile>) => {
+  const handleProfileUpdateFromPanel = async (partial: Partial<UserProfile>) => {
     if (!username || !profile) return
     updateProfile(partial)
     const merged = { ...profile, ...partial }
     const skills = merged.skills ?? profile.skills ?? []
     const prefs = merged.preferences ?? profile.preferences ?? []
     if (skills.length > 0 || prefs.length > 0) {
-      profileAPI.sync(username, skills, prefs, merged.language ?? profile.language).then(() => {
+      try {
+        await profileAPI.sync(username, skills, prefs, merged.language ?? profile.language)
         refreshRepos()
         resetProfileModified()
-      }).catch((e) => console.error('Profile sync failed:', e))
+      } catch (e) {
+        console.error('Profile sync failed:', e)
+        setToast(uiLanguage === 'english' ? 'Profile sync failed, please retry' : '个人信息同步失败，请重试')
+      }
     }
   }
 
@@ -498,6 +502,7 @@ const App: React.FC = () => {
         loading={chatLoading}
         loadingStage={loadingStage}
         searchProgressSeconds={searchProgressSeconds}
+        searchStage={searchStage}
         onSendMessage={handleSendMessage}
         onCancelSearch={cancelSearch}
         language={profile?.language || 'chinese'}
