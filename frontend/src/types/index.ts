@@ -37,6 +37,7 @@ export interface ChatMessage {
   action?: string
   isSearching?: boolean
   searchId?: string
+  searchResults?: RepoResponse[]
 }
 
 export interface ChatResponse {

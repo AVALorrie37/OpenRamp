@@ -133,7 +133,14 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       setMessages(prev => {
         const updated = prev.map((msg, idx) => 
           idx === prev.length - 1 && msg.isSearching 
-            ? { ...msg, isSearching: false, content: searchResult.repos.length > 0 ? (lang === 'chinese' ? `找到 ${searchResult.repos.length} 个匹配的项目` : `Found ${searchResult.repos.length} matching projects`) : (lang === 'chinese' ? '未找到匹配的项目' : 'No matching projects found') }
+            ? {
+                ...msg,
+                isSearching: false,
+                content: searchResult.repos.length > 0
+                  ? (lang === 'chinese' ? `找到 ${searchResult.repos.length} 个匹配的项目：` : `Found ${searchResult.repos.length} matching projects:`)
+                  : (lang === 'chinese' ? '未找到匹配的项目' : 'No matching projects found'),
+                searchResults: searchResult.repos.length > 0 ? searchResult.repos : undefined
+              }
             : msg
         )
         storage.saveChatMessages(user_id, updated)

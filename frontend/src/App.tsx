@@ -24,7 +24,7 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refreshRepos, deleteRepo, updateRepoMatchScore } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -211,6 +211,27 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('bulk_enrich error:', error)
     }
+  }
+
+  const handleChatFavorite = async (repo: any) => {
+    if (!username) return
+    addRepo(repo)
+    try {
+      const enriched = await manualSearchAPI.bulkEnrich([
+        { repo_id: repo.repo_id, full_name: repo.name }
+      ])
+      if (enriched && enriched.repos && enriched.repos.length > 0) {
+        const e = enriched.repos[0]
+        addRepo({ ...repo, ...e, description: repo.description || e.description })
+      }
+    } catch (error) {
+      console.error('chat favorite enrich error:', error)
+    }
+  }
+
+  const handleChatUnfavorite = (repoId: string) => {
+    if (!username) return
+    deleteRepo(repoId)
   }
 
   const handleProfileUpdateFromPanel = async (partial: Partial<UserProfile>) => {
@@ -506,6 +527,9 @@ const App: React.FC = () => {
         onSendMessage={handleSendMessage}
         onCancelSearch={cancelSearch}
         language={profile?.language || 'chinese'}
+        username={username}
+        onFavorite={handleChatFavorite}
+        onUnfavorite={handleChatUnfavorite}
       />
 
       <DebugLogWindow

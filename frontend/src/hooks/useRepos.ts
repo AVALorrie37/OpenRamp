@@ -163,6 +163,19 @@ export const useRepos = (username: string | null) => {
     })
   }, [username])
 
+  const addRepo = useCallback((repo: RepoResponse) => {
+    setRepos((prev) => {
+      if (prev.some((r) => r.repo_id === repo.repo_id)) {
+        return prev.map((r) => r.repo_id === repo.repo_id ? { ...r, ...repo, is_favorited: true } : r)
+      }
+      const next = [...prev, { ...repo, is_favorited: true }]
+      if (username) {
+        storage.saveUserRepos(username, next)
+      }
+      return next
+    })
+  }, [username])
+
   const deleteRepo = useCallback((repoId: string) => {
     setRepos((prev) => {
       const next = prev.filter((r) => r.repo_id !== repoId)
@@ -185,6 +198,7 @@ export const useRepos = (username: string | null) => {
     fetchRepos,
     refresh: refreshToPreset,
     refreshRepos,
+    addRepo,
     deleteRepo,
     updateRepoMatchScore
   }

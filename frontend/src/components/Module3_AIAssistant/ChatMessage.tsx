@@ -1,13 +1,19 @@
 import React from 'react'
 import { theme } from '../../styles/theme'
-import type { ChatMessage as ChatMessageType } from '../../types'
+import type { ChatMessage as ChatMessageType, RepoResponse } from '../../types'
+import SearchResultCards from './SearchResultCards'
 
 interface ChatMessageProps {
   message: ChatMessageType
+  language?: 'chinese' | 'english'
+  username?: string | null
+  onFavorite?: (repo: RepoResponse) => void
+  onUnfavorite?: (repoId: string) => void
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese', username, onFavorite, onUnfavorite }) => {
   const isUser = message.role === 'user'
+  const hasResults = !isUser && message.searchResults && message.searchResults.length > 0
 
   return (
     <div style={{
@@ -17,7 +23,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     }}>
       <div
         style={{
-          maxWidth: '70%',
+          maxWidth: hasResults ? '85%' : '70%',
           padding: '12px 16px',
           borderRadius: '12px',
           backgroundColor: isUser ? theme.primary : theme.primaryLight,
@@ -28,6 +34,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         }}
       >
         {message.content}
+        {hasResults && (
+          <SearchResultCards repos={message.searchResults!} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
+        )}
       </div>
     </div>
   )

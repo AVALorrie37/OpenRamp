@@ -5,6 +5,8 @@ Smooth your ramp to open source.
 OpenRamp 通过 **AI 对话画像 + 多维度数据评分**，帮你在茫茫仓库里精准找到适合自己“下手”的开源项目。
 
 ![](SnowShot_2026-03-17_16-10-57.png)
+![](image20260318174612.png)
+
 
 ## 为什么值得一试？
 

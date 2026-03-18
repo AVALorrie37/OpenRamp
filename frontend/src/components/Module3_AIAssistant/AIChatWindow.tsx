@@ -16,6 +16,9 @@ interface AIChatWindowProps {
   onSendMessage: (message: string) => Promise<any>
   onCancelSearch?: () => void
   language?: 'chinese' | 'english'
+  username?: string | null
+  onFavorite?: (repo: any) => void
+  onUnfavorite?: (repoId: string) => void
 }
 
 function stageLabel(stage: string | null | undefined, language: 'chinese' | 'english'): string {
@@ -42,7 +45,10 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   searchStage = null,
   onSendMessage,
   onCancelSearch,
-  language = 'chinese'
+  language = 'chinese',
+  username = null,
+  onFavorite,
+  onUnfavorite
 }) => {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -154,7 +160,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             if (msg.isSearching && onCancelSearch) {
               return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
             }
-            return <ChatMessage key={index} message={msg} />
+            return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
           })}
           {loading && (
             <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
