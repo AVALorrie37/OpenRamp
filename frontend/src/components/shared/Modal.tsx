@@ -1,4 +1,5 @@
 import React from 'react'
+import { X } from 'lucide-react'
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
@@ -24,9 +25,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, classNa
             <h2 className="m-0 text-text">{title}</h2>
             <button
               onClick={onClose}
-              className="px-2 text-2xl text-text"
+              className="inline-flex items-center justify-center px-2 text-text"
+              aria-label="Close"
             >
-              ×
+              <X size={20} />
             </button>
           </div>
         )}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { Send, X } from 'lucide-react'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -95,9 +96,10 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="px-2 text-2xl text-text"
+            className="inline-flex items-center justify-center px-2 text-text"
+            aria-label={language === 'english' ? 'Close' : '关闭'}
           >
-            ×
+            <X size={20} />
           </button>
         </div>
 
@@ -142,11 +144,12 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 type="submit"
                 disabled={!input.trim() || loading}
                 onClick={(e) => handleSubmit(e)}
-                className={`absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center px-2 text-xl transition ${
+                className={`absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center px-2 transition ${
                   (!input.trim() || loading) ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'
                 }`}
+                aria-label={language === 'english' ? 'Send' : '发送'}
               >
-                ➤
+                <Send size={18} />
               </button>
             </div>
             <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />

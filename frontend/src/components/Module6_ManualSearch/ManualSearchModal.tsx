@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { manualSearchAPI } from '../../services/api'
+import { Heart, Search, Star } from 'lucide-react'
 
 interface ManualSearchRepo {
   repo_id: string
@@ -232,7 +233,9 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
         >
           <div className="mr-4 flex flex-1 flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-lg">🔍</span>
+              <span className="inline-flex text-primary" aria-hidden="true">
+                <Search size={18} />
+              </span>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -392,7 +395,11 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                     {repo.full_name}
                   </a>
                   <div className="mt-1 text-xs text-text/80">
-                    ⭐ {repo.stargazers_count} · {repo.owner.login}
+                    <span className="inline-flex items-center gap-1">
+                      <Star size={14} />
+                      <span>{repo.stargazers_count}</span>
+                    </span>
+                    <span> · {repo.owner.login}</span>
                   </div>
                   <div className="mt-2 text-sm leading-6 text-text/80">
                     {repo.description || 'No description'}
@@ -403,7 +410,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                   className={`min-w-6 bg-transparent p-0 text-2xl ${isFavorited ? 'text-accent' : 'text-border'}`}
                   aria-label={isFavorited ? '取消收藏' : '收藏'}
                 >
-                  {isFavorited ? '♥' : '♡'}
+                  <Heart size={18} fill={isFavorited ? 'currentColor' : 'none'} />
                 </button>
               </div>
             )

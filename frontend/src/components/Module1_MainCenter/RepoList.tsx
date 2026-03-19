@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { RepoResponse } from '../../types'
+import { Search, Star } from 'lucide-react'
 
 interface RepoListProps {
   repos: RepoResponse[]
@@ -82,8 +83,9 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
           <button
             onClick={onOpenManualSearch}
             className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-surface px-2.5 py-1.5 text-xs text-primary transition hover:bg-primary/10"
+            aria-label="Search"
           >
-            <span>🔍</span>
+            <Search size={16} />
           </button>
         )}
       </div>
@@ -113,7 +115,9 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               <h3 className="m-0 text-lg font-semibold text-text">
                 {repo.name}
                 {repo.is_favorited && (
-                  <span className="ml-1.5 text-base">⭐</span>
+                  <span className="ml-1.5 inline-flex align-middle text-accent" aria-label="Favorited" title="Favorited">
+                    <Star size={14} fill="currentColor" />
+                  </span>
                 )}
               </h3>
               <div className="flex gap-2">

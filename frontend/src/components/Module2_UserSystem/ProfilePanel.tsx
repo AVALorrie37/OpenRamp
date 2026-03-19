@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { X } from 'lucide-react'
 import type { UserProfile } from '../../types'
 
 interface ProfilePanelProps {
@@ -264,8 +265,9 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                   <button
                     onClick={() => handleDelete(index)}
                     className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
+                    aria-label="Remove"
                   >
-                    ×
+                    <X size={16} />
                   </button>
                 </>
               )}
@@ -334,8 +336,9 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
               <button
                 onClick={() => handleDeletePreference(preference)}
                 className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
+                aria-label="Remove"
               >
-                ×
+                <X size={16} />
               </button>
             </div>
           ))}

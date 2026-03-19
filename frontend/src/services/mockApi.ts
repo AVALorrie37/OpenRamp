@@ -108,7 +108,7 @@ export const mockChatAPI = {
     const lowerMessage = message.toLowerCase()
     if (lowerMessage.includes('确认') || lowerMessage.includes('确认技能')) {
       return {
-        reply: '✅ 已确认！你的技能标签已保存。',
+        reply: '已确认！你的技能标签已保存。',
         status: 'confirmed',
         skills: ['python', 'javascript', 'react'],
         preferences: ['bug_fix', 'docs'],
@@ -120,7 +120,7 @@ export const mockChatAPI = {
     }
     if (lowerMessage.includes('搜索') || lowerMessage.includes('搜索匹配项目')) {
       return {
-        reply: '🔍 正在为你搜索匹配的项目...',
+        reply: '正在为你搜索匹配的项目...',
         status: 'collecting',
         skills: ['python', 'javascript'],
         preferences: ['bug_fix'],

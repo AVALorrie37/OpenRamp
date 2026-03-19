@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { storage } from '../../utils/storage'
 import type { RepoResponse } from '../../types'
+import { ChevronLeft, ChevronRight, Star } from 'lucide-react'
 
 interface SearchResultCardsProps {
   repos: RepoResponse[]
@@ -64,7 +65,9 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
                 title={language === 'chinese' ? (isFav ? '取消收藏' : '收藏') : (isFav ? 'Unfavorite' : 'Favorite')}
                 disabled={!username}
               >
-                {isFav ? '⭐' : '☆'}
+                <span className={isFav ? 'text-accent' : 'text-border'} aria-hidden="true">
+                  <Star size={16} fill={isFav ? 'currentColor' : 'none'} />
+                </span>
               </button>
             </div>
             {repo.match_score != null && (
@@ -85,9 +88,10 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className={`bg-transparent px-1.5 py-0.5 text-base ${page === 0 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
+            className={`inline-flex items-center justify-center bg-transparent px-1.5 py-0.5 ${page === 0 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
+            aria-label="Previous page"
           >
-            ◀
+            <ChevronLeft size={18} />
           </button>
           <span className="text-xs text-text">
             {page + 1} / {totalPages}
@@ -95,9 +99,10 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className={`bg-transparent px-1.5 py-0.5 text-base ${page >= totalPages - 1 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
+            className={`inline-flex items-center justify-center bg-transparent px-1.5 py-0.5 ${page >= totalPages - 1 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
+            aria-label="Next page"
           >
-            ▶
+            <ChevronRight size={18} />
           </button>
         </div>
       )}

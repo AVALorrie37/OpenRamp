@@ -1,4 +1,5 @@
 import React from 'react'
+import { User } from 'lucide-react'
 
 interface UserAvatarProps {
   username: string | null
@@ -11,8 +12,9 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ username, onClick }) => {
       <button
         onClick={onClick}
         className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-border text-xl text-text/60"
+        aria-label="User"
       >
-        👤
+        <User size={20} />
       </button>
     )
   }
