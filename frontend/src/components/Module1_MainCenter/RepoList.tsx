@@ -5,6 +5,7 @@ import { Search, Star } from 'lucide-react'
 interface RepoListProps {
   repos: RepoResponse[]
   onRepoClick: (repo: RepoResponse) => void
+  onToggleFavorite?: (repo: RepoResponse) => void
   onOpenManualSearch?: () => void
   highlightedRepoIds?: string[]
   onBackgroundClick?: () => void
@@ -15,7 +16,7 @@ interface RepoListProps {
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo, onDescriptionRefresh }) => {
+const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorite, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo, onDescriptionRefresh }) => {
   const [sortType, setSortType] = useState<SortType>('match')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
@@ -114,11 +115,6 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
             <div className="mb-2 flex items-start justify-between">
               <h3 className="m-0 text-lg font-semibold text-text">
                 {repo.name}
-                {repo.is_favorited && (
-                  <span className="ml-1.5 inline-flex align-middle text-accent" aria-label="Favorited" title="Favorited">
-                    <Star size={14} fill="currentColor" />
-                  </span>
-                )}
               </h3>
               <div className="flex gap-2">
                 {canUseMatch && (
@@ -133,6 +129,19 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                   <span className="rounded bg-accent px-2 py-1 text-xs font-medium text-white">
                     新手友好
                   </span>
+                )}
+                {onToggleFavorite && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleFavorite(repo)
+                    }}
+                    className="inline-flex items-center justify-center rounded-full bg-transparent p-1 text-base text-border transition hover:text-accent"
+                    aria-label={repo.is_favorited ? '取消收藏' : '收藏'}
+                  >
+                    <Star size={16} fill={repo.is_favorited ? 'currentColor' : 'none'} />
+                  </button>
                 )}
               </div>
             </div>

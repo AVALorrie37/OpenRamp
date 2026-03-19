@@ -191,6 +191,31 @@ export const useRepos = (username: string | null) => {
     })
   }, [username])
 
+  const toggleFavorite = useCallback((repoId: string) => {
+    if (!username) {
+      return
+    }
+    setRepos((prev) => {
+      const next = prev.map((r) =>
+        r.repo_id === repoId ? { ...r, is_favorited: !r.is_favorited } : r
+      )
+      const favorites = storage.getUserFavorites(username) || []
+      const exists = favorites.some((f: any) => f.repo_id === repoId)
+      let nextFavorites: any[]
+      if (exists) {
+        nextFavorites = favorites.filter((f: any) => f.repo_id !== repoId)
+      } else {
+        const repo = next.find((r) => r.repo_id === repoId)
+        if (!repo) {
+          return next
+        }
+        nextFavorites = [...favorites, { ...repo, is_favorited: true }]
+      }
+      storage.saveUserFavorites(username, nextFavorites)
+      return next
+    })
+  }, [username])
+
   return {
     repos,
     loading,
@@ -200,6 +225,7 @@ export const useRepos = (username: string | null) => {
     refreshRepos,
     addRepo,
     deleteRepo,
-    updateRepoMatchScore
+    updateRepoMatchScore,
+    toggleFavorite
   }
 }

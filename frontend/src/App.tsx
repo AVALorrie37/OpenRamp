@@ -23,7 +23,7 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore } = useRepos(username)
+  const { repos, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -447,6 +447,7 @@ const App: React.FC = () => {
             <RepoList
               repos={repos}
               onRepoClick={handleRepoClick}
+              onToggleFavorite={(repo) => toggleFavorite(repo.repo_id)}
               onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
               canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
