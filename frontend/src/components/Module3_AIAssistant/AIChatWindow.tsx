@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { theme } from '../../styles/theme'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -83,76 +82,28 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   return (
     <>
       <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: theme.overlay,
-          zIndex: 1000
-        }}
+        className="fixed inset-0 z-[1000] bg-black/30"
         onClick={onClose}
       />
       <div
-        style={{
-          position: 'fixed',
-          right: '30px',
-          bottom: '100px',
-          width: '500px',
-          height: '600px',
-          backgroundColor: theme.white,
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          zIndex: 1001,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        className="fixed bottom-[100px] right-4 z-[1001] flex h-[70vh] w-[calc(100%-2rem)] max-w-[500px] flex-col rounded-lg bg-surface shadow-modal sm:right-[30px] sm:h-[600px]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{
-          padding: '20px',
-          borderBottom: `1px solid ${theme.border}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: '16px',
-            color: theme.text,
-            fontWeight: 600
-          }}>
+        <div className="flex items-center justify-between border-b border-border p-5">
+          <h3 className="m-0 text-lg font-semibold text-text">
             {language === 'english' ? 'Open Source Contribution Assistant' : '开源贡献智能向导'}
           </h3>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: theme.text,
-              padding: '0 8px'
-            }}
+            className="px-2 text-2xl text-text"
           >
             ×
           </button>
         </div>
 
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px',
-          backgroundColor: theme.background
-        }}>
+        <div className="flex-1 overflow-y-auto bg-background p-5">
           {messages.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              color: theme.text,
-              opacity: 0.6,
-              marginTop: '40px'
-            }}>
+            <div className="mt-10 text-center text-text/60">
               {language === 'english' ? 'Start chatting!' : '开始对话吧！'}
             </div>
           )}
@@ -163,17 +114,10 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
           })}
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <div style={{
-                padding: '12px 16px',
-                backgroundColor: theme.primaryLight,
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
+            <div className="flex justify-start">
+              <div className="flex items-center gap-2 rounded-lg bg-primaryLight px-4 py-3">
                 <LoadingSpinner />
-                <span style={{ fontSize: '12px', color: theme.text, opacity: 0.7 }}>
+                <span className="text-xs text-text/70">
                   {stageLabel(loadingStage, language)}
                 </span>
               </div>
@@ -182,13 +126,9 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        <div style={{
-          padding: '16px',
-          borderTop: `1px solid ${theme.border}`,
-          backgroundColor: theme.white
-        }}>
-          <form onSubmit={handleSubmit} style={{ position: 'relative' }}>
-            <div style={{ position: 'relative', marginBottom: '12px' }}>
+        <div className="border-t border-border bg-surface p-4">
+          <form onSubmit={handleSubmit} className="relative">
+            <div className="relative mb-3">
               <input
                 ref={inputRef}
                 type="text"
@@ -196,37 +136,15 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
                 disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '10px 45px 10px 10px',
-                  border: `1px solid ${loading ? theme.primary : theme.border}`,
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  animation: loading ? 'pulse 1.5s ease-in-out infinite' : 'none'
-                }}
+                className={`w-full rounded-md border bg-surface px-3 py-2 pr-11 text-base outline-none ${loading ? 'border-primary animate-pulse' : 'border-border'}`}
               />
               <button
                 type="submit"
                 disabled={!input.trim() || loading}
                 onClick={(e) => handleSubmit(e)}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: (!input.trim() || loading) ? 'not-allowed' : 'pointer',
-                  padding: '4px 8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: (!input.trim() || loading) ? theme.border : theme.primary,
-                  fontSize: '20px',
-                  transition: 'color 0.2s'
-                }}
+                className={`absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center px-2 text-xl transition ${
+                  (!input.trim() || loading) ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'
+                }`}
               >
                 ➤
               </button>
@@ -234,12 +152,6 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
           </form>
         </div>
-        <style>{`
-          @keyframes pulse {
-            0%, 100% { border-color: ${theme.border}; }
-            50% { border-color: ${theme.primary}; }
-          }
-        `}</style>
       </div>
     </>
   )

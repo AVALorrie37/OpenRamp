@@ -1,5 +1,4 @@
 import React from 'react'
-import { theme } from '../../styles/theme'
 import type { ChatMessage as ChatMessageType, RepoResponse } from '../../types'
 import SearchResultCards from './SearchResultCards'
 
@@ -16,22 +15,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese'
   const hasResults = !isUser && message.searchResults && message.searchResults.length > 0
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom: '12px'
-    }}>
+    <div className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        style={{
-          maxWidth: hasResults ? '85%' : '70%',
-          padding: '12px 16px',
-          borderRadius: '12px',
-          backgroundColor: isUser ? theme.primary : theme.primaryLight,
-          color: isUser ? theme.white : theme.text,
-          fontSize: '14px',
-          lineHeight: '1.5',
-          whiteSpace: 'pre-wrap'
-        }}
+        className={`rounded-lg px-4 py-3 text-base leading-6 whitespace-pre-wrap ${
+          hasResults ? 'max-w-[85%]' : 'max-w-[70%]'
+        } ${isUser ? 'bg-primary text-white' : 'bg-primaryLight text-text'}`}
       >
         {message.content}
         {hasResults && (

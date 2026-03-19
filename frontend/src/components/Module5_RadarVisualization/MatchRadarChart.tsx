@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { theme } from '../../styles/theme'
+import { cssVar } from '../../utils/cssVars'
 import Modal from '../shared/Modal'
 
 interface MatchRadarChartProps {
@@ -34,6 +34,7 @@ interface MatchRadarChartProps {
     c_data: number
   }
   onBaseWeightsChange?: (next: { w_skill: number; w_activity: number; w_demand: number }) => void
+  themeVersion?: number
 }
 
 const MatchRadarChart: FC<MatchRadarChartProps> = ({ 
@@ -43,9 +44,13 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   embedded = false,
   baseWeights,
   dynamicWeights,
-  onBaseWeightsChange
+  onBaseWeightsChange,
+  themeVersion = 0
 }) => {
   if (!matchData) return null
+  const primary = cssVar('--color-primary') || '#7FB069'
+  const text = cssVar('--color-text') || '#2C3E2D'
+  const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
 
   const defaultBase = {
     w_skill: 0.5,
@@ -140,30 +145,14 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   )
 
   const chartContent = (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      height: '100%',
-      padding: embedded ? '20px' : '40px'
-    }}>
-      <h2 style={{
-        margin: '0 0 20px 0',
-        fontSize: '24px',
-        color: theme.text,
-        fontWeight: 600
-      }}>
+    <div className={`flex h-full flex-col items-center ${embedded ? 'p-5' : 'p-10'}`}>
+      <h2 className="mb-5 mt-0 text-3xl font-semibold text-text">
         {matchData.repoName}
       </h2>
-      <div style={{
-        marginBottom: '15px',
-        fontSize: '18px',
-        color: theme.primary,
-        fontWeight: 600
-      }}>
+      <div className="mb-4 text-xl font-semibold text-primary">
         匹配总分: {Math.round(matchData.matchScore * 100)}%
       </div>
-      <div style={{ width: '100%', height: embedded ? '200px' : '300px' }}>
+      <div className={`w-full ${embedded ? 'h-[200px]' : 'h-[300px]'}`} key={themeVersion}>
         <ResponsiveContainer>
           <RadarChart data={data}
           cx="52%"
@@ -172,60 +161,39 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
           innerRadius="20%"
           margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
 
-            <PolarGrid />
+            <PolarGrid stroke={grid} />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fill: theme.text, fontSize: 14}}
+              tick={{ fill: text, fontSize: 14}}
             />
             <Radar
               name="匹配度"
               dataKey="value"
-              stroke={theme.primary}
-              fill={theme.primary}
+              stroke={primary}
+              fill={primary}
               fillOpacity={0.5}
             />
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <div style={{
-        marginTop: '6px',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        fontSize: '12px',
-        color: theme.text
-      }}>
+      <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text">
         <div
-          style={{ lineHeight: 2, fontSize: '16px', textAlign: 'center'}}
+          className="text-center text-base leading-8"
           dangerouslySetInnerHTML={{ __html: formulaHtml }}
         />
         <div
-          style={{ lineHeight: 1.4, fontSize: '12px', textAlign: 'center' }}
+          className="text-center text-xs leading-5"
           dangerouslySetInnerHTML={{ __html: weightHtml }}
         />
 
         {onBaseWeightsChange && (
-          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
-            <div
-              style={{
-                padding: '14px 18px',
-                borderRadius: '10px',
-                border: `1px solid ${theme.border}`,
-                backgroundColor: theme.white,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-                minWidth: '200px',
-                maxWidth: '320px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>
+          <div className="mt-3 flex justify-center">
+            <div className="flex min-w-[200px] max-w-[320px] flex-col gap-2.5 rounded-lg border border-border bg-surface p-4 shadow-panel">
+              <div className="mb-0.5 text-sm font-semibold">
                 权重调节
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center justify-between">
                   <span
                     dangerouslySetInnerHTML={{
                       __html: katex.renderToString("w_{\\mathrm{skill}}", {
@@ -242,10 +210,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                     value={localWeights.w_skill.toFixed(1)}
                     onChange={(e) => handleInputChange('w_skill', e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown('w_skill', e)}
-                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                    className="ml-4 w-20 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                   />
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="flex items-center justify-between">
                   <span
                     dangerouslySetInnerHTML={{
                       __html: katex.renderToString("w_{\\mathrm{activity}}", {
@@ -262,10 +230,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                     value={localWeights.w_activity.toFixed(1)}
                     onChange={(e) => handleInputChange('w_activity', e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown('w_activity', e)}
-                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                    className="ml-4 w-20 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                   />
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="flex items-center justify-between">
                   <span
                     dangerouslySetInnerHTML={{
                       __html: katex.renderToString("w_{\\mathrm{demand}}", {
@@ -282,7 +250,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                     value={localWeights.w_demand.toFixed(1)}
                     onChange={(e) => handleInputChange('w_demand', e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown('w_demand', e)}
-                    style={{ width: '80px', marginLeft: '18px', textAlign: 'right' }}
+                    className="ml-4 w-20 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs outline-none focus:border-primary"
                   />
                 </label>
               </div>
@@ -301,8 +269,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      width="80vw"
-      height="80vh"
+      className="h-[80vh] w-[80vw]"
     >
       {chartContent}
     </Modal>

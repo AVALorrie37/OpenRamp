@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import UserAvatar from './UserAvatar'
 import ProfilePanel from './ProfilePanel'
-import { theme } from '../../styles/theme'
 import type { UserProfile } from '../../types'
 
 interface UserDropdownProps {
@@ -41,7 +40,7 @@ const UserDropdown: React.FC<UserDropdownProps> = ({
   if (!username) {
     // 未登录状态下，点击头像触发登录回调
     return onLogin ? (
-      <div onClick={onLogin} style={{ cursor: 'pointer' }}>
+      <div onClick={onLogin} className="cursor-pointer">
         <UserAvatar username={null} onClick={() => {}} />
       </div>
     ) : (
@@ -50,19 +49,10 @@ const UserDropdown: React.FC<UserDropdownProps> = ({
   }
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative' }}>
+    <div ref={dropdownRef} className="relative">
       <UserAvatar username={username} onClick={() => setIsOpen(!isOpen)} />
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '50px',
-          right: 0,
-          backgroundColor: theme.white,
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
-          minWidth: '320px'
-        }}>
+        <div className="absolute right-0 top-[50px] z-[1000] min-w-[320px] rounded-md bg-surface shadow-panel">
           <ProfilePanel
             profile={profile}
             onUpdate={onUpdate}

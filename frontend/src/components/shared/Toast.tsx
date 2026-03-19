@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { theme } from '../../styles/theme'
 
 interface ToastProps {
   message: string
@@ -22,32 +21,8 @@ const Toast: React.FC<ToastProps> = ({ message, duration = 3000, onClose }) => {
   if (!visible) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      backgroundColor: theme.primary,
-      color: theme.white,
-      padding: '12px 24px',
-      borderRadius: '8px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      zIndex: 10000,
-      animation: 'slideUp 0.3s ease-out'
-    }}>
+    <div className="fixed bottom-5 left-1/2 z-[10000] -translate-x-1/2 animate-[toastIn_300ms_ease-out] rounded-md bg-primary px-6 py-3 text-white shadow-panel">
       {message}
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-      `}</style>
     </div>
   )
 }

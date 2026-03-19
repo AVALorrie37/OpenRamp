@@ -1,10 +1,9 @@
-import React, { useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
 import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
-import { theme } from './styles/theme'
 import { storage } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
@@ -37,6 +36,83 @@ const App: React.FC = () => {
   const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
   const [activeKeywords, setActiveKeywords] = useState<string[]>([])
   const { logs, clearLogs } = useDebugLogs(showDebug)
+
+  const middleColumnRef = useRef<HTMLDivElement | null>(null)
+  const dragStateRef = useRef<{ dragging: boolean; startY: number; startTopHeight: number; total: number } | null>(null)
+  const [middleTopHeight, setMiddleTopHeight] = useState<number | null>(null)
+  const [colorMode, setColorMode] = useState<'light' | 'dark'>(() => {
+    try {
+      const v = window.localStorage.getItem('openramp_color_mode')
+      return v === 'dark' ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  })
+  const [themeVersion, setThemeVersion] = useState(0)
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (colorMode === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }, [])
+
+  useEffect(() => {
+    const el = middleColumnRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      const rect = el.getBoundingClientRect()
+      const total = rect.height
+      if (!Number.isFinite(total) || total <= 0) return
+      setMiddleTopHeight((prev) => {
+        if (typeof prev !== 'number' || !Number.isFinite(prev)) {
+          return Math.max(200, Math.round(total * 0.4))
+        }
+        const minTop = 200
+        const minBottom = 200
+        const maxTop = Math.max(minTop, total - minBottom)
+        return Math.min(Math.max(prev, minTop), maxTop)
+      })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const ds = dragStateRef.current
+      if (!ds?.dragging) return
+      const next = ds.startTopHeight + (e.clientY - ds.startY)
+      const minTop = 200
+      const minBottom = 200
+      const maxTop = Math.max(minTop, ds.total - minBottom)
+      setMiddleTopHeight(Math.min(Math.max(next, minTop), maxTop))
+    }
+    const onUp = () => {
+      const ds = dragStateRef.current
+      if (ds) {
+        ds.dragging = false
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [])
+
+  const middleStyles = useMemo(() => {
+    if (typeof middleTopHeight !== 'number') {
+      return { top: undefined as unknown as React.CSSProperties, bottom: undefined as unknown as React.CSSProperties }
+    }
+    return {
+      top: { height: `${Math.round(middleTopHeight)}px` } as React.CSSProperties,
+      bottom: { height: `calc(100% - ${Math.round(middleTopHeight)}px - 10px)` } as React.CSSProperties
+    }
+  }, [middleTopHeight])
   const handleSearchComplete = useCallback((searchRepos: any[]) => {
     if (searchRepos && searchRepos.length > 0) {
       fetchRepos({ repo_ids: searchRepos.map((r: { repo_id: string }) => r.repo_id), limit: 10 })
@@ -317,43 +393,41 @@ const App: React.FC = () => {
   }
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: theme.background
-    }}>
-      <header style={{
-        padding: '16px 24px',
-        backgroundColor: theme.white,
-        borderBottom: `1px solid ${theme.border}`,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: '20px',
-          color: theme.primary,
-          fontWeight: 700
-        }}>
+    <div className="flex h-screen w-full flex-col bg-background">
+      <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
+        <h1 className="m-0 text-xl font-bold text-primary">
           OpenRamp
         </h1>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            color: theme.text
-          }}>
+        <div className="flex items-center gap-4">
+          <label className="flex cursor-pointer items-center gap-2 text-base text-text">
+            <input
+              type="checkbox"
+              checked={colorMode === 'dark'}
+              onChange={(e) => {
+                const next = e.target.checked ? 'dark' : 'light'
+                const root = document.documentElement
+                if (next === 'dark') {
+                  root.classList.add('dark')
+                } else {
+                  root.classList.remove('dark')
+                }
+                try {
+                  window.localStorage.setItem('openramp_color_mode', next)
+                } catch {
+                }
+                setColorMode(next)
+                setThemeVersion((v) => v + 1)
+              }}
+              className="cursor-pointer"
+            />
+            {uiLanguage === 'english' ? 'Dark mode' : '深色模式'}
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-base text-text">
             <input
               type="checkbox"
               checked={showDebug}
               onChange={(e) => setShowDebug(e.target.checked)}
-              style={{ cursor: 'pointer' }}
+              className="cursor-pointer"
             />
             {uiLanguage === 'english' ? 'View terminal' : '查看终端'}
           </label>
@@ -367,29 +441,9 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main style={{
-        flex: 1,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: showDebug ? '0 0 300px 0' : '0'
-      }}>
-        <div style={{
-          flex: 1,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '20px',
-          padding: '20px',
-          overflow: 'hidden'
-          }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: theme.white,
-            borderRadius: '8px',
-            border: `1px solid ${theme.border}`,
-            overflow: 'hidden'
-          }}>
+      <main className={`flex flex-1 flex-col overflow-hidden ${showDebug ? 'pb-[300px]' : ''}`}>
+        <div className="grid flex-1 grid-cols-1 gap-5 overflow-hidden p-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col overflow-hidden rounded-md border border-border bg-surface">
             <RepoList
               repos={repos}
               onRepoClick={handleRepoClick}
@@ -421,31 +475,34 @@ const App: React.FC = () => {
             />
           </div>
 
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            height: '100%'
-          }}>
-            <div style={{
-              backgroundColor: theme.white,
-              borderRadius: '8px',
-              border: `1px solid ${theme.border}`,
-              minHeight: '200px',
-              flex:0.8,
-              position: 'relative'
-            }}>
-              <RepoActivityTabs repo={selectedRepo || repos[0]} />
+          <div ref={middleColumnRef} className="flex h-full flex-col">
+            <div
+              className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
+              style={middleStyles.top}
+            >
+              <RepoActivityTabs repo={selectedRepo || repos[0]} themeVersion={themeVersion} />
             </div>
             <div
-              style={{
-              backgroundColor: theme.white,
-              borderRadius: '8px',
-              border: `1px solid ${theme.border}`,
-              minHeight: '200px',
-              flex:1.2,
-              position: 'relative'
-            }}
+              className="group relative h-[10px] cursor-row-resize select-none"
+              onPointerDown={(e) => {
+                const el = middleColumnRef.current
+                if (!el) return
+                const rect = el.getBoundingClientRect()
+                const total = rect.height
+                const currentTop = typeof middleTopHeight === 'number' ? middleTopHeight : Math.max(200, Math.round(total * 0.4))
+                dragStateRef.current = { dragging: true, startY: e.clientY, startTopHeight: currentTop, total }
+                ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+              }}
+              aria-label="Resize middle panels"
+              role="separator"
+              aria-orientation="horizontal"
+            >
+              <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border transition group-hover:bg-primary" />
+              <div className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
+            </div>
+            <div
+              className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
+              style={middleStyles.bottom}
               onClick={handleKeywordAreaClick}
             >
               <KeywordCloud
@@ -457,39 +514,20 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div style={{
-            backgroundColor: theme.white,
-            borderRadius: '8px',
-            border: `1px solid ${theme.border}`,
-            position: 'relative',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <RadarPlaceholder 
+          <div className="relative flex items-center justify-center rounded-md border border-border bg-surface">
+            <RadarPlaceholder
               isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
               matchData={matchData}
               baseWeights={weights}
               onBaseWeightsChange={handleWeightsChange}
+              themeVersion={themeVersion}
             />
           </div>
           </div>
       </main>
 
-      <div style={{
-        padding: '12px 20px',
-        backgroundColor: theme.primaryLight + '40',
-        borderTop: `1px solid ${theme.border}`,
-        fontSize: '13px',
-        color: theme.text,
-        textAlign: 'center',
-        overflow: 'hidden',
-        whiteSpace: 'nowrap'
-      }}>
-        <div style={{
-          display: 'inline-block',
-          animation: 'scroll 20s linear infinite'
-        }}>
+      <div className="overflow-hidden whitespace-nowrap border-t border-border bg-primaryLight/25 px-5 py-3 text-center text-sm text-text">
+        <div className="inline-block animate-[scroll_20s_linear_infinite]">
           {uiLanguage === 'english'
             ? 'Tip: Log in to get personalized recommendations | Click a repo to view match details | Chat with the AI assistant to confirm your skills'
             : '提示：登录获取个性化推荐 | 点击仓库查看匹配详情 | 与AI助手对话确认技能'}
@@ -553,13 +591,7 @@ const App: React.FC = () => {
       )}
 
       {reposLoading && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 10000
-        }}>
+        <div className="fixed left-1/2 top-1/2 z-[10000] -translate-x-1/2 -translate-y-1/2">
           <LoadingSpinner />
         </div>
       )}

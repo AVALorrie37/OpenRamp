@@ -1,5 +1,4 @@
 import React from 'react'
-import { theme } from '../../styles/theme'
 
 interface SuggestionButtonsProps {
   onSuggestionClick: (suggestion: string) => void
@@ -20,34 +19,12 @@ const SuggestionButtons: React.FC<SuggestionButtonsProps> = ({ onSuggestionClick
     ]
 
   return (
-    <div style={{
-      display: 'flex',
-      gap: '8px',
-      flexWrap: 'wrap',
-      marginTop: '12px'
-    }}>
+    <div className="mt-3 flex flex-wrap gap-2">
       {suggestions.map((suggestion) => (
         <button
           key={suggestion}
           onClick={() => onSuggestionClick(suggestion)}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: theme.background,
-            color: theme.text,
-            border: `1px solid ${theme.border}`,
-            borderRadius: '16px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.primaryLight
-            e.currentTarget.style.borderColor = theme.primary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = theme.background
-            e.currentTarget.style.borderColor = theme.border
-          }}
+          className="cursor-pointer rounded-full border border-border bg-background px-3 py-1.5 text-xs text-text transition hover:border-primary hover:bg-primaryLight"
         >
           {suggestion}
         </button>

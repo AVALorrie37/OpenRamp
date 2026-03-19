@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { theme } from '../../styles/theme'
 import type { RepoResponse } from '../../types'
 
 interface RepoListProps {
@@ -49,60 +48,32 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
   })
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px',
-        borderBottom: `1px solid ${theme.border}`
-      }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-border p-3">
+        <div className="flex gap-2">
           {canUseMatch && (
             <button
               onClick={() => setSortType('match')}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: sortType === 'match' ? theme.primary : theme.background,
-                color: sortType === 'match' ? theme.white : theme.text,
-                border: `1px solid ${theme.primary}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+                sortType === 'match' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+              }`}
             >
               匹配总分
             </button>
           )}
           <button
             onClick={() => setSortType('active')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: sortType === 'active' ? theme.primary : theme.background,
-              color: sortType === 'active' ? theme.white : theme.text,
-              border: `1px solid ${theme.primary}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
+            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+              sortType === 'active' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            }`}
           >
             活跃度
           </button>
           <button
             onClick={() => setSortType('friendly')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: sortType === 'friendly' ? theme.primary : theme.background,
-              color: sortType === 'friendly' ? theme.white : theme.text,
-              border: `1px solid ${theme.primary}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
+            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+              sortType === 'friendly' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            }`}
           >
             新手友好度
           </button>
@@ -110,30 +81,14 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
         {onOpenManualSearch && (
           <button
             onClick={onOpenManualSearch}
-            style={{
-              marginLeft: 'auto',
-              padding: '6px 10px',
-              borderRadius: '999px',
-              border: `1px solid ${theme.primary}`,
-              backgroundColor: theme.white,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '12px',
-              color: theme.primary
-            }}
+            className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-surface px-2.5 py-1.5 text-xs text-primary transition hover:bg-primary/10"
           >
             <span>🔍</span>
           </button>
         )}
       </div>
       <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '12px 12px 32px 12px'
-        }}
+        className="flex-1 overflow-y-auto p-3 pb-8"
         onClick={onBackgroundClick}
       >
         {sortedRepos.map((repo: RepoResponse) => {
@@ -150,74 +105,28 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               e.stopPropagation()
               setDeleteTargetId(repo.repo_id)
             }}
-            style={{
-              padding: '16px',
-              marginBottom: '12px',
-              backgroundColor: theme.white,
-              borderRadius: '8px',
-              border: `2px solid ${isHighlighted ? theme.primary : theme.border}`,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: isHighlighted ? `0 0 0 2px ${theme.primaryLight}` : 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = theme.primary
-              e.currentTarget.style.boxShadow = `0 4px 12px ${theme.primaryLight}40`
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = isHighlighted ? theme.primary : theme.border
-              e.currentTarget.style.boxShadow = isHighlighted ? `0 0 0 2px ${theme.primaryLight}` : 'none'
-            }}
+            className={`mb-3 cursor-pointer rounded-md border-2 bg-surface p-4 transition hover:border-primary hover:shadow-panel ${
+              isHighlighted ? 'border-primary ring-2 ring-primaryLight/60' : 'border-border'
+            }`}
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              marginBottom: '8px'
-            }}>
-              <h3 style={{
-                margin: 0,
-                fontSize: '16px',
-                color: theme.text,
-                fontWeight: 600
-              }}>
+            <div className="mb-2 flex items-start justify-between">
+              <h3 className="m-0 text-lg font-semibold text-text">
                 {repo.name}
                 {repo.is_favorited && (
-                  <span style={{ marginLeft: '6px', fontSize: '14px' }}>⭐</span>
+                  <span className="ml-1.5 text-base">⭐</span>
                 )}
               </h3>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="flex gap-2">
                 {canUseMatch && (
-                  <span style={{
-                    padding: '4px 8px',
-                    backgroundColor: theme.primary,
-                    color: theme.white,
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 500
-                  }}>
+                  <span className="rounded px-2 py-1 text-xs font-medium text-white bg-primary">
                     匹配{Math.round(getPrimaryScore(repo) * 100)}%
                   </span>
                 )}
-                <span style={{
-                  padding: '4px 8px',
-                  backgroundColor: theme.primaryLight,
-                  color: theme.text,
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 500
-                }}>
+                <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
                   活跃度{Math.round(repo.active_score * 100)}%
                 </span>
                 {canUseMatch && getPrimaryScore(repo) > 0.7 && (
-                  <span style={{
-                    padding: '4px 8px',
-                    backgroundColor: theme.accent,
-                    color: theme.white,
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 500
-                  }}>
+                  <span className="rounded bg-accent px-2 py-1 text-xs font-medium text-white">
                     新手友好
                   </span>
                 )}
@@ -225,29 +134,13 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
             </div>
             {deleteTargetId === repo.repo_id && onDeleteRepo && (
               <div
-                style={{
-                  marginTop: '8px',
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  backgroundColor: theme.primaryLight,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '12px'
-                }}
+                className="mt-2 flex items-center justify-between rounded-md bg-primaryLight p-2 text-xs"
                 onClick={(e) => e.stopPropagation()}
               >
                 <span>删除这个仓库？</span>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="flex gap-2">
                   <button
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: `1px solid ${theme.error}`,
-                      backgroundColor: theme.error,
-                      color: '#fff',
-                      cursor: 'pointer'
-                    }}
+                    className="rounded border border-error bg-error px-2 py-1 text-white"
                     onClick={(e) => {
                       e.stopPropagation()
                       onDeleteRepo(repo.repo_id)
@@ -257,14 +150,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
                     删除
                   </button>
                   <button
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: `1px solid ${theme.border}`,
-                      backgroundColor: theme.white,
-                      color: theme.text,
-                      cursor: 'pointer'
-                    }}
+                    className="rounded border border-border bg-surface px-2 py-1 text-text"
                     onClick={(e) => {
                       e.stopPropagation()
                       setDeleteTargetId(null)
@@ -276,15 +162,9 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onOpenManualSea
               </div>
             )}
             <p
-              style={{
-                margin: '8px 0 0 0',
-                fontSize: '13px',
-                color: theme.text,
-                opacity: 0.7,
-                lineHeight: '1.5',
-                cursor: !repo.description ? 'pointer' : 'default',
-                textDecoration: !repo.description ? 'underline dotted' : 'none'
-              }}
+              className={`mt-2 text-sm leading-5 text-text/70 ${
+                !repo.description ? 'cursor-pointer underline decoration-dotted' : ''
+              }`}
               onClick={(e) => {
                 if (!repo.description && onDescriptionRefresh) {
                   e.stopPropagation()

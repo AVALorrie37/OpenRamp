@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { theme } from '../../styles/theme'
+import { cssVar } from '../../utils/cssVars'
 import OpenRankChart from './OpenRankChart'
 import type { RepoResponse } from '../../types'
 import { activityAPI } from '../../services/api'
@@ -27,6 +27,7 @@ ChartJS.register(
 
 interface RepoActivityTabsProps {
   repo: RepoResponse | null
+  themeVersion?: number
 }
 
 type TrendPoint = { date: string; count: number }
@@ -37,7 +38,7 @@ interface TrendState {
   data: TrendPoint[] | null
 }
 
-const buildChartData = (points: TrendPoint[] | null, label: string) => {
+const buildChartData = (points: TrendPoint[] | null, label: string, primary: string) => {
   if (!points || points.length === 0) {
     return { labels: [], datasets: [] }
   }
@@ -49,15 +50,15 @@ const buildChartData = (points: TrendPoint[] | null, label: string) => {
       {
         label,
         data,
-        borderColor: theme.primary,
-        backgroundColor: `${theme.primary}40`,
+        borderColor: primary,
+        backgroundColor: `${primary}40`,
         tension: 0.4
       }
     ]
   }
 }
 
-const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
+const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion = 0 }) => {
   const [activeTab, setActiveTab] = useState<'commits' | 'issues' | 'openrank'>('commits')
   const [commitTrend, setCommitTrend] = useState<TrendState>({ loading: false, error: null, data: null })
   const [issueTrend, setIssueTrend] = useState<TrendState>({ loading: false, error: null, data: null })
@@ -97,14 +98,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
   const renderBody = () => {
     if (!repo) {
       return (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: theme.text,
-          opacity: 0.5
-        }}>
+        <div className="flex h-[200px] items-center justify-center text-text/50">
           请选择仓库
         </div>
       )
@@ -112,9 +106,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
 
     if (activeTab === 'openrank') {
       return (
-        <OpenRankChart
-          repo={repo}
-        />
+        <OpenRankChart key={themeVersion} repo={repo} themeVersion={themeVersion} />
       )
     }
 
@@ -124,14 +116,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
 
     if (state.loading) {
       return (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: theme.text,
-          opacity: 0.7
-        }}>
+        <div className="flex h-[200px] items-center justify-center text-text/70">
           加载中...
         </div>
       )
@@ -139,73 +124,73 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
 
     if (state.error) {
       return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: theme.text,
-          opacity: 0.7,
-          fontSize: '12px'
-        }}>
-          <div style={{ marginBottom: 8 }}>{title}</div>
+        <div className="flex h-[200px] flex-col items-center justify-center text-xs text-text/70">
+          <div className="mb-2">{title}</div>
           <div>{state.error}</div>
         </div>
       )
     }
 
-    const chartData = buildChartData(state.data, label)
+    const primary = cssVar('--color-primary') || '#7FB069'
+    const text = cssVar('--color-text') || '#2C3E2D'
+    const bg = cssVar('--color-background') || '#F5F7F6'
+    const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+    const chartData = buildChartData(state.data, label, primary)
     if (!chartData.labels.length) {
       return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: theme.text,
-          opacity: 0.5
-        }}>
-          <div style={{ marginBottom: 8 }}>{title}</div>
+        <div className="flex h-[200px] flex-col items-center justify-center text-text/50">
+          <div className="mb-2">{title}</div>
           <div>暂无数据</div>
         </div>
       )
     }
 
     return (
-      <div style={{ padding: '0 8px 8px 8px', width: '100%', height: '100%' }}>
-        <div style={{ marginBottom: 8, fontSize: 12, color: theme.text }}>{title}</div>
+      <div className="flex h-full w-full flex-col px-2 pb-2">
+        <div className="mb-2 shrink-0 text-xs text-text">{title}</div>
+        <div className="min-h-0 flex-1 overflow-hidden">
         <Line
+          key={themeVersion}
           data={chartData}
           options={{
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: theme.white,
-                borderColor: theme.primary,
+                backgroundColor: bg,
+                borderColor: primary,
                 borderWidth: 1,
-                titleColor: theme.text,
-                bodyColor: theme.text,
+                titleColor: text,
+                bodyColor: text,
                 padding: 12
               }
             },
             scales: {
               x: {
+                grid: {
+                  color: grid
+                },
                 ticks: {
+                  color: text,
                   maxRotation: 45,
                   minRotation: 45,
                   font: { size: 10 }
                 }
               },
               y: {
-                beginAtZero: true
+                beginAtZero: true,
+                grid: {
+                  color: grid
+                },
+                ticks: {
+                  color: text
+                }
               }
             }
           }}
         />
+        </div>
       </div>
     )
   }
@@ -213,24 +198,12 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
   const repoId = repo?.repo_id || ''
 
   return (
-    <div style={{
-      padding: '12px 16px',
-      height: '100%',
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      <div style={{ display: 'flex', marginBottom: 12, borderBottom: `1px solid ${theme.border}` }}>
+    <div className="flex h-full w-full flex-col p-3">
+      <div className="mb-3 flex border-b border-border">
         <button
-          style={{
-            padding: '6px 12px',
-            fontSize: 12,
-            border: 'none',
-            borderBottom: activeTab === 'commits' ? `2px solid ${theme.primary}` : '2px solid transparent',
-            backgroundColor: 'transparent',
-            color: activeTab === 'commits' ? theme.primary : theme.text,
-            cursor: 'pointer'
-          }}
+          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
+            activeTab === 'commits' ? 'border-primary text-primary' : 'border-transparent text-text'
+          }`}
           onClick={() => {
             setActiveTab('commits')
             if (repoId) loadTrend('commits', repoId)
@@ -239,15 +212,9 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
           Commit
         </button>
         <button
-          style={{
-            padding: '6px 12px',
-            fontSize: 12,
-            border: 'none',
-            borderBottom: activeTab === 'issues' ? `2px solid ${theme.primary}` : '2px solid transparent',
-            backgroundColor: 'transparent',
-            color: activeTab === 'issues' ? theme.primary : theme.text,
-            cursor: 'pointer'
-          }}
+          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
+            activeTab === 'issues' ? 'border-primary text-primary' : 'border-transparent text-text'
+          }`}
           onClick={() => {
             setActiveTab('issues')
             if (repoId) loadTrend('issues', repoId)
@@ -256,15 +223,9 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
           Issues
         </button>
         <button
-          style={{
-            padding: '6px 12px',
-            fontSize: 12,
-            border: 'none',
-            borderBottom: activeTab === 'openrank' ? `2px solid ${theme.primary}` : '2px solid transparent',
-            backgroundColor: 'transparent',
-            color: activeTab === 'openrank' ? theme.primary : theme.text,
-            cursor: 'pointer'
-          }}
+          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
+            activeTab === 'openrank' ? 'border-primary text-primary' : 'border-transparent text-text'
+          }`}
           onClick={() => {
             setActiveTab('openrank')
           }}
@@ -272,7 +233,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo }) => {
           openRank
         </button>
       </div>
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div className="flex flex-1 items-stretch justify-center overflow-hidden">
         {renderBody()}
       </div>
     </div>

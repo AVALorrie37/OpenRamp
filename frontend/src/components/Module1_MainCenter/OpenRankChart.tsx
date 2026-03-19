@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { theme } from '../../styles/theme'
+import { cssVar } from '../../utils/cssVars'
 import type { RepoResponse } from '../../types'
 
 ChartJS.register(
@@ -25,9 +25,10 @@ ChartJS.register(
 
 interface OpenRankChartProps {
   repo: RepoResponse | null
+  themeVersion?: number
 }
 
-const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
+const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 }) => {
   const chartData = useMemo(() => {
     if (!repo?.raw_metrics?.openrank) {
       return {
@@ -49,19 +50,20 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
       }
     })
 
+    const primary = cssVar('--color-primary') || '#7FB069'
     return {
       labels,
       datasets: [
         {
           label: '贡献者数量',
           data,
-          borderColor: theme.primary,
-          backgroundColor: `${theme.primary}40`,
+          borderColor: primary,
+          backgroundColor: `${primary}40`,
           tension: 0.4
         }
       ]
     }
-  }, [repo])
+  }, [repo, themeVersion])
 
   const hasData = chartData.labels.length > 0
   const rawNote = (repo?.raw_metrics as any)?.note as string | undefined
@@ -75,62 +77,60 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo }) => {
           : null
 
   return (
-    <div style={{ 
-      padding: '16px',
-      height: '100%', 
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center'
-      }}>
-      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: theme.text }}>
+    <div className="flex h-full w-full flex-col items-center justify-center p-4">
+      <h4 className="mb-4 mt-0 text-base text-text">
         OpenRank活跃度图（近30天）
       </h4>
       {statusText ? (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: theme.text,
-          opacity: 0.5
-        }}>
+        <div className="flex h-[200px] items-center justify-center text-text/50">
           {statusText}
         </div>
       ) : (
-        <Line
-          data={chartData}
-          options={{
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                backgroundColor: theme.white,
-                borderColor: theme.primary,
-                borderWidth: 1,
-                titleColor: theme.text,
-                bodyColor: theme.text,
-                padding: 12
-              }
-            },
-            scales: {
-              x: {
-                ticks: {
-                  maxRotation: 45,
-                  minRotation: 45,
-                  font: { size: 10 }
+        <div className="min-h-0 w-full flex-1 overflow-hidden">
+          <Line
+            key={themeVersion}
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+                tooltip: {
+                  backgroundColor: cssVar('--color-background') || '#F5F7F6',
+                  borderColor: cssVar('--color-primary') || '#7FB069',
+                  borderWidth: 1,
+                  titleColor: cssVar('--color-text') || '#2C3E2D',
+                  bodyColor: cssVar('--color-text') || '#2C3E2D',
+                  padding: 12
                 }
               },
-              y: {
-                beginAtZero: true
+              scales: {
+                x: {
+                  grid: {
+                    color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+                  },
+                  ticks: {
+                    color: cssVar('--color-text') || '#2C3E2D',
+                    maxRotation: 45,
+                    minRotation: 45,
+                    font: { size: 10 }
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+                  },
+                  ticks: {
+                    color: cssVar('--color-text') || '#2C3E2D'
+                  }
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        </div>
       )}
     </div>
   )

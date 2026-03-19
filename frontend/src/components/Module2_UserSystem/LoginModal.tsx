@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import Modal from '../shared/Modal'
-import { theme } from '../../styles/theme'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -22,16 +21,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={language === 'english' ? 'Login' : '登录'} width="400px">
+    <Modal isOpen={isOpen} onClose={onClose} title={language === 'english' ? 'Login' : '登录'} className="w-[400px]">
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: theme.text,
-            fontSize: '14px',
-            fontWeight: 500
-          }}>
+        <div className="mb-5">
+          <label className="mb-2 block text-base font-medium text-text">
             {language === 'english' ? 'Username' : '用户名'}
           </label>
           <input
@@ -39,41 +32,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder={language === 'english' ? 'Enter username' : '输入用户名'}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: `1px solid ${theme.border}`,
-              borderRadius: '6px',
-              fontSize: '14px',
-              outline: 'none'
-            }}
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-base outline-none transition focus:border-primary"
             autoFocus
           />
         </div>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: theme.text,
-            fontSize: '14px',
-            fontWeight: 500
-          }}>
+        <div className="mb-5">
+          <label className="mb-2 block text-base font-medium text-text">
             语言 / Language
           </label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as 'chinese' | 'english')}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: `1px solid ${theme.border}`,
-              borderRadius: '6px',
-              fontSize: '14px',
-              outline: 'none',
-              backgroundColor: theme.white,
-              color: theme.text,
-              cursor: 'pointer'
-            }}
+            className="w-full cursor-pointer rounded-md border border-border bg-surface px-3 py-2 text-base text-text outline-none transition focus:border-primary"
           >
             <option value="chinese">中文</option>
             <option value="english">English</option>
@@ -81,24 +51,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => 
         </div>
         <button
           type="submit"
-          style={{
-            width: '100%',
-            padding: '12px',
-            backgroundColor: theme.primary,
-            color: theme.white,
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'background-color 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.primaryDark
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = theme.primary
-          }}
+          className="w-full rounded-md bg-primary px-3 py-3 text-base font-semibold text-white transition hover:bg-primaryDark"
         >
           {language === 'english' ? 'Login' : '登录'}
         </button>

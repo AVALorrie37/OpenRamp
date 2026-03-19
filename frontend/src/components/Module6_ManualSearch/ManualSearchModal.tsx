@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { theme } from '../../styles/theme'
 import { manualSearchAPI } from '../../services/api'
 
 interface ManualSearchRepo {
@@ -221,44 +220,19 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        zIndex: 9000,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}
+      className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/35"
       onClick={handleClose}
     >
       <div
-        style={{
-          width: '90%',
-          height: '90%',
-          backgroundColor: theme.background,
-          borderRadius: '12px',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          position: 'relative'
-        }}
+        className="relative flex h-[90%] w-[90%] flex-col overflow-hidden rounded-lg bg-background shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          style={{
-            padding: '16px 24px',
-            borderBottom: `1px solid ${theme.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme.white
-          }}
+          className="flex items-center justify-between border-b border-border bg-surface px-6 py-4"
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, marginRight: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '18px' }}>🔍</span>
+          <div className="mr-4 flex flex-1 flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔍</span>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -268,28 +242,12 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                   }
                 }}
                 placeholder="搜索 GitHub 仓库，如：good-first-issue python"
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${theme.border}`,
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
+                className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-base text-text outline-none focus:border-primary"
               />
               <button
                 onClick={() => void handleSearch()}
                 disabled={loading || autoLoading}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: theme.primary,
-                  color: theme.white,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  opacity: loading ? 0.7 : 1
-                }}
+                className="rounded-md bg-primary px-4 py-2 text-base text-white transition disabled:cursor-default disabled:opacity-70"
               >
                 {loading ? '搜索中...' : '搜索'}
               </button>
@@ -323,58 +281,45 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                   }
                 }}
                 disabled={loading || autoLoading}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: autoLoading ? theme.primaryLight : theme.primary,
-                  color: theme.white,
-                  fontSize: '14px',
-                  cursor: loading || autoLoading ? 'default' : 'pointer',
-                  opacity: loading || autoLoading ? 0.7 : 1
-                }}
+                className={`rounded-md px-4 py-2 text-base text-white transition disabled:cursor-default disabled:opacity-70 ${
+                  autoLoading ? 'bg-primaryLight' : 'bg-primary'
+                }`}
               >
                 {autoLoading ? '多轮搜索中...' : '一键多轮搜索'}
               </button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: theme.text, opacity: 0.8 }}>推荐:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-text/80">推荐:</span>
               {hotKeywords.map((k) => {
                 const active = selectedKeywords.includes(k)
                 return (
                   <button
                     key={k}
                     onClick={() => handleKeywordClick(k)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '999px',
-                      border: `1px solid ${active ? theme.primary : theme.border}`,
-                      backgroundColor: active ? theme.primaryLight : theme.white,
-                      color: active ? theme.primary : theme.text,
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${
+                      active ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                    }`}
                   >
                     {k}
                   </button>
                 )
               })}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '8px', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: theme.text }}>
+              <div className="ml-2 flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1 text-xs text-text">
                   <input
                     type="checkbox"
                     checked={archived}
                     onChange={(e) => setArchived(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
+                    className="cursor-pointer"
                   />
                   <span>archived:{archived ? 'true' : 'false'}</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: theme.text }}>
+                <label className="flex items-center gap-1 text-xs text-text">
                   <input
                     type="checkbox"
                     checked={usePushedFilter}
                     onChange={(e) => setUsePushedFilter(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
+                    className="cursor-pointer"
                   />
                   <span>pushed:&gt;</span>
                   <input
@@ -382,57 +327,34 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                     value={pushedDate}
                     onChange={(e) => setPushedDate(e.target.value)}
                     disabled={!usePushedFilter}
-                    style={{
-                      padding: '4px 6px',
-                      borderRadius: '6px',
-                      border: `1px solid ${theme.border}`,
-                      fontSize: '12px'
-                    }}
+                    className="rounded-md border border-border bg-surface px-1.5 py-1 text-xs text-text"
                   />
                 </label>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: theme.text, opacity: 0.8 }}>排序:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text/80">排序:</span>
               <button
                 onClick={() => setSortKey('best')}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '999px',
-                  border: `1px solid ${sortKey === 'best' ? theme.primary : theme.border}`,
-                  backgroundColor: sortKey === 'best' ? theme.primaryLight : theme.white,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  color: sortKey === 'best' ? theme.primary : theme.text
-                }}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  sortKey === 'best' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                }`}
               >
                 综合
               </button>
               <button
                 onClick={() => setSortKey('stars')}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '999px',
-                  border: `1px solid ${sortKey === 'stars' ? theme.primary : theme.border}`,
-                  backgroundColor: sortKey === 'stars' ? theme.primaryLight : theme.white,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  color: sortKey === 'stars' ? theme.primary : theme.text
-                }}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  sortKey === 'stars' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                }`}
               >
                 按Star
               </button>
               <button
                 onClick={() => setSortKey('updated')}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '999px',
-                  border: `1px solid ${sortKey === 'updated' ? theme.primary : theme.border}`,
-                  backgroundColor: sortKey === 'updated' ? theme.primaryLight : theme.white,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  color: sortKey === 'updated' ? theme.primary : theme.text
-                }}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  sortKey === 'updated' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                }`}
               >
                 按更新时间
               </button>
@@ -441,19 +363,15 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
         </div>
 
         <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '16px 24px'
-          }}
+          className="flex-1 overflow-y-auto px-6 py-4"
         >
           {error && (
-            <div style={{ marginBottom: '12px', color: '#d9534f', fontSize: '13px' }}>
+            <div className="mb-3 text-sm text-error">
               {error}
             </div>
           )}
           {!loading && results.length === 0 && !error && (
-            <div style={{ marginTop: '40px', textAlign: 'center', color: theme.text, opacity: 0.7, fontSize: '14px' }}>
+            <div className="mt-10 text-center text-base text-text/70">
               输入关键词并搜索，结果将展示在这里
             </div>
           )}
@@ -462,57 +380,27 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
             return (
               <div
                 key={repo.repo_id}
-                style={{
-                  display: 'flex',
-                  padding: '12px 16px',
-                  marginBottom: '12px',
-                  backgroundColor: theme.white,
-                  borderRadius: '8px',
-                  border: `1px solid ${theme.border}`,
-                  alignItems: 'flex-start',
-                  gap: '12px'
-                }}
+                className="mb-3 flex items-start gap-3 rounded-md border border-border bg-surface px-4 py-3"
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="min-w-0 flex-1">
                   <a
                     href={repo.html_url}
                     target="_blank"
                     rel="noreferrer"
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: theme.primary,
-                      textDecoration: 'none'
-                    }}
+                    className="text-base font-semibold text-primary no-underline"
                   >
                     {repo.full_name}
                   </a>
-                  <div style={{ marginTop: '4px', fontSize: '12px', color: theme.text, opacity: 0.8 }}>
+                  <div className="mt-1 text-xs text-text/80">
                     ⭐ {repo.stargazers_count} · {repo.owner.login}
                   </div>
-                  <div
-                    style={{
-                      marginTop: '8px',
-                      fontSize: '13px',
-                      color: theme.text,
-                      opacity: 0.8,
-                      lineHeight: 1.5
-                    }}
-                  >
+                  <div className="mt-2 text-sm leading-6 text-text/80">
                     {repo.description || 'No description'}
                   </div>
                 </div>
                 <button
                   onClick={() => toggleFavorite(repo.repo_id)}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    fontSize: '20px',
-                    color: isFavorited ? theme.accent : theme.border,
-                    padding: 0,
-                    minWidth: '24px'
-                  }}
+                  className={`min-w-6 bg-transparent p-0 text-2xl ${isFavorited ? 'text-accent' : 'text-border'}`}
                   aria-label={isFavorited ? '取消收藏' : '收藏'}
                 >
                   {isFavorited ? '♥' : '♡'}
@@ -521,33 +409,18 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
             )
           })}
           {loading && (
-            <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '14px', color: theme.text }}>
+            <div className="mt-6 text-center text-base text-text">
               正在搜索 GitHub 仓库...
             </div>
           )}
           {!loading && totalPages > 0 && (
             <div
-              style={{
-                marginTop: '12px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '12px',
-                fontSize: '12px',
-                color: theme.text
-              }}
+              className="mt-3 flex items-center justify-center gap-3 text-xs text-text"
             >
               <button
                 onClick={handlePrevPage}
                 disabled={!canPrev}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: canPrev ? theme.white : theme.background,
-                  cursor: canPrev ? 'pointer' : 'default',
-                  opacity: canPrev ? 1 : 0.5
-                }}
+                className={`rounded-md border border-border px-2 py-1 ${canPrev ? 'bg-surface' : 'bg-background opacity-50'}`}
               >
                 上一页
               </button>
@@ -557,14 +430,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
               <button
                 onClick={handleNextPage}
                 disabled={!canNext}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: canNext ? theme.white : theme.background,
-                  cursor: canNext ? 'pointer' : 'default',
-                  opacity: canNext ? 1 : 0.5
-                }}
+                className={`rounded-md border border-border px-2 py-1 ${canNext ? 'bg-surface' : 'bg-background opacity-50'}`}
               >
                 下一页
               </button>

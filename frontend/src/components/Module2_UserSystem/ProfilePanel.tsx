@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { theme } from '../../styles/theme'
 import type { UserProfile } from '../../types'
 
 interface ProfilePanelProps {
@@ -193,46 +192,25 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
   }
 
   return (
-    <div style={{
-      padding: '20px',
-      minWidth: '300px'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{
-          margin: 0,
-          fontSize: '16px',
-          color: theme.text,
-          fontWeight: 600
-        }}>
+    <div className="min-w-[300px] p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="m-0 text-lg font-semibold text-text">
           {lang === 'english' ? 'Profile' : '个人信息'}
         </h3>
         <div>
           <button
             onClick={() => onUpdate({ language: 'chinese' as any })}
-            style={{
-              padding: '4px 8px',
-              marginRight: '8px',
-              borderRadius: '12px',
-              border: `1px solid ${theme.border}`,
-              backgroundColor: profile?.language === 'chinese' ? theme.primary : theme.background,
-              color: profile?.language === 'chinese' ? theme.white : theme.text,
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}
+            className={`mr-2 rounded-full border px-2 py-1 text-xs ${
+              profile?.language === 'chinese' ? 'border-primary bg-primary text-white' : 'border-border bg-background text-text'
+            }`}
           >
             中文
           </button>
           <button
             onClick={() => onUpdate({ language: 'english' as any })}
-            style={{
-              padding: '4px 8px',
-              borderRadius: '12px',
-              border: `1px solid ${theme.border}`,
-              backgroundColor: profile?.language === 'english' ? theme.primary : theme.background,
-              color: profile?.language === 'english' ? theme.white : theme.text,
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}
+            className={`rounded-full border px-2 py-1 text-xs ${
+              profile?.language === 'english' ? 'border-primary bg-primary text-white' : 'border-border bg-background text-text'
+            }`}
           >
             EN
           </button>
@@ -240,34 +218,15 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
       </div>
 
       {/* 技能标签部分 */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{
-          marginBottom: '12px',
-          fontSize: '14px',
-          color: theme.text,
-          fontWeight: 500
-        }}>
+      <div className="mb-5">
+        <div className="mb-3 text-base font-medium text-text">
           {lang === 'english' ? 'Skill tags' : '技能标签'}
         </div>
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          marginBottom: '12px'
-        }}>
+        <div className="mb-3 flex flex-wrap gap-2">
           {(profile?.skills || []).map((skill, index) => (
             <div
               key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 12px',
-                backgroundColor: theme.primary, // 使用主题主色（绿色）
-                color: theme.white, // 白色文字
-                borderRadius: '16px',
-                fontSize: '13px'
-              }}
+              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm text-white"
             >
               {editingIndex === index ? (
                 <>
@@ -285,23 +244,11 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                         setTagError(null)
                       }
                     }}
-                    style={{
-                      width: '80px',
-                      padding: '2px 6px',
-                      border: `1px solid ${tagError ? theme.error : theme.primary}`,
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      outline: 'none',
-                      backgroundColor: theme.white,
-                      color: theme.text
-                    }}
+                    className={`w-20 rounded border bg-surface px-2 py-0.5 text-xs text-text outline-none ${tagError ? 'border-error' : 'border-primary'}`}
                     autoFocus
                   />
                   {tagError && (
-                    <span style={{
-                      fontSize: '10px',
-                      color: theme.error
-                    }}>
+                    <span className="text-[10px] text-error">
                       {tagError}
                     </span>
                   )}
@@ -310,24 +257,13 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                 <>
                   <span
                     onDoubleClick={() => handleEdit(index, skill)}
-                    style={{
-                      cursor: 'pointer',
-                      color: theme.white // 白色文字
-                    }}
+                    className="cursor-pointer text-white"
                   >
                     {cleanTag(skill)}
                   </span>
                   <button
                     onClick={() => handleDelete(index)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: theme.white,
-                      fontSize: '14px',
-                      padding: '0 4px',
-                      lineHeight: 1
-                    }}
+                    className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
                   >
                     ×
                   </button>
@@ -339,8 +275,8 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
 
         <div ref={addTagContainerRef}>
           {isAdding ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="flex flex-col items-start gap-1">
+              <div className="flex items-center gap-2">
                 <input
                   ref={addTagInputRef}
                   type="text"
@@ -356,37 +292,18 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                     }
                   }}
                   placeholder={lang === 'english' ? 'Enter tag' : '输入标签'}
-                  style={{
-                    flex: 1,
-                    padding: '6px 12px',
-                    border: `1px solid ${tagError ? theme.error : theme.primary}`,
-                    borderRadius: '16px',
-                    fontSize: '13px',
-                    outline: 'none'
-                  }}
+                  className={`flex-1 rounded-full border bg-surface px-3 py-1.5 text-sm outline-none ${tagError ? 'border-error' : 'border-primary'}`}
                   autoFocus
                 />
                 <button
                   onClick={handleAdd}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: theme.primary,
-                    color: theme.white,
-                    border: 'none',
-                    borderRadius: '16px',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs text-white hover:bg-primaryDark"
                 >
                   {lang === 'english' ? 'Confirm' : '确认'}
                 </button>
               </div>
               {tagError && (
-                <span style={{
-                  fontSize: '11px',
-                  color: theme.error,
-                  marginLeft: '4px'
-                }}>
+                <span className="ml-1 text-xs text-error">
                   {tagError}
                 </span>
               )}
@@ -394,15 +311,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           ) : (
             <button
               onClick={() => setIsAdding(true)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: theme.background,
-                color: theme.text,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '16px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-text hover:border-primary hover:bg-primaryLight/40"
             >
               {lang === 'english' ? '+ Add tag' : '+ 新增标签'}
             </button>
@@ -411,47 +320,20 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
       </div>
 
       {/* 贡献偏好部分 */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{
-          marginBottom: '12px',
-          fontSize: '14px',
-          color: theme.text,
-          fontWeight: 500
-        }}>
+      <div className="mb-5">
+        <div className="mb-3 text-base font-medium text-text">
           {lang === 'english' ? 'Contribution preferences' : '贡献偏好'}
         </div>
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          marginBottom: '12px'
-        }}>
+        <div className="mb-3 flex flex-wrap gap-2">
           {selectedPreferences.map((preference, index) => (
             <div
               key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 12px',
-                backgroundColor: theme.primary,
-                color: theme.white,
-                borderRadius: '16px',
-                fontSize: '13px'
-              }}
+              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm text-white"
             >
               <span>{preferenceTypes[preference as keyof typeof preferenceTypes]?.label || preference}</span>
               <button
                 onClick={() => handleDeletePreference(preference)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: theme.white,
-                  fontSize: '14px',
-                  padding: '0 4px',
-                  lineHeight: 1
-                }}
+                className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
               >
                 ×
               </button>
@@ -461,46 +343,24 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
 
         <div ref={preferenceSelectorRef}>
           {showPreferenceSelector ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
+            <div className="mb-3 grid grid-cols-2 gap-2">
               {Object.entries(preferenceTypes).map(([key, pref]) => (
                 <div
                   key={key}
                   onClick={() => handleTogglePreference(key)}
-                  style={{
-                    padding: '8px',
-                    border: selectedPreferences.includes(key) 
-                      ? `2px solid ${theme.primary}` 
-                      : `1px solid ${theme.border}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    backgroundColor: selectedPreferences.includes(key) 
-                      ? `${theme.primary}20` 
-                      : theme.white,
-                    fontSize: '12px'
-                  }}
+                  className={`cursor-pointer rounded-md bg-surface p-2 text-xs ${
+                    selectedPreferences.includes(key) ? 'border-2 border-primary bg-primary/10' : 'border border-border'
+                  }`}
                 >
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{pref.label}</div>
-                  <div style={{ fontSize: '11px', color: theme.accent }}>{pref.description}</div>
+                  <div className="mb-1 font-bold">{pref.label}</div>
+                  <div className="text-xs text-accent">{pref.description}</div>
                 </div>
               ))}
             </div>
           ) : (
             <button
               onClick={() => setShowPreferenceSelector(true)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: theme.background,
-                color: theme.text,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '16px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-text hover:border-primary hover:bg-primaryLight/40"
             >
               {lang === 'english' ? '+ Choose preferences' : '+ 选择偏好'}
             </button>
@@ -509,16 +369,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           {showPreferenceSelector && (
             <button
               onClick={() => setShowPreferenceSelector(false)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: theme.background,
-                color: theme.text,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '16px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                marginLeft: '8px'
-              }}
+              className="ml-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-text hover:border-primary hover:bg-primaryLight/40"
             >
               {lang === 'english' ? 'Done' : '完成选择'}
             </button>
@@ -528,17 +379,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
 
       <button
         onClick={onLogout}
-        style={{
-          width: '100%',
-          padding: '10px',
-          backgroundColor: theme.background,
-          color: theme.text,
-          border: `1px solid ${theme.border}`,
-          borderRadius: '6px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          marginTop: '20px'
-        }}
+        className="mt-5 w-full rounded-md border border-border bg-background px-3 py-2.5 text-base text-text hover:border-primary hover:bg-primaryLight/40"
       >
         {lang === 'english' ? 'Logout' : '注销'}
       </button>

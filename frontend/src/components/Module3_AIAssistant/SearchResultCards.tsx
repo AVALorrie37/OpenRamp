@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { theme } from '../../styles/theme'
 import { storage } from '../../utils/storage'
 import type { RepoResponse } from '../../types'
 
@@ -44,54 +43,24 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
   const repoUrl = (name: string) => `https://github.com/${name}`
 
   return (
-    <div style={{ marginTop: '8px', width: '100%' }}>
+    <div className="mt-2 w-full">
       {pageRepos.map((repo) => {
         const isFav = favoritedIds.has(repo.repo_id)
         return (
-          <div key={repo.repo_id} style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: '8px',
-            padding: '10px 12px',
-            marginBottom: '8px',
-            backgroundColor: theme.white,
-            transition: 'box-shadow 0.2s',
-          }}
-            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div key={repo.repo_id} className="mb-2 rounded-md border border-border bg-surface px-3 py-2.5 transition hover:shadow-panel">
+            <div className="mb-1 flex items-center justify-between gap-2">
               <a
                 href={repoUrl(repo.name)}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  color: theme.primary,
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  flex: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-primary no-underline hover:underline"
                 title={repo.name}
               >
                 {repo.name}
               </a>
               <button
                 onClick={() => toggleFavorite(repo)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: username ? 'pointer' : 'not-allowed',
-                  fontSize: '16px',
-                  padding: '0 4px',
-                  flexShrink: 0,
-                  opacity: username ? 1 : 0.4,
-                }}
+                className={`flex-shrink-0 bg-transparent px-1 text-lg ${username ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
                 title={language === 'chinese' ? (isFav ? '取消收藏' : '收藏') : (isFav ? 'Unfavorite' : 'Favorite')}
                 disabled={!username}
               >
@@ -99,29 +68,12 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
               </button>
             </div>
             {repo.match_score != null && (
-              <div style={{
-                display: 'inline-block',
-                fontSize: '11px',
-                color: theme.white,
-                backgroundColor: theme.primary,
-                borderRadius: '10px',
-                padding: '1px 8px',
-                marginBottom: '4px',
-              }}>
+              <div className="mb-1 inline-block rounded-full bg-primary px-2 py-0.5 text-xs text-white">
                 {language === 'chinese' ? '匹配' : 'Match'} {Math.round(repo.match_score * 100)}%
               </div>
             )}
             {repo.description && (
-              <div style={{
-                fontSize: '12px',
-                color: theme.text,
-                opacity: 0.75,
-                lineHeight: '1.4',
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-              }}>
+              <div className="line-clamp-2 text-xs leading-5 text-text/75">
                 {repo.description}
               </div>
             )}
@@ -129,35 +81,21 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
         )
       })}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+        <div className="mt-1 flex items-center justify-center gap-2">
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            style={{
-              border: 'none',
-              background: 'none',
-              cursor: page === 0 ? 'not-allowed' : 'pointer',
-              color: page === 0 ? theme.border : theme.primary,
-              fontSize: '14px',
-              padding: '2px 6px',
-            }}
+            className={`bg-transparent px-1.5 py-0.5 text-base ${page === 0 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
           >
             ◀
           </button>
-          <span style={{ fontSize: '12px', color: theme.text }}>
+          <span className="text-xs text-text">
             {page + 1} / {totalPages}
           </span>
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            style={{
-              border: 'none',
-              background: 'none',
-              cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer',
-              color: page >= totalPages - 1 ? theme.border : theme.primary,
-              fontSize: '14px',
-              padding: '2px 6px',
-            }}
+            className={`bg-transparent px-1.5 py-0.5 text-base ${page >= totalPages - 1 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
           >
             ▶
           </button>

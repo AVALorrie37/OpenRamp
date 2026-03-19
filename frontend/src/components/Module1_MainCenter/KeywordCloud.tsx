@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import { theme } from '../../styles/theme'
 import { extractKeywords } from '../../utils/formatters'
 import type { RepoResponse } from '../../types'
 
@@ -46,55 +45,30 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos, selectedRepo, onKeyw
   const maxCount = keywordData[0]?.count || 1
 
   return (
-    <div style={{
-      padding: '8px 12px 16px',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginBottom: '8px'
-      }}>
-        <span style={{
-          fontSize: '11px',
-          padding: '4px 10px',
-          borderRadius: '999px',
-          border: `1px solid ${theme.primaryLight}`,
-          backgroundColor: theme.white,
-          color:  theme.text,
-          maxWidth: '100%',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden'
-        }}>
+    <div className="flex h-full flex-col px-3 pb-4 pt-2">
+      <div className="mb-2 flex justify-end">
+        <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-primaryLight bg-surface px-2.5 py-1 text-xs text-text">
           {modeLabel}
         </span>
       </div>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: isSingleRepo ? '6px' : '10px',
-        justifyContent: isSingleRepo ? 'flex-start' : 'center',
-        alignItems: 'flex-start',
-        minHeight: '160px'
-      }}>
+      <div className={`flex min-h-[160px] flex-1 flex-wrap items-start ${isSingleRepo ? 'justify-start gap-1.5' : 'justify-center gap-2.5'}`}>
         {keywordData.map(({ word, count }) => {
           const isActive = activeKeywords.includes(word)
+          const sizeClass = (() => {
+            const s = getFontSize(count, maxCount)
+            if (s >= 21) return 'text-xl'
+            if (s >= 18) return 'text-lg'
+            if (s >= 15) return 'text-base'
+            if (s >= 13) return 'text-sm'
+            return 'text-xs'
+          })()
+          const weightClass = count > maxCount * 0.5 ? 'font-semibold' : 'font-normal'
           return (
             <span
               key={word}
-              style={{
-                fontSize: `${getFontSize(count, maxCount)}px`,
-                color: isActive ? theme.white : theme.primary,
-                fontWeight: count > maxCount * 0.5 ? 600 : 400,
-                padding: '4px 8px',
-                backgroundColor: isActive ? theme.primary : theme.primaryLight + '40',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className={`cursor-pointer rounded px-2 py-1 transition ${sizeClass} ${weightClass} ${
+                isActive ? 'bg-primary text-white' : 'bg-surface2 text-primary hover:bg-primaryLight/60'
+              }`}
               onClick={(e) => {
                 e.stopPropagation()
                 onKeywordClick(word)
