@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { reposAPI, searchAPI } from '../services/api'
+import { reposAPI, matchAPI } from '../services/api'
 import { storage } from '../utils/storage'
 import type { RepoResponse } from '../types'
 
@@ -84,20 +84,37 @@ export const useRepos = (username: string | null) => {
       setLoading(true)
       setError(null)
       try {
-        const response = await searchAPI.search(username, 10)
-        const list = response.repos || []
-        const merged = mergeWithFavorites(list, username)
-        if (merged.length > 0) {
-          storage.saveUserRepos(username, merged)
-          setRepos(merged)
-        } else {
-          const userRepos = storage.getUserRepos(username)
-          if (userRepos && userRepos.length > 0) {
-            setRepos(mergeWithFavorites(userRepos, username))
+        let baseList = storage.getUserRepos(username)
+        if (!baseList || baseList.length === 0) {
+          const preset = storage.getPresetRepos()
+          if (preset && preset.length > 0) {
+            baseList = preset
           } else {
             await loadPreset()
+            setLoading(false)
+            return
           }
         }
+
+        const mergedBase = mergeWithFavorites(baseList, username)
+
+        const updated = await Promise.all(
+          mergedBase.map(async (repo) => {
+            try {
+              const match = await matchAPI.calculate(username, repo.repo_id)
+              return {
+                ...repo,
+                match_score: typeof match.match_score === 'number' ? match.match_score : repo.match_score,
+                breakdown: (match as any).breakdown ?? (repo as any).breakdown
+              }
+            } catch {
+              return repo
+            }
+          })
+        )
+
+        storage.saveUserRepos(username, updated)
+        setRepos(updated)
       } catch (err: any) {
         setError(err.message || 'Failed to fetch repos')
         const userRepos = storage.getUserRepos(username)
