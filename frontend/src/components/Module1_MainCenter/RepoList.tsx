@@ -12,11 +12,25 @@ interface RepoListProps {
   canUseMatchSort?: boolean
   onDeleteRepo?: (repoId: string) => void
   onDescriptionRefresh?: (repo: RepoResponse) => void
+  openRepoHintTitle?: string
 }
 
 type SortType = 'match' | 'active' | 'friendly'
 
-const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorite, onOpenManualSearch, highlightedRepoIds, onBackgroundClick, canUseMatchSort, onDeleteRepo, onDescriptionRefresh }) => {
+const REPO_ID_FOR_URL = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+
+const RepoList: React.FC<RepoListProps> = ({
+  repos,
+  onRepoClick,
+  onToggleFavorite,
+  onOpenManualSearch,
+  highlightedRepoIds,
+  onBackgroundClick,
+  canUseMatchSort,
+  onDeleteRepo,
+  onDescriptionRefresh,
+  openRepoHintTitle = '按住 Ctrl 并点击在浏览器中打开 GitHub 仓库页面'
+}) => {
   const [sortType, setSortType] = useState<SortType>('match')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
@@ -124,7 +138,33 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
           >
             <div className="mb-2 flex items-start justify-between">
               <h3 className="m-0 text-lg font-semibold text-text">
-                {repo.name}
+                <span
+                  title={openRepoHintTitle}
+                  role="link"
+                  tabIndex={0}
+                  className="cursor-pointer rounded-sm hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  onClick={(e) => {
+                    if (!e.ctrlKey) return
+                    e.stopPropagation()
+                    e.preventDefault()
+                    const rid = repo.repo_id
+                    if (rid && REPO_ID_FOR_URL.test(rid)) {
+                      window.open(`https://github.com/${rid}`, '_blank', 'noopener,noreferrer')
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    if (!e.ctrlKey) return
+                    e.stopPropagation()
+                    e.preventDefault()
+                    const rid = repo.repo_id
+                    if (rid && REPO_ID_FOR_URL.test(rid)) {
+                      window.open(`https://github.com/${rid}`, '_blank', 'noopener,noreferrer')
+                    }
+                  }}
+                >
+                  {repo.name}
+                </span>
               </h3>
               <div className="flex gap-2">
                 {canUseMatchSort && typeof repo.match_score === 'number' && (

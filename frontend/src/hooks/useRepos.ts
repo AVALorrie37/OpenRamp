@@ -15,6 +15,7 @@ function stripMatchFields(repo: RepoResponse): RepoResponse {
 
 export const useRepos = (username: string | null) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
+  const [reposMeta, setReposMeta] = useState<{ mode: string; source?: string }>({ mode: 'offline' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -86,6 +87,7 @@ export const useRepos = (username: string | null) => {
     setError(null)
     try {
       const response = await reposAPI.get({ limit: 10 })
+      setReposMeta({ mode: response.mode, source: response.source })
       if (response.repos.length > 0) {
         storage.savePresetRepos(response.repos)
         let list = response.repos
@@ -177,6 +179,7 @@ export const useRepos = (username: string | null) => {
       setError(null)
       try {
         const response = await reposAPI.get(params || { limit: 10 })
+        setReposMeta({ mode: response.mode, source: response.source })
         const list = response.repos || []
         let merged = mergeWithFavorites(list, username)
         if (username && merged.length > 0) {
@@ -192,9 +195,11 @@ export const useRepos = (username: string | null) => {
           }
         }
         setRepos(merged)
+        return merged
       } catch (err: any) {
         setError(err.message || 'Failed to fetch repos')
         console.error('Fetch repos error:', err)
+        return undefined
       } finally {
         setLoading(false)
       }
@@ -277,6 +282,7 @@ export const useRepos = (username: string | null) => {
 
   return {
     repos,
+    reposMeta,
     loading,
     error,
     fetchRepos,

@@ -22,9 +22,12 @@ import LoadingSpinner from './components/shared/LoadingSpinner'
 
 import type { RepoResponse, MatchResult, UserProfile } from './types'
 
+const keywordsFingerprint = (kws: string[] | undefined): string =>
+  (kws ?? []).map((k) => k.toLowerCase()).sort().join('\u0001')
+
 const App: React.FC = () => {
   const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username)
+  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -403,6 +406,64 @@ const App: React.FC = () => {
     setActiveKeywords([])
   }
 
+  const skipDescriptionKeywordFallback =
+    typeof navigator !== 'undefined' &&
+    navigator.onLine &&
+    !!reposMeta.source &&
+    String(reposMeta.source).startsWith('online')
+
+  const handleKeywordCloudRepoLabelClick = async (repo: RepoResponse) => {
+    const prevFp = keywordsFingerprint(repo.keywords)
+    try {
+      await manualSearchAPI.bulkEnrich([{ repo_id: repo.repo_id, full_name: repo.repo_id }])
+      const merged = await fetchRepos({ repo_ids: [repo.repo_id], limit: 1 })
+      const next = merged?.find((r) => r.repo_id === repo.repo_id)
+      if (!next) return
+      const nextFp = keywordsFingerprint(next.keywords)
+      const kwsChanged = prevFp !== nextFp
+      if (
+        kwsChanged &&
+        username &&
+        isLoggedIn &&
+        profile?.skills &&
+        profile.skills.length > 0
+      ) {
+        try {
+          const match = await matchAPI.calculate(username, repo.repo_id, weights)
+          if (typeof match.match_score === 'number') {
+            updateRepoMatchScore(repo.repo_id, match.match_score)
+          }
+          setSelectedRepo((sel) => {
+            if (sel?.repo_id !== repo.repo_id) return sel
+            return {
+              ...next,
+              match_score: match.match_score,
+              breakdown: match.breakdown,
+              dynamic_weights: match.dynamic_weights
+            }
+          })
+          setMatchData((md) => {
+            if (!md || md.repo_full_name !== repo.repo_id) return md
+            return {
+              match_score: match.match_score,
+              breakdown: match.breakdown,
+              repo_name: next.name,
+              repo_full_name: repo.repo_id,
+              dynamic_weights: match.dynamic_weights
+            }
+          })
+        } catch (err) {
+          console.error('Match recalc after keywords sync failed:', err)
+          setSelectedRepo((sel) => (sel?.repo_id === repo.repo_id ? next : sel))
+        }
+      } else {
+        setSelectedRepo((sel) => (sel?.repo_id === repo.repo_id ? next : sel))
+      }
+    } catch (e) {
+      console.error('Repo topics sync failed:', e)
+    }
+  }
+
   const handleRepoBackgroundClick = () => {
     setSelectedRepo(null)
     setHighlightedRepoIds([])
@@ -468,6 +529,11 @@ const App: React.FC = () => {
               onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
               canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
+              openRepoHintTitle={
+                uiLanguage === 'english'
+                  ? 'Ctrl+click to open this repository on GitHub'
+                  : '按住 Ctrl 并点击，在浏览器中查看 GitHub 仓库'
+              }
               onOpenManualSearch={() => setShowManualSearch(true)}
               onDeleteRepo={(repoId) => {
                 deleteRepo(repoId)
@@ -528,6 +594,8 @@ const App: React.FC = () => {
                 selectedRepo={selectedRepo}
                 onKeywordClick={handleKeywordClick}
                 activeKeywords={activeKeywords}
+                skipDescriptionKeywordFallback={skipDescriptionKeywordFallback}
+                onSingleRepoLabelClick={handleKeywordCloudRepoLabelClick}
               />
             </div>
           </div>

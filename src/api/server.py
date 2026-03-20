@@ -111,6 +111,7 @@ class ReposResponse(BaseModel):
     """仓库列表响应模型"""
     mode: str
     repos: List[RepoResponse]
+    source: Optional[str] = None
 
 
 def get_offline_loader() -> OfflineRepoLoader:
@@ -258,6 +259,33 @@ def fetch_github_repo_for_match(repo_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def apply_github_topics_if_missing(unified: Dict[str, Any], repo_id: str) -> None:
+    """在线场景下优先用 GitHub 官方 topics 填充 keywords，避免仅用描述分词。"""
+    if unified.get("keywords"):
+        return
+    gh_json = fetch_github_repo_for_match(repo_id)
+    if not gh_json:
+        return
+    topics = gh_json.get("topics") or []
+    if topics:
+        unified["keywords"] = topics
+    if not (unified.get("description") or "").strip():
+        desc = (gh_json.get("description") or "").strip()
+        if desc:
+            unified["description"] = desc
+    try:
+        gh_client = GitHubClient(use_cache=True)
+        kws = list(unified.get("keywords") or topics or [])
+        payload = {
+            "description": ((gh_json.get("description") or "").strip() or unified.get("description", "")),
+            "keywords": kws,
+            "topics": kws,
+        }
+        gh_client._write_repo_to_cache(repo_id, payload)
+    except Exception:
+        logger.debug("Failed to write GitHub cache for %s", repo_id, exc_info=True)
+
+
 async def convert_online_to_unified_async(online_data: dict, repo_id: str) -> dict:
     base = convert_online_to_unified(online_data, repo_id)
     if base.get("description"):
@@ -373,6 +401,14 @@ async def get_repos(
                                     unified_data["keywords"] = kws
                         except Exception:
                             pass
+                        if not unified_data.get("keywords"):
+                            loop = asyncio.get_event_loop()
+                            await loop.run_in_executor(
+                                None,
+                                apply_github_topics_if_missing,
+                                unified_data,
+                                repo_id,
+                            )
                         repos.append(unified_data)
                     except Exception as e:
                         logger.warning(f"获取仓库 {repo_id} 在线数据失败: {e}")
@@ -892,6 +928,8 @@ async def calculate_match(request: MatchRequest = Body(...)):
                 _offline_cache.append(unified)
                 repo_data_dict = unified
         
+        if not repo_data_dict.get("keywords"):
+            apply_github_topics_if_missing(repo_data_dict, request.repo_id)
         repo_keywords = repo_data_dict.get("keywords") or []
         if not repo_keywords:
             repo_keywords = repo_data_dict.get("languages", []) + (repo_data_dict.get("description", "") or "").split()
@@ -1361,6 +1399,14 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
                 client = get_online_client()
                 online_data = client.get_activity_data(rid)
                 unified = convert_online_to_unified(online_data, rid)
+                if not unified.get("keywords"):
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None,
+                        apply_github_topics_if_missing,
+                        unified,
+                        rid,
+                    )
                 enriched.append(unified)
                 if existing:
                     existing.update(unified)
@@ -1401,6 +1447,14 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
                                 placeholder["keywords"] = cached_kws
                     except Exception:
                         pass
+                    if not placeholder.get("keywords"):
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(
+                            None,
+                            apply_github_topics_if_missing,
+                            placeholder,
+                            rid,
+                        )
                     enriched.append(placeholder)
                     if existing:
                         existing.update(placeholder)

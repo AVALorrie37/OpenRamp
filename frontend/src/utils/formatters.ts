@@ -6,8 +6,10 @@ export const formatDate = (date: string): string => {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
+export const KEYWORD_CLOUD_STOP_WORDS = new Set(['description', 'offline', 'online', 'mode'])
+
 export const extractKeywords = (text: string): string[] => {
-  const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can']
+  const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', ...KEYWORD_CLOUD_STOP_WORDS]
   const words = text.toLowerCase().match(/\b\w+\b/g) || []
   return words.filter(w => w.length > 3 && !commonWords.includes(w))
 }

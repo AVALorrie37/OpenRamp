@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { extractKeywords } from '../../utils/formatters'
+import { extractKeywords, KEYWORD_CLOUD_STOP_WORDS } from '../../utils/formatters'
 import type { RepoResponse } from '../../types'
 
 interface KeywordCloudProps {
@@ -7,17 +7,28 @@ interface KeywordCloudProps {
   selectedRepo: RepoResponse | null
   onKeywordClick: (keyword: string) => void
   activeKeywords: string[]
+  skipDescriptionKeywordFallback?: boolean
+  onSingleRepoLabelClick?: (repo: RepoResponse) => void
 }
 // frontend/src/components/Module1_MainCenter/KeywordCloud.tsx
-const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos, selectedRepo, onKeywordClick, activeKeywords }) => {
+const KeywordCloud: React.FC<KeywordCloudProps> = ({
+  repos,
+  selectedRepo,
+  onKeywordClick,
+  activeKeywords,
+  skipDescriptionKeywordFallback = false,
+  onSingleRepoLabelClick
+}) => {
   const keywordData = useMemo(() => {
     const allKeywords: string[] = []
     const sourceRepos = selectedRepo ? [selectedRepo] : repos
     sourceRepos.forEach(repo => {
       const fromBackend = repo.keywords && repo.keywords.length > 0 ? repo.keywords : []
       if (fromBackend.length > 0) {
-        allKeywords.push(...fromBackend)
-      } else if (repo.description) {
+        allKeywords.push(
+          ...fromBackend.filter(k => !KEYWORD_CLOUD_STOP_WORDS.has(k.toLowerCase()))
+        )
+      } else if (repo.description && !skipDescriptionKeywordFallback) {
         allKeywords.push(...extractKeywords(repo.description))
       }
     })
@@ -31,7 +42,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos, selectedRepo, onKeyw
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30)
       .map(([word, count]) => ({ word, count }))
-  }, [repos, selectedRepo])
+  }, [repos, selectedRepo, skipDescriptionKeywordFallback])
 
   const isSingleRepo = !!selectedRepo
   const modeLabel = isSingleRepo ? (selectedRepo?.name || '单个仓库') : '所有仓库'
@@ -47,7 +58,25 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({ repos, selectedRepo, onKeyw
   return (
     <div className="flex h-full flex-col px-3 pb-4 pt-2">
       <div className="mb-2 flex justify-end">
-        <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-primaryLight bg-surface px-2.5 py-1 text-xs text-text">
+        <span
+          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-primaryLight bg-surface px-2.5 py-1 text-xs text-text ${
+            isSingleRepo && selectedRepo ? 'cursor-pointer hover:bg-primaryLight/40' : ''
+          }`}
+          role={isSingleRepo && selectedRepo ? 'link' : undefined}
+          tabIndex={isSingleRepo && selectedRepo ? 0 : undefined}
+          onClick={(e) => {
+            if (!isSingleRepo || !selectedRepo || !onSingleRepoLabelClick) return
+            e.stopPropagation()
+            onSingleRepoLabelClick(selectedRepo)
+          }}
+          onKeyDown={(e) => {
+            if (!isSingleRepo || !selectedRepo || !onSingleRepoLabelClick) return
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            e.preventDefault()
+            e.stopPropagation()
+            onSingleRepoLabelClick(selectedRepo)
+          }}
+        >
           {modeLabel}
         </span>
       </div>

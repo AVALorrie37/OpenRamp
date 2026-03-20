@@ -39,6 +39,7 @@ export interface RepoResponse {
 export interface ReposResponse {
   mode: string
   repos: RepoResponse[]
+  source?: string
 }
 
 export interface UserProfile {

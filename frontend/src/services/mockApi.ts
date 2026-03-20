@@ -3,6 +3,7 @@ import type { ReposResponse, ChatResponse, UserProfile, MatchResult } from '../t
 
 const MOCK_REPOS: ReposResponse = {
   mode: 'offline',
+  source: 'offline_dataset',
   repos: [
     {
       repo_id: 'test/repo1',
