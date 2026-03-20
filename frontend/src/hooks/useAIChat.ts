@@ -217,7 +217,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     })
 
     setLoading(true)
-    setLoadingStage(opts?.skipIntent ? 'generating_reply' : 'intent_recognizing')
+    setLoadingStage(opts?.skipIntent ? 'concept_explaining' : 'intent_recognizing')
 
     try {
       const response = await chatAPI.send(
@@ -228,8 +228,12 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
         profile?.language,
         (stage, data) => {
           if (stage === 'intent_recognizing') setLoadingStage('intent_recognizing')
-          else if (stage === 'intent_done') setLoadingStage((data.next as string) || 'generating_reply')
-          else if (stage === 'generating_reply') setLoadingStage('generating_reply')
+          else if (stage === 'intent_done') {
+            const next = (data.next as string) || 'generating_reply'
+            setLoadingStage(next === 'generating_reply' && opts?.skipIntent ? 'concept_explaining' : next)
+          } else if (stage === 'generating_reply') {
+            setLoadingStage(opts?.skipIntent ? 'concept_explaining' : 'generating_reply')
+          }
         },
         opts?.skipIntent
       )

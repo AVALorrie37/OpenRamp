@@ -142,12 +142,16 @@ class ConversationHandler:
         user_input: str,
         user_language: str,
         stage: Callable[[str, Optional[Dict[str, Any]]], None],
+        include_profile_context: bool = True,
     ) -> Dict[str, Any]:
-        profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
         base_system_prompt, _ = self.prompt_manager.get_agent_prompt('conversation')
         system_prompt = self._inject_language_instruction(base_system_prompt, user_language)
         conversation_context = self._build_conversation_context()
-        user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
+        if include_profile_context:
+            profile_text = self._format_profile_for_agent1(self.current_profile, user_language)
+            user_prompt = f"{conversation_context}\n\nCurrent Profile (from Agent2):\n{profile_text}\n\nUser: {user_input}"
+        else:
+            user_prompt = f"{conversation_context}\n\nUser: {user_input}"
         try:
             stage("generating_reply", {})
             ai_response = self.provider.generate(
@@ -157,20 +161,27 @@ class ConversationHandler:
                 temperature=0.3
             )
         except Exception:
-            cached = self._load_profile_from_cache()
-            if cached:
-                skills = cached.get('skills', [])
-                styles = cached.get('contribution_styles', [])
-                if user_language == 'chinese':
-                    skills_txt = '、'.join(skills) if skills else '暂无'
-                    styles_txt = '、'.join(styles) if styles else '暂无'
-                    ai_response = f"根据你之前的画像信息（技能：{skills_txt}；贡献偏好：{styles_txt}），我暂时无法连接到 AI 服务，但仍然可以基于这些信息给你一些方向建议。"
-                else:
-                    skills_txt = ', '.join(skills) if skills else 'none'
-                    styles_txt = ', '.join(styles) if styles else 'none'
-                    ai_response = f"Based on your previous profile (skills: {skills_txt}; contribution preferences: {styles_txt}), I cannot reach the AI service right now but can still suggest directions using this information."
+            if not include_profile_context:
+                ai_response = (
+                    '我暂时无法连接 AI 服务，请稍后再试。'
+                    if user_language == 'chinese'
+                    else 'I cannot reach the AI service right now; please try again later.'
+                )
             else:
-                ai_response = self._get_fallback_reply(user_input, user_language)
+                cached = self._load_profile_from_cache()
+                if cached:
+                    skills = cached.get('skills', [])
+                    styles = cached.get('contribution_styles', [])
+                    if user_language == 'chinese':
+                        skills_txt = '、'.join(skills) if skills else '暂无'
+                        styles_txt = '、'.join(styles) if styles else '暂无'
+                        ai_response = f"根据你之前的画像信息（技能：{skills_txt}；贡献偏好：{styles_txt}），我暂时无法连接到 AI 服务，但仍然可以基于这些信息给你一些方向建议。"
+                    else:
+                        skills_txt = ', '.join(skills) if skills else 'none'
+                        styles_txt = ', '.join(styles) if styles else 'none'
+                        ai_response = f"Based on your previous profile (skills: {skills_txt}; contribution preferences: {styles_txt}), I cannot reach the AI service right now but can still suggest directions using this information."
+                else:
+                    ai_response = self._get_fallback_reply(user_input, user_language)
 
         reply, action, action_data = self._parse_conversation_response(ai_response, user_language)
         self.conversation_history.append({'role': 'assistant', 'content': reply})
@@ -198,7 +209,9 @@ class ConversationHandler:
         if skip_intent:
             self.conversation_history.append({'role': 'user', 'content': user_input})
             stage("intent_done", {"intent": "ask_content", "next": "generating_reply"})
-            return self._complete_ask_content_response(user_input, user_language, stage)
+            return self._complete_ask_content_response(
+                user_input, user_language, stage, include_profile_context=False
+            )
 
         stage("intent_recognizing", {})
         intent = self._recognize_intent(user_input)

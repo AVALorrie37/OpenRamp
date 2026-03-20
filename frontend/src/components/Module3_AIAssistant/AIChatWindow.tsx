@@ -26,6 +26,7 @@ function stageLabel(stage: string | null | undefined, language: 'chinese' | 'eng
   if (!stage) return language === 'chinese' ? '处理中...' : 'Processing...'
   const labels: Record<string, { chinese: string; english: string }> = {
     intent_recognizing: { chinese: '意图识别中...', english: 'Recognizing intent...' },
+    concept_explaining: { chinese: '概念解释中...', english: 'Explaining...' },
     generating_reply: { chinese: '思考回复中...', english: 'Thinking...' },
     query_status: { chinese: '查询状态中...', english: 'Querying status...' },
     confirm: { chinese: '确认中...', english: 'Confirming...' },
