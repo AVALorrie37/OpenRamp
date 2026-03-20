@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
@@ -584,12 +585,14 @@ const App: React.FC = () => {
         onClose={handleManualSearchClose}
       />
 
-      {toast && (
-        <Toast
-          message={toast}
-          onClose={() => setToast(null)}
-        />
-      )}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {reposLoading && (
         <div className="fixed left-1/2 top-1/2 z-[10000] -translate-x-1/2 -translate-y-1/2">

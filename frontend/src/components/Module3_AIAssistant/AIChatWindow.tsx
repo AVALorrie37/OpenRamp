@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send, X } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -78,85 +79,94 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
     await onSendMessage(suggestion)
   }
 
-  if (!isOpen) return null
-
   return (
-    <>
-      <div
-        className="fixed inset-0 z-[1000] bg-black/30"
-        onClick={onClose}
-      />
-      <div
-        className="fixed bottom-[100px] right-4 z-[1001] flex h-[70vh] w-[calc(100%-2rem)] max-w-[500px] flex-col rounded-lg bg-surface shadow-modal sm:right-[30px] sm:h-[600px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-border p-5">
-          <h3 className="m-0 text-lg font-semibold text-text">
-            {language === 'english' ? 'Open Source Contribution Assistant' : '开源贡献智能向导'}
-          </h3>
-          <button
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-[1000] bg-black/30"
             onClick={onClose}
-            className="inline-flex items-center justify-center px-2 text-text"
-            aria-label={language === 'english' ? 'Close' : '关闭'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+          <motion.div
+            className="fixed bottom-[100px] right-4 z-[1001] flex h-[70vh] w-[calc(100%-2rem)] max-w-[500px] flex-col rounded-lg bg-surface shadow-modal sm:right-[30px] sm:h-[600px]"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.18 }}
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto bg-background p-5">
-          {messages.length === 0 && (
-            <div className="mt-10 text-center text-text/60">
-              {language === 'english' ? 'Start chatting!' : '开始对话吧！'}
-            </div>
-          )}
-          {messages.map((msg, index) => {
-            if (msg.isSearching && onCancelSearch) {
-              return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
-            }
-            return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
-          })}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-lg bg-primaryLight px-4 py-3">
-                <LoadingSpinner />
-                <span className="text-xs text-text/70">
-                  {stageLabel(loadingStage, language)}
-                </span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="border-t border-border bg-surface p-4">
-          <form onSubmit={handleSubmit} className="relative">
-            <div className="relative mb-3">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
-                disabled={loading}
-                className={`w-full rounded-md border bg-surface px-3 py-2 pr-11 text-base outline-none ${loading ? 'border-primary animate-pulse' : 'border-border'}`}
-              />
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <h3 className="m-0 text-lg font-semibold text-text">
+                {language === 'english' ? 'Open Source Contribution Assistant' : '开源贡献智能向导'}
+              </h3>
               <button
-                type="submit"
-                disabled={!input.trim() || loading}
-                onClick={(e) => handleSubmit(e)}
-                className={`absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center px-2 transition ${
-                  (!input.trim() || loading) ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'
-                }`}
-                aria-label={language === 'english' ? 'Send' : '发送'}
+                onClick={onClose}
+                className="inline-flex items-center justify-center px-2 text-text"
+                aria-label={language === 'english' ? 'Close' : '关闭'}
               >
-                <Send size={18} />
+                <X size={20} />
               </button>
             </div>
-            <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
-          </form>
-        </div>
-      </div>
-    </>
+
+            <div className="flex-1 overflow-y-auto bg-background p-5">
+              {messages.length === 0 && (
+                <div className="mt-10 text-center text-text/60">
+                  {language === 'english' ? 'Start chatting!' : '开始对话吧！'}
+                </div>
+              )}
+              {messages.map((msg, index) => {
+                if (msg.isSearching && onCancelSearch) {
+                  return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
+                }
+                return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
+              })}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-2 rounded-lg bg-primaryLight px-4 py-3">
+                    <LoadingSpinner />
+                    <span className="text-xs text-text/70">
+                      {stageLabel(loadingStage, language)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="border-t border-border bg-surface p-4">
+              <form onSubmit={handleSubmit} className="relative">
+                <div className="relative mb-3">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
+                    disabled={loading}
+                    className={`w-full rounded-md border bg-surface px-3 py-2 pr-11 text-base outline-none ${loading ? 'border-primary animate-pulse' : 'border-border'}`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || loading}
+                    onClick={(e) => handleSubmit(e)}
+                    className={`absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center px-2 transition ${
+                      (!input.trim() || loading) ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'
+                    }`}
+                    aria-label={language === 'english' ? 'Send' : '发送'}
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
+                <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
+              </form>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   )
 }
 
