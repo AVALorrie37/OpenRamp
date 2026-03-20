@@ -99,6 +99,13 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
           return (
           <div
             key={repo.repo_id}
+            onClickCapture={(e) => {
+              if (deleteTargetId !== repo.repo_id || !onDeleteRepo) return
+              const raw = e.target
+              const el = raw instanceof Element ? raw : (raw as Node).parentElement
+              if (el?.closest('[data-delete-confirm]')) return
+              setDeleteTargetId(null)
+            }}
             onClick={(e) => {
               e.stopPropagation()
               onRepoClick(repo)
@@ -178,6 +185,7 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
                 >
                   <button
                     type="button"
+                    data-delete-confirm
                     className="inline-flex items-center justify-center rounded border border-error bg-error px-3 py-1.5 text-center text-xs leading-tight text-white"
                     onClick={(e) => {
                       e.stopPropagation()
