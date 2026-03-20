@@ -257,7 +257,7 @@ class ConversationHandler:
         stage("intent_done", {"intent": intent, "next": "generating_reply"})
 
         if intent == 'ask_content':
-            return self._complete_ask_content_response(user_input, user_language, stage)
+            return self._complete_ask_content_response(user_input, user_language, stage, include_profile_context=False)
 
         if self._is_likely_question(user_input):
             profile_text = self._format_profile_for_agent1(self.current_profile, user_language)

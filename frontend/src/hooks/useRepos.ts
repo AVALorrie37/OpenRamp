@@ -170,6 +170,19 @@ export const useRepos = (username: string | null) => {
   }, [username, loadPreset, mergeWithFavorites, applyMatchScores])
 
   useEffect(() => {
+    if (username !== null) return
+    const preset = storage.getPresetRepos()
+    if (preset && Array.isArray(preset) && preset.length > 0) {
+      setRepos(preset as RepoResponse[])
+      setReposMeta({ mode: 'offline', source: 'offline_dataset' })
+    } else {
+      setRepos([])
+      setReposMeta({ mode: 'offline' })
+    }
+    setError(null)
+  }, [username])
+
+  useEffect(() => {
     loadPreset()
   }, [loadPreset])
 

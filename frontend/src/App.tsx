@@ -37,6 +37,7 @@ const App: React.FC = () => {
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [weights, setWeights] = useState(DEFAULT_MATCH_WEIGHTS)
   const [toast, setToast] = useState<string | null>(null)
+  const prevIsLoggedInRef = useRef<boolean>(isLoggedIn)
 
   useEffect(() => {
     if (username) {
@@ -46,6 +47,14 @@ const App: React.FC = () => {
       setWeights(DEFAULT_MATCH_WEIGHTS)
     }
   }, [username])
+
+  useEffect(() => {
+    const prev = prevIsLoggedInRef.current
+    if (prev && !isLoggedIn) {
+      void refreshRepos()
+    }
+    prevIsLoggedInRef.current = isLoggedIn
+  }, [isLoggedIn, refreshRepos])
   const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
   const [activeKeywords, setActiveKeywords] = useState<string[]>([])
   const { logs, clearLogs } = useDebugLogs(showDebug)
@@ -147,6 +156,8 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setSelectedRepo(null)
     setMatchData(null)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
     logout()
   }
 
