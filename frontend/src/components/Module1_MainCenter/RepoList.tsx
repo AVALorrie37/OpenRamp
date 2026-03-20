@@ -145,25 +145,51 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
                 )}
               </div>
             </div>
-            {deleteTargetId === repo.repo_id && onDeleteRepo && (
-              <div
-                className="mt-2 flex items-center justify-between rounded-md bg-primaryLight p-2 text-xs"
-                onClick={(e) => e.stopPropagation()}
+            <div className="relative mt-2 min-h-[2.75rem]">
+              <p
+                className={`text-sm leading-5 text-text/70 transition-[filter] duration-200 ${
+                  deleteTargetId === repo.repo_id && onDeleteRepo ? 'blur-sm pointer-events-none select-none' : ''
+                } ${
+                  !repo.description ? 'cursor-pointer underline decoration-dotted' : ''
+                }`}
+                onClick={(e) => {
+                  if (!repo.description && onDescriptionRefresh) {
+                    e.stopPropagation()
+                    onDescriptionRefresh(repo)
+                  }
+                }}
               >
-                <span>删除这个仓库？</span>
-                <div className="flex gap-2">
+                {repo.description && repo.description.includes('暂无 OpenDigger 数据（使用 GitHub 指标兜底）')
+                  ? 'No description'
+                  : (repo.description || 'No description')}
+              </p>
+              {deleteTargetId === repo.repo_id && onDeleteRepo && (
+                <div
+                  className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-md bg-black/20 px-3 py-2 text-xs text-text dark:bg-white/20"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteTargetId(null)
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDeleteTargetId(null)
+                  }}
+                >
                   <button
-                    className="rounded border border-error bg-error px-2 py-1 text-white"
+                    type="button"
+                    className="inline-flex items-center justify-center rounded border border-error bg-error px-3 py-1.5 text-center text-xs leading-tight text-white"
                     onClick={(e) => {
                       e.stopPropagation()
                       onDeleteRepo(repo.repo_id)
                       setDeleteTargetId(null)
                     }}
                   >
-                    删除
+                    删除这个仓库？
                   </button>
                   <button
-                    className="rounded border border-border bg-surface px-2 py-1 text-text"
+                    type="button"
+                    className="inline-flex items-center justify-center rounded border border-border bg-surface px-2 py-1.5 text-xs text-text"
                     onClick={(e) => {
                       e.stopPropagation()
                       setDeleteTargetId(null)
@@ -172,23 +198,8 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
                     取消
                   </button>
                 </div>
-              </div>
-            )}
-            <p
-              className={`mt-2 text-sm leading-5 text-text/70 ${
-                !repo.description ? 'cursor-pointer underline decoration-dotted' : ''
-              }`}
-              onClick={(e) => {
-                if (!repo.description && onDescriptionRefresh) {
-                  e.stopPropagation()
-                  onDescriptionRefresh(repo)
-                }
-              }}
-            >
-              {repo.description && repo.description.includes('暂无 OpenDigger 数据（使用 GitHub 指标兜底）')
-                ? 'No description'
-                : (repo.description || 'No description')}
-            </p>
+              )}
+            </div>
           </div>
         )})}
       </div>
