@@ -96,7 +96,10 @@ class RepoData:
             issues_new_last_30=data.get("issues_new_last_30", 0),
             openrank=data.get("openrank", 0.0),
             name=data.get("name"),
-            full_name=data.get("full_name")
+            full_name=data.get("full_name"),
+            precomputed_activity_score=data.get("precomputed_activity_score"),
+            precomputed_demand_score=data.get("precomputed_demand_score"),
+            data_source=data.get("data_source"),
         )
 
 

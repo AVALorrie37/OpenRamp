@@ -32,7 +32,7 @@ from src.data_layer.offline.loader import OfflineRepoLoader
 from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
 from src.core.match.config import MatchConfig, MatchWeights, DEFAULT_CONFIG
-from src.data_layer.online.integrated_search import IntegratedRepoSearch
+from src.data_layer.online.integrated_search import IntegratedRepoSearch, build_unified_from_github_metadata
 import re
 import httpx
 
@@ -221,6 +221,7 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         "composite_score": round(composite_score, 4),
         "raw_metrics": {"openrank": openrank_str} if openrank_str else None,
         "keywords": [],
+        "source": "opendigger_online",
     }
 
     try:
@@ -237,6 +238,24 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         logger.debug(f"Failed to get cached repo info for {repo_id}", exc_info=True)
 
     return base
+
+
+def fetch_github_repo_for_match(repo_id: str) -> Optional[Dict[str, Any]]:
+    """同步拉取 GitHub 仓库元数据，供 OpenDigger 缺失时的匹配兜底。"""
+    try:
+        headers = {"Accept": "application/vnd.github+json"}
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        with httpx.Client(timeout=20.0) as client:
+            r = client.get(f"https://api.github.com/repos/{repo_id}", headers=headers)
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        logger.warning("GITHUB_REPO_FETCH_FAILED: %s — %s", repo_id, e)
+        return None
 
 
 async def convert_online_to_unified_async(online_data: dict, repo_id: str) -> dict:
@@ -836,6 +855,7 @@ async def calculate_match(request: MatchRequest = Body(...)):
                 break
 
         if not repo_data_dict:
+            global _offline_cache
             try:
                 client = get_online_client()
                 online_data = client.get_activity_data(request.repo_id)
@@ -849,18 +869,40 @@ async def calculate_match(request: MatchRequest = Body(...)):
                             unified["keywords"] = kws
                 except Exception:
                     pass
-                global _offline_cache
                 if _offline_cache is None:
                     _offline_cache = []
                 _offline_cache.append(unified)
                 repo_data_dict = unified
             except Exception as e:
                 logger.error(f"MATCH_REPOSITORY_ONLINE_FETCH_FAILED: {e}", exc_info=True)
-                raise HTTPException(status_code=404, detail="MATCH_REPOSITORY_NOT_FOUND: Repository not found")
+                gh_json = fetch_github_repo_for_match(request.repo_id)
+                if not gh_json:
+                    raise HTTPException(status_code=404, detail="MATCH_REPOSITORY_NOT_FOUND: Repository not found")
+                unified = build_unified_from_github_metadata(
+                    request.repo_id,
+                    gh_json.get("description") or "",
+                    gh_json.get("topics") or [],
+                    int(gh_json.get("stargazers_count") or 0),
+                    int(gh_json.get("forks_count") or 0),
+                    int(gh_json.get("open_issues_count") or 0),
+                    gh_json.get("pushed_at") or "",
+                )
+                if _offline_cache is None:
+                    _offline_cache = []
+                _offline_cache.append(unified)
+                repo_data_dict = unified
         
         repo_keywords = repo_data_dict.get("keywords") or []
         if not repo_keywords:
             repo_keywords = repo_data_dict.get("languages", []) + (repo_data_dict.get("description", "") or "").split()
+        src = repo_data_dict.get("source")
+        if src == "opendigger_online":
+            data_source = "opendigger+github"
+        elif src == "github_only":
+            data_source = "github_only"
+        else:
+            data_source = "metadata_only"
+
         repo_data = RepoData(
             keywords=repo_keywords,
             active_days_last_30=30,
@@ -870,7 +912,7 @@ async def calculate_match(request: MatchRequest = Body(...)):
             full_name=repo_data_dict.get("repo_id"),
             precomputed_activity_score=repo_data_dict.get("active_score"),
             precomputed_demand_score=repo_data_dict.get("demand_score"),
-            data_source="opendigger+github" if repo_data_dict.get("source") == "opendigger_online" else "metadata_only",
+            data_source=data_source,
         )
         
         match_result = scorer.calculate(user_profile, repo_data)

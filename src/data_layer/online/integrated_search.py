@@ -850,6 +850,48 @@ class IntegratedRepoSearch:
         return all_combinations
 
 
+def build_unified_from_github_metadata(
+    repo_id: str,
+    description: str,
+    topics: List[str],
+    stars: int,
+    forks: int,
+    open_issues: int,
+    pushed_at: str,
+) -> Dict[str, Any]:
+    """
+    OpenDigger 无数据时，用 GitHub REST 元数据构建与离线/在线统一结构对齐的字典。
+    活跃度/需求子分使用 IntegratedRepoSearch._compute_github_only_scores（与设计文档 GitHub 校准一致）。
+    """
+    from .GithubAPI.schemas import RepoMetadata
+
+    metadata = RepoMetadata(
+        stars=max(0, int(stars or 0)),
+        last_updated=(pushed_at or "").strip(),
+        forks=max(0, int(forks or 0)),
+        open_issues=max(0, int(open_issues or 0)),
+    )
+    kws = [str(t).strip().lower() for t in (topics or []) if str(t).strip()]
+    searcher = IntegratedRepoSearch()
+    scores = searcher._compute_github_only_scores(metadata, kws)
+    parts = repo_id.split("/")
+    repo_name = parts[1] if len(parts) == 2 else repo_id
+    langs = scores.get("languages") or kws or ["unknown"]
+    return {
+        "repo_id": repo_id,
+        "name": repo_name,
+        "description": (description or "").strip(),
+        "languages": langs if isinstance(langs, list) else [langs],
+        "active_score": scores["active_score"],
+        "influence_score": scores["influence_score"],
+        "demand_score": scores["demand_score"],
+        "composite_score": scores["composite_score"],
+        "raw_metrics": None,
+        "keywords": kws,
+        "source": "github_only",
+    }
+
+
 # Convenience functions for quick searches
 def search_repos_with_opendigger(
     keywords: List[str],
