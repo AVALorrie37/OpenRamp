@@ -493,6 +493,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     language: Optional[str] = None
     agent_type: str = 'agent1'
+    skip_intent: bool = False
 
 
 class GreetingRequest(BaseModel):
@@ -625,7 +626,7 @@ async def chat(request: ChatRequest = Body(...)):
             request.language, 
             request.session_id
         )
-        result = handler.process_user_input(request.message)
+        result = handler.process_user_input(request.message, skip_intent=request.skip_intent)
         
         if request.agent_type != 'agent1':
             logger.info(f"[{request.agent_type}] User: {request.user_id}, Message: {request.message[:100]}")
@@ -726,7 +727,9 @@ async def chat_stream(request: ChatRequest = Body(...)):
 
             def run():
                 try:
-                    result = handler.process_user_input(request.message, on_stage=on_stage)
+                    result = handler.process_user_input(
+                        request.message, on_stage=on_stage, skip_intent=request.skip_intent
+                    )
                     sync_q.put({"type": "result", "result": result, "session_id": session_id})
                 except Exception as e:
                     sync_q.put({"type": "error", "detail": str(e)})

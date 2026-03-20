@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { RepoResponse } from '../../types'
 import { Search, Star } from 'lucide-react'
 
@@ -13,6 +14,8 @@ interface RepoListProps {
   onDeleteRepo?: (repoId: string) => void
   onDescriptionRefresh?: (repo: RepoResponse) => void
   openRepoHintTitle?: string
+  onAskAIAboutText?: (text: string) => void
+  selectionAskLanguage?: 'chinese' | 'english'
 }
 
 type SortType = 'match' | 'active' | 'friendly'
@@ -29,10 +32,71 @@ const RepoList: React.FC<RepoListProps> = ({
   canUseMatchSort,
   onDeleteRepo,
   onDescriptionRefresh,
-  openRepoHintTitle = '按住 Ctrl 并点击在浏览器中打开 GitHub 仓库页面'
+  openRepoHintTitle = '按住 Ctrl 并点击在浏览器中打开 GitHub 仓库页面',
+  onAskAIAboutText,
+  selectionAskLanguage = 'chinese'
 }) => {
   const [sortType, setSortType] = useState<SortType>('match')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [askAiBubble, setAskAiBubble] = useState<{ text: string; top: number; left: number } | null>(null)
+
+  const syncSelectionBubble = useCallback(() => {
+    if (!onAskAIAboutText) {
+      setAskAiBubble(null)
+      return
+    }
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      setAskAiBubble(null)
+      return
+    }
+    const text = sel.toString().trim()
+    if (text.length < 2) {
+      setAskAiBubble(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    const descRoot = (node: Node | null): Element | null => {
+      const el =
+        node?.nodeType === Node.TEXT_NODE ? (node as Text).parentElement : (node as Element | null)
+      return el?.closest('[data-repo-description]') ?? null
+    }
+    const a = descRoot(sel.anchorNode)
+    const f = descRoot(sel.focusNode)
+    if (!a || a !== f || !a.contains(range.commonAncestorContainer)) {
+      setAskAiBubble(null)
+      return
+    }
+    const rect = range.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      setAskAiBubble(null)
+      return
+    }
+    setAskAiBubble({ text, top: rect.top, left: rect.right })
+  }, [onAskAIAboutText])
+
+  useEffect(() => {
+    if (!onAskAIAboutText) return
+    let t: number
+    const onSel = () => {
+      window.clearTimeout(t)
+      t = window.setTimeout(syncSelectionBubble, 20)
+    }
+    document.addEventListener('selectionchange', onSel)
+    document.addEventListener('mouseup', onSel)
+    return () => {
+      window.clearTimeout(t)
+      document.removeEventListener('selectionchange', onSel)
+      document.removeEventListener('mouseup', onSel)
+    }
+  }, [onAskAIAboutText, syncSelectionBubble])
+
+  useEffect(() => {
+    if (!onAskAIAboutText) return
+    const onScroll = () => setAskAiBubble(null)
+    window.addEventListener('scroll', onScroll, true)
+    return () => window.removeEventListener('scroll', onScroll, true)
+  }, [onAskAIAboutText])
 
   const hasMatchScore = repos.some(r => typeof r.match_score === 'number')
   const canUseMatch = !!canUseMatchSort && hasMatchScore
@@ -66,8 +130,36 @@ const RepoList: React.FC<RepoListProps> = ({
     }
   })
 
+  const askAiLabel = selectionAskLanguage === 'english' ? 'Ask AI?' : '问问AI？'
+
   return (
     <div className="flex h-full flex-col">
+      {askAiBubble &&
+        onAskAIAboutText &&
+        createPortal(
+          <button
+            type="button"
+            className="pointer-events-auto rounded-md border border-primary bg-surface px-2 py-1 text-xs font-medium text-primary shadow-md transition hover:bg-primary/10"
+            style={{
+              position: 'fixed',
+              top: Math.max(8, askAiBubble.top - 30),
+              left: askAiBubble.left + 4,
+              zIndex: 999
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const t = askAiBubble.text
+              setAskAiBubble(null)
+              window.getSelection()?.removeAllRanges()
+              onAskAIAboutText(t)
+            }}
+          >
+            {askAiLabel}
+          </button>,
+          document.body
+        )}
       <div className="flex items-center justify-between border-b border-border p-3">
         <div className="flex gap-2">
           {canUseMatch && (
@@ -197,6 +289,7 @@ const RepoList: React.FC<RepoListProps> = ({
             </div>
             <div className="relative mt-2 min-h-[2.75rem]">
               <p
+                data-repo-description
                 className={`text-sm leading-5 text-text/70 transition-[filter] duration-200 ${
                   deleteTargetId === repo.repo_id && onDeleteRepo ? 'blur-sm pointer-events-none select-none' : ''
                 } ${

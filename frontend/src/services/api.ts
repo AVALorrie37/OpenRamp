@@ -82,7 +82,8 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type?: string,
     language?: string,
-    onStage?: (stage: string, data: Record<string, unknown>) => void
+    onStage?: (stage: string, data: Record<string, unknown>) => void,
+    skipIntent?: boolean
   ) => Promise<ChatResponse>
   greeting: (
     user_id: string,
@@ -97,9 +98,17 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type: string = 'agent1',
     language?: string,
-    onStage?: (stage: string, data: Record<string, unknown>) => void
+    onStage?: (stage: string, data: Record<string, unknown>) => void,
+    skipIntent?: boolean
   ): Promise<ChatResponse> => {
-    const body = { user_id, message, session_id, agent_type, language }
+    const body = {
+      user_id,
+      message,
+      session_id,
+      agent_type,
+      language,
+      skip_intent: !!skipIntent
+    }
     const res = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

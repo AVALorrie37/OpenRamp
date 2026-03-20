@@ -341,14 +341,28 @@ const App: React.FC = () => {
     }
   }
 
-  const handleSendMessage = async (message: string) => {
-    const response = await sendMessage(message)
+  const handleSendMessage = async (message: string, opts?: { skipIntent?: boolean }) => {
+    const response = await sendMessage(message, opts)
     if (response) {
       await handleAIChatResponse(response)
     }
     return response
   }
 
+  const handleAskAIAboutSelection = (selected: string) => {
+    const t = selected.trim()
+    if (!t) return
+    if (!isLoggedIn) {
+      setShowLoginModal(true)
+      return
+    }
+    setShowAIChat(true)
+    const prompt =
+      uiLanguage === 'english'
+        ? `In open-source / technical context, explain this concept clearly: 「${t}」`
+        : `请结合开源仓库/技术语境，解释以下概念：「${t}」`
+    void handleSendMessage(prompt, { skipIntent: true })
+  }
 
   const handleWeightsChange = async (next: { w_skill: number; w_activity: number; w_demand: number }) => {
     setWeights(next)
@@ -556,6 +570,8 @@ const App: React.FC = () => {
                   console.error('Description refresh failed:', e)
                 }
               }}
+              onAskAIAboutText={handleAskAIAboutSelection}
+              selectionAskLanguage={uiLanguage}
             />
           </div>
 
