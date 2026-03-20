@@ -1,3 +1,20 @@
+export interface MatchResult {
+  match_score: number
+  breakdown: {
+    skill: number
+    activity: number
+    demand: number
+  }
+  repo_name: string
+  repo_full_name: string
+  dynamic_weights?: {
+    w_skill: number
+    w_activity: number
+    w_demand: number
+    c_data: number
+  }
+}
+
 export interface RepoResponse {
   repo_id: string
   name: string
@@ -15,6 +32,8 @@ export interface RepoResponse {
   }
   is_favorited?: boolean
   keywords?: string[]
+  breakdown?: MatchResult['breakdown']
+  dynamic_weights?: MatchResult['dynamic_weights']
 }
 
 export interface ReposResponse {
@@ -52,23 +71,6 @@ export interface ChatResponse {
   session_id?: string
   error?: string
   auto_search?: boolean
-}
-
-export interface MatchResult {
-  match_score: number
-  breakdown: {
-    skill: number
-    activity: number
-    demand: number
-  }
-  repo_name: string
-  repo_full_name: string
-  dynamic_weights?: {
-    w_skill: number
-    w_activity: number
-    w_demand: number
-    c_data: number
-  }
 }
 
 export interface LogEntry {

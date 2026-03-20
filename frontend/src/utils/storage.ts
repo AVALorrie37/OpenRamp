@@ -9,6 +9,16 @@ const _userReposKey = (username: string) => `user_repos_${username}${_reposSuffi
 // 收藏仓库的 key 去掉环境后缀，线上/本地共用
 const _userFavoritesKey = (username: string) => `user_repos_${username}_favorites`
 
+const _userMatchWeightsKey = (username: string) => `user_match_weights_${username}${_reposSuffix()}`
+
+export type StoredMatchWeights = { w_skill: number; w_activity: number; w_demand: number }
+
+export const DEFAULT_MATCH_WEIGHTS: StoredMatchWeights = {
+  w_skill: 0.5,
+  w_activity: 0.3,
+  w_demand: 0.2
+}
+
 export const storage = {
   getUserData: (username: string): any => {
     const key = `${STORAGE_PREFIX}${username}`
@@ -82,5 +92,27 @@ export const storage = {
 
   saveUserFavorites: (username: string, repos: any[]): void => {
     localStorage.setItem(_userFavoritesKey(username), JSON.stringify(repos))
+  },
+
+  getUserMatchWeights: (username: string): StoredMatchWeights | null => {
+    const data = localStorage.getItem(_userMatchWeightsKey(username))
+    if (!data) return null
+    try {
+      const w = JSON.parse(data) as StoredMatchWeights
+      if (
+        typeof w?.w_skill === 'number' &&
+        typeof w?.w_activity === 'number' &&
+        typeof w?.w_demand === 'number'
+      ) {
+        return w
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  },
+
+  saveUserMatchWeights: (username: string, weights: StoredMatchWeights): void => {
+    localStorage.setItem(_userMatchWeightsKey(username), JSON.stringify(weights))
   }
 }

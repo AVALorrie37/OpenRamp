@@ -5,7 +5,7 @@ import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { useDebugLogs } from './hooks/useDebugLogs'
 import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
-import { storage } from './utils/storage'
+import { storage, DEFAULT_MATCH_WEIGHTS } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
 import RepoActivityTabs from './components/Module1_MainCenter/RepoActivityTabs'
@@ -32,8 +32,17 @@ const App: React.FC = () => {
   const [showManualSearch, setShowManualSearch] = useState(false)
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
-  const [weights, setWeights] = useState({ w_skill: 0.5, w_activity: 0.3, w_demand: 0.2 })
+  const [weights, setWeights] = useState(DEFAULT_MATCH_WEIGHTS)
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (username) {
+      const w = storage.getUserMatchWeights(username)
+      setWeights(w ?? DEFAULT_MATCH_WEIGHTS)
+    } else {
+      setWeights(DEFAULT_MATCH_WEIGHTS)
+    }
+  }, [username])
   const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
   const [activeKeywords, setActiveKeywords] = useState<string[]>([])
   const { logs, clearLogs } = useDebugLogs(showDebug)
@@ -340,22 +349,29 @@ const App: React.FC = () => {
 
   const handleWeightsChange = async (next: { w_skill: number; w_activity: number; w_demand: number }) => {
     setWeights(next)
-    if (username && selectedRepo && isLoggedIn && profile?.skills && profile.skills.length > 0) {
-      try {
-        const match = await matchAPI.calculate(username, selectedRepo.repo_id, next)
-        setMatchData({
-          match_score: match.match_score,
-          breakdown: match.breakdown,
-          repo_name: selectedRepo.name,
-          repo_full_name: selectedRepo.repo_id,
-          dynamic_weights: match.dynamic_weights
-        })
-        if (typeof match.match_score === 'number') {
-          updateRepoMatchScore(selectedRepo.repo_id, match.match_score)
+    if (username) {
+      storage.saveUserMatchWeights(username, next)
+    }
+    if (!username || !isLoggedIn || !profile?.skills || profile.skills.length === 0) {
+      return
+    }
+    try {
+      const updated = await refreshRepos()
+      const sel = selectedRepo
+      if (updated && sel) {
+        const r = updated.find((x) => x.repo_id === sel.repo_id)
+        if (r && typeof r.match_score === 'number') {
+          setMatchData({
+            match_score: r.match_score,
+            breakdown: r.breakdown ?? { skill: 0, activity: 0, demand: 0 },
+            repo_name: r.name,
+            repo_full_name: r.repo_id,
+            dynamic_weights: r.dynamic_weights
+          })
         }
-      } catch (error) {
-        console.error('Match error:', error)
       }
+    } catch (error) {
+      console.error('Match error:', error)
     }
   }
 

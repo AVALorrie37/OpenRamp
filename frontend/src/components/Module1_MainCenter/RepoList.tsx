@@ -29,11 +29,11 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
     }
   }, [canUseMatch, sortType])
 
-  const getPrimaryScore = (repo: RepoResponse) => {
-    if (canUseMatch && typeof repo.match_score === 'number') {
-      return repo.match_score
-    }
-    return repo.composite_score
+  const compareMatchThenActive = (a: RepoResponse, b: RepoResponse) => {
+    const ma = typeof a.match_score === 'number' ? a.match_score : -1
+    const mb = typeof b.match_score === 'number' ? b.match_score : -1
+    if (mb !== ma) return mb - ma
+    return b.active_score - a.active_score
   }
 
   const sortedRepos = [...repos].sort((a, b) => {
@@ -41,11 +41,14 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
       if (!canUseMatch) {
         return b.active_score - a.active_score
       }
-      return getPrimaryScore(b) - getPrimaryScore(a)
+      return compareMatchThenActive(a, b)
     } else if (sortType === 'active') {
       return b.active_score - a.active_score
-    } else { // friendly
-      return getPrimaryScore(b) - getPrimaryScore(a)
+    } else {
+      if (!canUseMatch) {
+        return b.active_score - a.active_score
+      }
+      return compareMatchThenActive(a, b)
     }
   })
 
@@ -124,15 +127,15 @@ const RepoList: React.FC<RepoListProps> = ({ repos, onRepoClick, onToggleFavorit
                 {repo.name}
               </h3>
               <div className="flex gap-2">
-                {canUseMatch && (
+                {canUseMatchSort && typeof repo.match_score === 'number' && (
                   <span className="rounded px-2 py-1 text-xs font-medium text-white bg-primary">
-                    匹配{Math.round(getPrimaryScore(repo) * 100)}%
+                    匹配{Math.round(repo.match_score * 100)}%
                   </span>
                 )}
                 <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
                   活跃度{Math.round(repo.active_score * 100)}%
                 </span>
-                {canUseMatch && getPrimaryScore(repo) > 0.7 && (
+                {canUseMatchSort && typeof repo.match_score === 'number' && repo.match_score > 0.7 && (
                   <span className="rounded bg-accent px-2 py-1 text-xs font-medium text-white">
                     新手友好
                   </span>

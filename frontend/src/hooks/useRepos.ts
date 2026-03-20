@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { reposAPI, matchAPI } from '../services/api'
-import { storage } from '../utils/storage'
+import { storage, DEFAULT_MATCH_WEIGHTS } from '../utils/storage'
 import type { RepoResponse } from '../types'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+
+function stripMatchFields(repo: RepoResponse): RepoResponse {
+  const next = { ...repo }
+  delete next.match_score
+  delete next.breakdown
+  delete next.dynamic_weights
+  return next
+}
 
 export const useRepos = (username: string | null) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
@@ -37,11 +45,39 @@ export const useRepos = (username: string | null) => {
     })
   }, [])
 
+  const applyMatchScores = useCallback(async (uname: string, list: RepoResponse[]): Promise<RepoResponse[]> => {
+    const stored = storage.getUserMatchWeights(uname)
+    const weights = stored ?? DEFAULT_MATCH_WEIGHTS
+    return Promise.all(
+      list.map(async (repo) => {
+        const base = stripMatchFields(repo)
+        try {
+          const match = await matchAPI.calculate(uname, repo.repo_id, weights)
+          if (typeof match.match_score !== 'number') {
+            return base
+          }
+          return {
+            ...base,
+            match_score: match.match_score,
+            breakdown: match.breakdown,
+            dynamic_weights: match.dynamic_weights
+          }
+        } catch {
+          return base
+        }
+      })
+    )
+  }, [])
+
   const loadPreset = useCallback(async () => {
     if (USE_MOCK) {
       const preset = storage.getPresetRepos()
       if (preset && preset.length > 0) {
-        const finalList = username ? mergeWithFavorites(preset, username) : preset
+        let list = preset as RepoResponse[]
+        if (username) {
+          list = await applyMatchScores(username, preset.map((r: RepoResponse) => ({ ...r })))
+        }
+        const finalList = username ? mergeWithFavorites(list, username) : list
         setRepos(finalList)
         return
       }
@@ -52,7 +88,11 @@ export const useRepos = (username: string | null) => {
       const response = await reposAPI.get({ limit: 10 })
       if (response.repos.length > 0) {
         storage.savePresetRepos(response.repos)
-        const finalList = username ? mergeWithFavorites(response.repos, username) : response.repos
+        let list = response.repos
+        if (username) {
+          list = await applyMatchScores(username, response.repos.map((r) => ({ ...r })))
+        }
+        const finalList = username ? mergeWithFavorites(list, username) : list
         setRepos(finalList)
       } else {
         setRepos([])
@@ -60,25 +100,32 @@ export const useRepos = (username: string | null) => {
     } catch (err: any) {
       setError(err.message || 'Failed to fetch repos')
       const fallback = storage.getPresetRepos()
-      const base = fallback && fallback.length > 0 ? fallback : []
-      const finalList = username ? mergeWithFavorites(base, username) : base
+      const raw = fallback && fallback.length > 0 ? fallback : []
+      let list = raw as RepoResponse[]
+      if (username && list.length > 0) {
+        list = await applyMatchScores(username, raw.map((r: RepoResponse) => ({ ...r })))
+      }
+      const finalList = username ? mergeWithFavorites(list, username) : list
       setRepos(finalList)
     } finally {
       setLoading(false)
     }
-  }, [username, mergeWithFavorites])
+  }, [username, mergeWithFavorites, applyMatchScores])
 
-  const refreshRepos = useCallback(async () => {
+  const refreshRepos = useCallback(async (): Promise<RepoResponse[] | undefined> => {
     if (USE_MOCK) {
       if (username) {
         const userRepos = storage.getUserRepos(username)
         if (userRepos && userRepos.length > 0) {
-          setRepos(mergeWithFavorites(userRepos, username))
-          return
+          const mergedBase = mergeWithFavorites(userRepos, username)
+          const updated = await applyMatchScores(username, mergedBase)
+          storage.saveUserRepos(username, updated)
+          setRepos(updated)
+          return updated
         }
       }
       await loadPreset()
-      return
+      return undefined
     }
     if (username) {
       setLoading(true)
@@ -92,73 +139,68 @@ export const useRepos = (username: string | null) => {
           } else {
             await loadPreset()
             setLoading(false)
-            return
+            return undefined
           }
         }
 
         const mergedBase = mergeWithFavorites(baseList, username)
-
-        const updated = await Promise.all(
-          mergedBase.map(async (repo) => {
-            try {
-              const match = await matchAPI.calculate(username, repo.repo_id)
-              return {
-                ...repo,
-                match_score: typeof match.match_score === 'number' ? match.match_score : repo.match_score,
-                breakdown: (match as any).breakdown ?? (repo as any).breakdown
-              }
-            } catch {
-              return repo
-            }
-          })
-        )
+        const updated = await applyMatchScores(username, mergedBase)
 
         storage.saveUserRepos(username, updated)
         setRepos(updated)
+        return updated
       } catch (err: any) {
         setError(err.message || 'Failed to fetch repos')
         const userRepos = storage.getUserRepos(username)
         if (userRepos && userRepos.length > 0) {
-          setRepos(mergeWithFavorites(userRepos, username))
+          const merged = mergeWithFavorites(userRepos, username)
+          setRepos(merged)
         } else {
           await loadPreset()
         }
+        return undefined
       } finally {
         setLoading(false)
       }
-      return
     }
     await loadPreset()
-  }, [username, loadPreset, mergeWithFavorites])
+    return undefined
+  }, [username, loadPreset, mergeWithFavorites, applyMatchScores])
 
   useEffect(() => {
     loadPreset()
   }, [loadPreset])
 
-  const fetchRepos = useCallback(async (params?: { mode?: string; repo_ids?: string[]; limit?: number }) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await reposAPI.get(params || { limit: 10 })
-      const list = response.repos || []
-      const merged = mergeWithFavorites(list, username)
-      if (params?.repo_ids && params.repo_ids.length > 0 && username) {
-        storage.saveUserRepos(username, merged)
-      }
-      if (!params?.repo_ids && list.length > 0) {
-        const preset = storage.getPresetRepos()
-        if (!preset || preset.length === 0) {
-          storage.savePresetRepos(list)
+  const fetchRepos = useCallback(
+    async (params?: { mode?: string; repo_ids?: string[]; limit?: number }) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await reposAPI.get(params || { limit: 10 })
+        const list = response.repos || []
+        let merged = mergeWithFavorites(list, username)
+        if (username && merged.length > 0) {
+          merged = await applyMatchScores(username, merged.map((r) => ({ ...r })))
         }
+        if (params?.repo_ids && params.repo_ids.length > 0 && username) {
+          storage.saveUserRepos(username, merged)
+        }
+        if (!params?.repo_ids && list.length > 0) {
+          const preset = storage.getPresetRepos()
+          if (!preset || preset.length === 0) {
+            storage.savePresetRepos(list)
+          }
+        }
+        setRepos(merged)
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch repos')
+        console.error('Fetch repos error:', err)
+      } finally {
+        setLoading(false)
       }
-      setRepos(merged)
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch repos')
-      console.error('Fetch repos error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [username, mergeWithFavorites])
+    },
+    [username, mergeWithFavorites, applyMatchScores]
+  )
 
   const refreshToPreset = useCallback(() => {
     loadPreset()
