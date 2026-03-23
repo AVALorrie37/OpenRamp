@@ -38,6 +38,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const searchAbortControllerRef = useRef<AbortController | null>(null)
   const searchStartTimeRef = useRef<number>(0)
   const searchIdRef = useRef<string | null>(null)
+  const searchCompleteMetaRef = useRef<{ totalRepos: number; targetCount: number; rounds: number } | null>(null)
   const agentType = 'agent1'
 
   useEffect(() => {
@@ -119,12 +120,43 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     const abortController = new AbortController()
     searchAbortControllerRef.current = abortController
     searchStartTimeRef.current = Date.now()
+    searchCompleteMetaRef.current = null
 
     const lang = profile?.language || 'chinese'
     const cancelMessage = (sec: number) => lang === 'chinese' ? `搜索已终止，已进行 ${sec} 秒` : `Search cancelled after ${sec} seconds`
 
     try {
       const searchResult = await searchAPI.search(user_id, 10, searchId, abortController.signal, (stage, data) => {
+        if (stage === 'partial_repos') {
+          const incoming = (data.repos as any[]) || []
+          if (incoming.length > 0) {
+            setMessages(prev => {
+              const updated = prev.map((msg, idx) => {
+                if (!(idx === prev.length - 1 && msg.isSearching)) return msg
+                const existing = msg.searchResults || []
+                const seen = new Set(existing.map(r => r.repo_id))
+                const appended = incoming.filter(r => !seen.has(r.repo_id))
+                const merged = [...existing, ...appended]
+                return {
+                  ...msg,
+                  content: lang === 'chinese' ? `已找到 ${merged.length} 个候选项目` : `Found ${merged.length} candidate projects`,
+                  searchResults: merged
+                }
+              })
+              storage.saveChatMessages(user_id, updated)
+              return updated
+            })
+          }
+          return
+        }
+        if (stage === 'search_complete_notice') {
+          searchCompleteMetaRef.current = {
+            totalRepos: Number(data.total_repos ?? 0),
+            targetCount: Number(data.target_count ?? 0),
+            rounds: Number(data.rounds ?? 0)
+          }
+          return
+        }
         setSearchStage(searchStageToText(stage, data, lang))
       })
       setIsSearching(false)
@@ -139,7 +171,9 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
                 content: searchResult.repos.length > 0
                   ? (lang === 'chinese' ? `找到 ${searchResult.repos.length} 个匹配的项目：` : `Found ${searchResult.repos.length} matching projects:`)
                   : (lang === 'chinese' ? '未找到匹配的项目' : 'No matching projects found'),
-                searchResults: searchResult.repos.length > 0 ? searchResult.repos : undefined
+                searchResults: searchResult.repos.length > 0 ? searchResult.repos : undefined,
+                searchCompleted: true,
+                searchCompleteMeta: searchCompleteMetaRef.current || undefined
               }
             : msg
         )

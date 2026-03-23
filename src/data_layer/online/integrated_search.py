@@ -682,6 +682,22 @@ class IntegratedRepoSearch:
         
         print(f" User Skills: {skills}")
         print(f" Target: {target_count} repositories with match scores\n")
+
+        def _to_progress_repo(repo: IntegratedRepoResult) -> Dict[str, Any]:
+            return {
+                "repo_id": repo.repo_id,
+                "name": repo.repo_id.split("/")[-1],
+                "description": repo.description or "No description",
+                "languages": repo.languages or [],
+                "active_score": repo.active_score,
+                "influence_score": repo.influence_score,
+                "demand_score": repo.demand_score,
+                "composite_score": repo.composite_score,
+                "match_score": repo.match_score,
+                "breakdown": repo.match_breakdown,
+                "source": "github_opendigger_online",
+                "keywords": repo.github_keywords,
+            }
         
         # Step 2: Generate keyword combinations
         keyword_combinations = self._generate_keyword_combinations(
@@ -729,14 +745,25 @@ class IntegratedRepoSearch:
                 )
                 
                 # Add to collection (avoid duplicates)
+                round_new_repos: List[IntegratedRepoResult] = []
                 for repo in result.repositories:
                     if repo.repo_id not in all_repos:
+                        score, breakdown = self._calculate_match_score(user_profile, repo)
+                        repo.match_score = score
+                        repo.match_breakdown = breakdown
                         all_repos[repo.repo_id] = repo
+                        round_new_repos.append(repo)
                 
                 total_github_checked += result.github_repos_checked
                 skipped_count += result.opendigger_skipped_count
                 
                 print(f"✅ Round {round_num} added {len(result.repositories)} new repos")
+                if on_progress and round_new_repos:
+                    on_progress("partial_repos", {
+                        "round": round_num,
+                        "total_rounds": min(max_rounds, len(keyword_combinations)),
+                        "repos": [_to_progress_repo(r) for r in round_new_repos],
+                    })
                 
             except Exception as e:
                 logger.error(f"Round {round_num} failed: {e}")
@@ -765,18 +792,15 @@ class IntegratedRepoSearch:
             if i <= 5 or i % 10 == 0:
                 print(f"  [{i}/{len(all_repos)}] {repo.repo_id}: score={score:.4f}")
         
-        # Step 5: Sort by match score (descending)
-        scored_repos.sort(key=lambda r: r.match_score or 0.0, reverse=True)
-        
-        # Take top N
-        final_repos = scored_repos[:target_count]
+        # Step 5: Keep discovery order by default
+        final_repos = scored_repos
         
         # Generate summary
         is_sufficient = len(final_repos) >= target_count
         
         if is_sufficient:
             message = (
-                f"✅ Success: Found {len(final_repos)} repositories ranked by match score. "
+                f"✅ Success: Found {len(final_repos)} repositories in discovery order. "
                 f"Searched {len(keyword_combinations[:max_rounds])} keyword combinations, "
                 f"checked {total_github_checked} GitHub repos."
             )
@@ -797,6 +821,12 @@ class IntegratedRepoSearch:
             print(f"  ... and {len(final_repos) - 5} more")
         print(f"\n{message}")
         print(f"{'='*70}\n")
+        if on_progress:
+            on_progress("search_complete_notice", {
+                "total_repos": len(final_repos),
+                "target_count": target_count,
+                "rounds": min(max_rounds, len(keyword_combinations)),
+            })
         
         return IntegratedSearchResult(
             search_keywords=skills,

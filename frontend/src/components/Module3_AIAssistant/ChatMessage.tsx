@@ -23,7 +23,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese'
       >
         {message.content}
         {hasResults && (
-          <SearchResultCards repos={message.searchResults!} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
+          <SearchResultCards
+            repos={message.searchResults!}
+            language={language}
+            username={username}
+            onFavorite={onFavorite}
+            onUnfavorite={onUnfavorite}
+            searchCompleted={message.searchCompleted}
+            searchCompleteMeta={message.searchCompleteMeta}
+          />
         )}
       </div>
     </div>

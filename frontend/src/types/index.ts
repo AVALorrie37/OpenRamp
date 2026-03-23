@@ -58,6 +58,12 @@ export interface ChatMessage {
   isSearching?: boolean
   searchId?: string
   searchResults?: RepoResponse[]
+  searchCompleted?: boolean
+  searchCompleteMeta?: {
+    totalRepos: number
+    targetCount: number
+    rounds: number
+  }
 }
 
 export interface ChatResponse {

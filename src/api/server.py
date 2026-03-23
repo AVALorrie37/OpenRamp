@@ -1032,19 +1032,20 @@ async def search_repos(request: SearchRequest = Body(...)):
                                 data_source="opendigger+github" if repo_copy.get("source") == "opendigger_online" else "metadata_only",
                             )
                             match_with_breakdown = scorer.calculate(user_profile_obj, repo_data_for_breakdown)
-                            activity_score = match_with_breakdown.breakdown.activity
+                            breakdown = match_with_breakdown.breakdown.to_dict()
                             repos.append(
                                 {
                                     "repo_id": repo_copy["repo_id"],
                                     "name": repo_copy["name"],
                                     "description": repo_copy.get("description") or "No description",
                                     "languages": repo_copy.get("languages") or [],
-                                    "active_score": activity_score,
+                                    "active_score": repo_copy.get("active_score", 0.0),
                                     "influence_score": repo_copy.get("influence_score", 0.0),
                                     "demand_score": repo_copy.get("demand_score", 0.0),
                                     "composite_score": repo_copy.get("composite_score", 0.0),
                                     "raw_metrics": None,
                                     "match_score": score,
+                                    "breakdown": breakdown,
                                     "source": repo_copy.get("source", "offline_dataset"),
                                     "keywords": repo_copy.get("keywords") or [],
                                 }
@@ -1056,23 +1057,19 @@ async def search_repos(request: SearchRequest = Body(...)):
                         message = result.message or "No offline dataset available."
                 else:
                     for repo_result in result.repositories:
-                        activity_score = None
-                        if repo_result.match_breakdown and "activity" in repo_result.match_breakdown:
-                            activity_score = repo_result.match_breakdown["activity"]
-                        else:
-                            activity_score = repo_result.active_score
                         repos.append(
                             {
                                 "repo_id": repo_result.repo_id,
                                 "name": repo_result.repo_id.split("/")[-1],
                                 "description": repo_result.description or "No description",
                                 "languages": repo_result.languages,
-                                "active_score": activity_score,
+                                "active_score": repo_result.active_score,
                                 "influence_score": repo_result.influence_score,
                                 "demand_score": repo_result.demand_score,
                                 "composite_score": repo_result.composite_score,
                                 "raw_metrics": None,
                                 "match_score": repo_result.match_score,
+                                "breakdown": repo_result.match_breakdown,
                                 "source": "github_opendigger_online",
                                 "keywords": repo_result.github_keywords,
                             }

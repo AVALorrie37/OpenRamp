@@ -120,7 +120,20 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               )}
               {messages.map((msg, index) => {
                 if (msg.isSearching && onCancelSearch) {
-                  return <SearchBubble key={`search-${index}`} onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
+                  return (
+                    <div key={`search-${index}`}>
+                      <SearchBubble onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
+                      {(msg.searchResults && msg.searchResults.length >= 3) && (
+                        <ChatMessage
+                          message={{ ...msg, isSearching: false }}
+                          language={language}
+                          username={username}
+                          onFavorite={onFavorite}
+                          onUnfavorite={onUnfavorite}
+                        />
+                      )}
+                    </div>
+                  )
                 }
                 return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
               })}

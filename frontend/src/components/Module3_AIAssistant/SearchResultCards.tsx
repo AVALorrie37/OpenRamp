@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { storage } from '../../utils/storage'
 import type { RepoResponse } from '../../types'
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react'
@@ -10,10 +10,28 @@ interface SearchResultCardsProps {
   pageSize?: number
   onFavorite?: (repo: RepoResponse) => void
   onUnfavorite?: (repoId: string) => void
+  searchCompleted?: boolean
+  searchCompleteMeta?: {
+    totalRepos: number
+    targetCount: number
+    rounds: number
+  }
 }
 
-const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language = 'chinese', username, pageSize = 3, onFavorite, onUnfavorite }) => {
+type SortMode = 'time' | 'match' | 'skill' | 'activity' | 'demand'
+
+const SearchResultCards: React.FC<SearchResultCardsProps> = ({
+  repos,
+  language = 'chinese',
+  username,
+  pageSize = 3,
+  onFavorite,
+  onUnfavorite,
+  searchCompleted = false,
+  searchCompleteMeta
+}) => {
   const [page, setPage] = useState(0)
+  const [sortMode, setSortMode] = useState<SortMode>('time')
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(() => {
     if (!username) return new Set()
     const favs = storage.getUserFavorites(username) || []
@@ -29,8 +47,24 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
     setFavoritedIds(new Set(favs.map((f: any) => f.repo_id)))
   }, [username, repos])
 
-  const totalPages = Math.ceil(repos.length / pageSize)
-  const pageRepos = repos.slice(page * pageSize, (page + 1) * pageSize)
+  useEffect(() => {
+    setPage(0)
+  }, [sortMode])
+
+  const sortedRepos = useMemo(() => {
+    if (sortMode === 'time') return repos
+    const next = [...repos]
+    next.sort((a, b) => {
+      if (sortMode === 'match') return (b.match_score ?? -1) - (a.match_score ?? -1)
+      if (sortMode === 'skill') return (b.breakdown?.skill ?? -1) - (a.breakdown?.skill ?? -1)
+      if (sortMode === 'activity') return (b.breakdown?.activity ?? -1) - (a.breakdown?.activity ?? -1)
+      return (b.breakdown?.demand ?? -1) - (a.breakdown?.demand ?? -1)
+    })
+    return next
+  }, [repos, sortMode])
+
+  const totalPages = Math.ceil(sortedRepos.length / pageSize)
+  const pageRepos = sortedRepos.slice(page * pageSize, (page + 1) * pageSize)
 
   const toggleFavorite = (repo: RepoResponse) => {
     if (!username) return
@@ -53,9 +87,33 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
   }
 
   const repoUrl = (name: string) => `https://github.com/${name}`
+  const pct = (v?: number) => `${Math.round(Math.max(0, (v ?? 0)) * 100)}%`
 
   return (
     <div className="mt-2 w-full">
+      {searchCompleted && (
+        <div className="mb-2 text-[11px] text-text/60">
+          {language === 'chinese'
+            ? `搜索完成：共 ${searchCompleteMeta?.totalRepos ?? repos.length} 个仓库，目标 ${searchCompleteMeta?.targetCount ?? repos.length}，轮次 ${searchCompleteMeta?.rounds ?? '-'}。`
+            : `Search complete: ${searchCompleteMeta?.totalRepos ?? repos.length} repos, target ${searchCompleteMeta?.targetCount ?? repos.length}, rounds ${searchCompleteMeta?.rounds ?? '-'}.`}
+        </div>
+      )}
+      {searchCompleted && repos.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button onClick={() => setSortMode('match')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'match' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+            {language === 'chinese' ? '综合（匹配总分）' : 'Overall (Match)'}
+          </button>
+          <button onClick={() => setSortMode('skill')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'skill' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+            {language === 'chinese' ? '技能' : 'Skill'}
+          </button>
+          <button onClick={() => setSortMode('activity')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'activity' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+            {language === 'chinese' ? '活跃' : 'Activity'}
+          </button>
+          <button onClick={() => setSortMode('demand')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'demand' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+            {language === 'chinese' ? '需求' : 'Demand'}
+          </button>
+        </div>
+      )}
       {pageRepos.map((repo) => {
         const isFav = favoritedIds.has(repo.repo_id)
         return (
@@ -81,11 +139,28 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
                 </span>
               </button>
             </div>
-            {repo.match_score != null && (
-              <div className="mb-1 inline-block rounded-full bg-primary px-2 py-0.5 text-xs text-white">
-                {language === 'chinese' ? '匹配' : 'Match'} {Math.round(repo.match_score * 100)}%
-              </div>
-            )}
+            <div className="mb-1 flex flex-wrap gap-1">
+              {repo.match_score != null && (
+                <div className="inline-block rounded-full bg-primary px-2 py-0.5 text-xs text-white">
+                  {language === 'chinese' ? '匹配' : 'Match'} {pct(repo.match_score)}
+                </div>
+              )}
+              {repo.breakdown?.skill != null && (
+                <div className="inline-block rounded-full bg-surface px-2 py-0.5 text-xs text-text border border-border">
+                  {language === 'chinese' ? '技能' : 'Skill'} {pct(repo.breakdown.skill)}
+                </div>
+              )}
+              {repo.breakdown?.activity != null && (
+                <div className="inline-block rounded-full bg-surface px-2 py-0.5 text-xs text-text border border-border">
+                  {language === 'chinese' ? '活跃' : 'Activity'} {pct(repo.breakdown.activity)}
+                </div>
+              )}
+              {repo.breakdown?.demand != null && (
+                <div className="inline-block rounded-full bg-surface px-2 py-0.5 text-xs text-text border border-border">
+                  {language === 'chinese' ? '需求' : 'Demand'} {pct(repo.breakdown.demand)}
+                </div>
+              )}
+            </div>
             {repo.description && (
               <div className="line-clamp-2 text-xs leading-5 text-text/75">
                 {repo.description}
