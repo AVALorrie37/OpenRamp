@@ -270,7 +270,7 @@ const App: React.FC = () => {
     }
   }
 
-  const handleManualSearchClose = async (favorited: { repo_id: string; full_name: string }[]) => {
+  const handleManualSearchClose = async (favorited: any[]) => {
     setShowManualSearch(false)
     if (!favorited || favorited.length === 0) {
       return
@@ -285,6 +285,23 @@ const App: React.FC = () => {
         ]
         storage.saveUserFavorites(username, mergedFavorites)
       }
+      favorited.forEach((repo) => {
+        addRepo({
+          repo_id: repo.repo_id,
+          name: repo.full_name || repo.repo_id,
+          description: repo.description || '',
+          languages: repo.languages || [],
+          active_score: repo.active_score || 0,
+          influence_score: repo.influence_score || 0,
+          demand_score: repo.demand_score || 0,
+          composite_score: repo.composite_score || 0,
+          match_score: repo.match_score,
+          breakdown: repo.breakdown,
+          dynamic_weights: repo.dynamic_weights,
+          keywords: repo.keywords || [],
+          is_favorited: true
+        } as any)
+      })
       const enriched = await manualSearchAPI.bulkEnrich(
         favorited.map((r) => ({
           repo_id: r.repo_id,
@@ -292,7 +309,18 @@ const App: React.FC = () => {
         }))
       )
       if (enriched && enriched.repos && enriched.repos.length > 0) {
-        fetchRepos({ repo_ids: enriched.repos.map(r => r.repo_id), limit: 20 })
+        enriched.repos.forEach((e: any) => {
+          const local = favorited.find((f) => f.repo_id === e.repo_id)
+          addRepo({
+            ...e,
+            ...(local || {}),
+            description: (local && local.description) || e.description,
+            match_score: local?.match_score,
+            breakdown: local?.breakdown,
+            dynamic_weights: local?.dynamic_weights,
+            is_favorited: true
+          })
+        })
         const hasZeroScores = enriched.repos.some((r: any) =>
           (r.active_score === 0 || r.active_score === 0.0) &&
           (r.influence_score === 0 || r.influence_score === 0.0) &&

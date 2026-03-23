@@ -14,6 +14,7 @@ interface SearchResultCardsProps {
 }
 
 type SortMode = 'time' | 'match' | 'skill' | 'activity' | 'demand'
+const REPO_ID_FOR_URL = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 
 const SearchResultCards: React.FC<SearchResultCardsProps> = ({
   repos,
@@ -80,7 +81,10 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
     setFavoritedIds(next)
   }
 
-  const repoUrl = (name: string) => `https://github.com/${name}`
+  const repoUrl = (repo: RepoResponse) =>
+    REPO_ID_FOR_URL.test(repo.repo_id)
+      ? `https://github.com/${repo.repo_id}`
+      : `https://github.com/${repo.name}`
   const pct = (v?: number) => `${Math.round(Math.max(0, (v ?? 0)) * 100)}%`
 
   return (
@@ -107,7 +111,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
           <div key={repo.repo_id} className="mb-2 rounded-md border border-border bg-surface px-3 py-2.5 transition hover:shadow-panel">
             <div className="mb-1 flex items-center justify-between gap-2">
               <a
-                href={repoUrl(repo.name)}
+                href={repoUrl(repo)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-primary no-underline hover:underline"

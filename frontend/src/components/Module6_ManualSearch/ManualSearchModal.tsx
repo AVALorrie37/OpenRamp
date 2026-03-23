@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { manualSearchAPI } from '../../services/api'
-import { Heart, Search, Star } from 'lucide-react'
+import { manualSearchAPI, matchAPI } from '../../services/api'
+import { Heart, Loader2, Search, Star } from 'lucide-react'
+import { DEFAULT_MATCH_WEIGHTS, storage } from '../../utils/storage'
+import type { MatchResult } from '../../types'
 
 interface ManualSearchRepo {
   repo_id: string
@@ -13,6 +15,10 @@ interface ManualSearchRepo {
     login: string
     avatar_url?: string
   }
+  match_score?: number
+  breakdown?: MatchResult['breakdown']
+  dynamic_weights?: MatchResult['dynamic_weights']
+  matchLoading?: boolean
 }
 
 interface ManualSearchModalProps {
@@ -24,6 +30,8 @@ interface ManualSearchModalProps {
 
 const DEFAULT_HOT_KEYWORDS = ['good-first-issue', 'beginner-friendly', 'python', 'javascript', 'typescript']
 type SortKey = 'best' | 'stars' | 'updated'
+const backfillLocks = new Set<string>()
+type ResultSource = 'keyword' | 'multi_round'
 
 const getDefaultPushedDate = () => {
   const now = new Date()
@@ -35,7 +43,7 @@ const getDefaultPushedDate = () => {
   return `${year}-${month}-${day}`
 }
 
-const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, onClose }) => {
+const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username, skills, onClose }) => {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [autoLoading, setAutoLoading] = useState(false)
@@ -47,9 +55,115 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
   const [usePushedFilter, setUsePushedFilter] = useState<boolean>(true)
   const [pushedDate, setPushedDate] = useState<string>(getDefaultPushedDate)
   const [sortKey, setSortKey] = useState<SortKey>('best')
+  const [resultSource, setResultSource] = useState<ResultSource>('keyword')
   const [page, setPage] = useState<number>(1)
   const [totalCount, setTotalCount] = useState<number>(0)
   const perPage = 20
+  const profileFingerprint = useMemo(
+    () => (skills || []).map((s) => s.toLowerCase().trim()).sort().join('|'),
+    [skills]
+  )
+  const weights = useMemo(() => {
+    if (!username) return DEFAULT_MATCH_WEIGHTS
+    return storage.getUserMatchWeights(username) || DEFAULT_MATCH_WEIGHTS
+  }, [isOpen, username])
+  const weightsFingerprint = `${weights.w_skill.toFixed(4)}|${weights.w_activity.toFixed(4)}|${weights.w_demand.toFixed(4)}`
+
+  const getCurrentUser = () => {
+    return (username || '').trim()
+  }
+  const buildCacheKey = (repoId: string) => `${repoId}|${weightsFingerprint}|${profileFingerprint}`
+
+  const applyCachedMatch = (repo: ManualSearchRepo): ManualSearchRepo => {
+    const username = getCurrentUser()
+    if (!username) return repo
+    if (
+      typeof repo.match_score === 'number' &&
+      typeof repo.breakdown?.skill === 'number' &&
+      typeof repo.breakdown?.activity === 'number' &&
+      typeof repo.breakdown?.demand === 'number'
+    ) return repo
+    const cached = storage.getManualMatchScore(username, buildCacheKey(repo.repo_id))
+    if (!cached) return repo
+    return {
+      ...repo,
+      match_score: cached.match_score,
+      breakdown: cached.breakdown,
+      dynamic_weights: cached.dynamic_weights
+    }
+  }
+
+  const calculateAndCacheRepo = async (repoId: string): Promise<{ match_score: number; breakdown: MatchResult['breakdown']; dynamic_weights?: MatchResult['dynamic_weights'] } | null> => {
+    const username = getCurrentUser()
+    if (!username) return null
+    const cacheKey = buildCacheKey(repoId)
+    const cached = storage.getManualMatchScore(username, cacheKey)
+    if (cached) {
+      return {
+        match_score: cached.match_score,
+        breakdown: cached.breakdown,
+        dynamic_weights: cached.dynamic_weights
+      }
+    }
+    try {
+      const match = await matchAPI.calculate(username, repoId, weights)
+      if (
+        typeof match.match_score !== 'number' ||
+        typeof match.breakdown?.skill !== 'number' ||
+        typeof match.breakdown?.activity !== 'number' ||
+        typeof match.breakdown?.demand !== 'number'
+      ) return null
+      storage.saveManualMatchScore(username, cacheKey, {
+        match_score: match.match_score,
+        breakdown: match.breakdown,
+        dynamic_weights: match.dynamic_weights,
+        updated_at: Date.now()
+      })
+      return {
+        match_score: match.match_score,
+        breakdown: match.breakdown,
+        dynamic_weights: match.dynamic_weights
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const processBackfillQueue = async (uname: string) => {
+    if (!uname || backfillLocks.has(uname)) return
+    backfillLocks.add(uname)
+    try {
+      const tasks = storage.getManualBackfillQueue(uname)
+      for (const task of tasks) {
+        const cached = storage.getManualMatchScore(uname, task.cache_key)
+        if (cached) {
+          storage.removeManualBackfillTask(uname, task.cache_key)
+          continue
+        }
+        try {
+          const match = await matchAPI.calculate(uname, task.repo_id, task.weights)
+          if (
+            typeof match.match_score === 'number' &&
+            typeof match.breakdown?.skill === 'number' &&
+            typeof match.breakdown?.activity === 'number' &&
+            typeof match.breakdown?.demand === 'number'
+          ) {
+            storage.saveManualMatchScore(uname, task.cache_key, {
+              match_score: match.match_score,
+              breakdown: match.breakdown,
+              dynamic_weights: match.dynamic_weights,
+              updated_at: Date.now()
+            })
+          }
+        } catch {
+        } finally {
+          storage.removeManualBackfillTask(uname, task.cache_key)
+        }
+      }
+    } finally {
+      backfillLocks.delete(uname)
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -63,10 +177,13 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
       setUsePushedFilter(true)
       setPushedDate(getDefaultPushedDate())
       setSortKey('best')
+      setResultSource('keyword')
       setPage(1)
       setTotalCount(0)
+    } else if (username) {
+      void processBackfillQueue(username)
     }
-  }, [isOpen])
+  }, [isOpen, username])
 
   const hotKeywords = useMemo(() => {
     if (skills && skills.length >= 2) {
@@ -119,7 +236,8 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
           avatar_url: item.owner?.avatar_url
         }
       }))
-      setResults(repos)
+      setResultSource('keyword')
+      setResults(repos.map(applyCachedMatch))
       try {
         window.localStorage.setItem(
           'manual_search_last_results',
@@ -184,6 +302,26 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
 
   const handleClose = () => {
     const favorited = results.filter(r => favoritedIds.has(r.repo_id))
+    const uname = getCurrentUser()
+    if (uname) {
+      favorited.forEach((repo) => {
+        const hasMatch = (
+          typeof repo.match_score === 'number' &&
+          typeof repo.breakdown?.skill === 'number' &&
+          typeof repo.breakdown?.activity === 'number' &&
+          typeof repo.breakdown?.demand === 'number'
+        )
+        if (hasMatch) return
+        const cacheKey = buildCacheKey(repo.repo_id)
+        storage.upsertManualBackfillTask(uname, {
+          repo_id: repo.repo_id,
+          cache_key: cacheKey,
+          weights,
+          profile_fingerprint: profileFingerprint
+        })
+      })
+      void processBackfillQueue(uname)
+    }
     onClose(favorited)
   }
 
@@ -273,9 +411,12 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                       owner: {
                         login: item.owner?.login || (item.repo_id ? (item.repo_id.split('/')[0] || '') : ''),
                         avatar_url: item.owner?.avatar_url
-                      }
+                      },
+                      match_score: item.match_score,
+                      breakdown: item.breakdown
                     }))
-                    setResults(repos)
+                    setResultSource('multi_round')
+                    setResults(repos.map(applyCachedMatch))
                     setTotalCount(repos.length)
                   } catch (e: any) {
                     setError(e?.message || 'Multi-round search error')
@@ -380,6 +521,11 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
           )}
           {sortedResults.map((repo) => {
             const isFavorited = favoritedIds.has(repo.repo_id)
+            const hasMatch = typeof repo.match_score === 'number' &&
+              typeof repo.breakdown?.skill === 'number' &&
+              typeof repo.breakdown?.activity === 'number' &&
+              typeof repo.breakdown?.demand === 'number'
+            const canManualCalculate = resultSource === 'keyword' && !hasMatch
             return (
               <div
                 key={repo.repo_id}
@@ -404,6 +550,49 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, skills, o
                   <div className="mt-2 text-sm leading-6 text-text/80">
                     {repo.description || 'No description'}
                   </div>
+                </div>
+                <div className="flex min-w-[220px] flex-col items-end gap-2 self-start">
+                  {hasMatch && (
+                    <div className="max-w-[320px] overflow-x-auto">
+                      <div className="flex w-max justify-end gap-1 whitespace-nowrap">
+                      <span className="rounded bg-primary px-2 py-1 text-xs font-medium text-white">
+                        匹配{Math.round((repo.match_score || 0) * 100)}%
+                      </span>
+                      <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                        技能{Math.round((repo.breakdown?.skill || 0) * 100)}%
+                      </span>
+                      <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                        活跃{Math.round((repo.breakdown?.activity || 0) * 100)}%
+                      </span>
+                      <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                        需求{Math.round((repo.breakdown?.demand || 0) * 100)}%
+                      </span>
+                      </div>
+                    </div>
+                  )}
+                  {canManualCalculate && (
+                    <button
+                      onClick={async () => {
+                        setResults((prev) => prev.map((r) => r.repo_id === repo.repo_id ? { ...r, matchLoading: true } : r))
+                        const m = await calculateAndCacheRepo(repo.repo_id)
+                        setResults((prev) => prev.map((r) => {
+                          if (r.repo_id !== repo.repo_id) return r
+                          if (!m) return { ...r, matchLoading: false }
+                          return {
+                            ...r,
+                            matchLoading: false,
+                            match_score: m.match_score,
+                            breakdown: m.breakdown,
+                            dynamic_weights: m.dynamic_weights
+                          }
+                        }))
+                      }}
+                      disabled={repo.matchLoading}
+                      className="rounded-md border border-primary bg-surface px-2 py-1 text-xs text-primary"
+                    >
+                      {repo.matchLoading ? <Loader2 size={14} className="animate-spin" /> : '计算匹配'}
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={() => toggleFavorite(repo.repo_id)}
