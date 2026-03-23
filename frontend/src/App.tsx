@@ -612,6 +612,7 @@ const App: React.FC = () => {
               }}
               onAskAIAboutText={handleAskAIAboutSelection}
               selectionAskLanguage={uiLanguage}
+              language={uiLanguage}
             />
           </div>
 
@@ -663,6 +664,7 @@ const App: React.FC = () => {
               baseWeights={weights}
               onBaseWeightsChange={handleWeightsChange}
               themeVersion={themeVersion}
+              language={uiLanguage}
             />
           </div>
           </div>

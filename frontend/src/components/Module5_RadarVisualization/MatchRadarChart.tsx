@@ -35,6 +35,7 @@ interface MatchRadarChartProps {
   }
   onBaseWeightsChange?: (next: { w_skill: number; w_activity: number; w_demand: number }) => void
   themeVersion?: number
+  language?: 'chinese' | 'english'
 }
 
 const MatchRadarChart: FC<MatchRadarChartProps> = ({ 
@@ -45,7 +46,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   baseWeights,
   dynamicWeights,
   onBaseWeightsChange,
-  themeVersion = 0
+  themeVersion = 0,
+  language = 'chinese'
 }) => {
   if (!matchData) return null
   const primary = cssVar('--color-primary') || '#7FB069'
@@ -64,19 +66,37 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
     setLocalWeights(baseWeights || defaultBase)
   }, [baseWeights?.w_skill, baseWeights?.w_activity, baseWeights?.w_demand])
 
+  const labels = language === 'english'
+    ? {
+        skillMatch: 'Skill Match',
+        projectActivity: 'Project Activity',
+        communityDemand: 'Community Demand',
+        overallMatch: 'Overall Match',
+        matchDegree: 'Match',
+        weightAdjust: 'Weight Adjustment'
+      }
+    : {
+        skillMatch: '技能匹配度',
+        projectActivity: '项目活跃度',
+        communityDemand: '社区需求热度',
+        overallMatch: '匹配总分',
+        matchDegree: '匹配度',
+        weightAdjust: '权重调节'
+      }
+
   const data = [
     {
-      subject: '技能匹配度',
+      subject: labels.skillMatch,
       value: matchData.skill * 100,
       fullMark: 100
     },
     {
-      subject: '项目活跃度',
+      subject: labels.projectActivity,
       value: matchData.activity * 100,
       fullMark: 100
     },
     {
-      subject: '社区需求热度',
+      subject: labels.communityDemand,
       value: matchData.demand * 100,
       fullMark: 100
     }
@@ -150,7 +170,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         {matchData.repoName}
       </h2>
       <div className="mb-4 text-xl font-semibold text-primary">
-        匹配总分: {Math.round(matchData.matchScore * 100)}%
+        {labels.overallMatch}: {Math.round(matchData.matchScore * 100)}%
       </div>
       <div className={`w-full ${embedded ? 'h-[200px]' : 'h-[300px]'}`} key={themeVersion}>
         <ResponsiveContainer>
@@ -167,7 +187,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               tick={{ fill: text, fontSize: 14}}
             />
             <Radar
-              name="匹配度"
+              name={labels.matchDegree}
               dataKey="value"
               stroke={primary}
               fill={primary}
@@ -190,7 +210,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
           <div className="mt-3 flex justify-center">
             <div className="flex min-w-[200px] max-w-[320px] flex-col gap-2.5 rounded-lg border border-border bg-surface p-4 shadow-panel">
               <div className="mb-0.5 text-sm font-semibold">
-                权重调节
+                {labels.weightAdjust}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="flex items-center justify-between">

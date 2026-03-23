@@ -11,14 +11,15 @@ interface RadarPlaceholderProps {
   }
   onBaseWeightsChange?: (next: { w_skill: number; w_activity: number; w_demand: number }) => void
   themeVersion?: number
+  language?: 'chinese' | 'english'
 }
 
-const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData, baseWeights, onBaseWeightsChange, themeVersion = 0 }) => {
+const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData, baseWeights, onBaseWeightsChange, themeVersion = 0, language = 'chinese' }) => {
   if (!isActive && !matchData) {
     // 未登录状态
     return (
       <div className="p-10 text-center text-lg text-text/60">
-        与AI助手对话确认技能后解锁
+        {language === 'english' ? 'Unlock after confirming skills with AI assistant' : '与AI助手对话确认技能后解锁'}
       </div>
     )
   } else if (matchData) {
@@ -39,13 +40,14 @@ const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData
         onBaseWeightsChange={onBaseWeightsChange}
         embedded={true}  // 启用内嵌模式
         themeVersion={themeVersion}
+        language={language}
       />
     )
   } else {
     // 已登录但无数据
     return (
       <div className="p-10 text-center text-base text-text/40">
-        点击仓库查看匹配详情
+        {language === 'english' ? 'Click a repository to view match details' : '点击仓库查看匹配详情'}
       </div>
     )
   }

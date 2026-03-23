@@ -16,6 +16,7 @@ interface RepoListProps {
   openRepoHintTitle?: string
   onAskAIAboutText?: (text: string) => void
   selectionAskLanguage?: 'chinese' | 'english'
+  language?: 'chinese' | 'english'
 }
 
 type SortType = 'match' | 'skill' | 'activity' | 'demand'
@@ -34,7 +35,8 @@ const RepoList: React.FC<RepoListProps> = ({
   onDescriptionRefresh,
   openRepoHintTitle = '按住 Ctrl 并点击在浏览器中打开 GitHub 仓库页面',
   onAskAIAboutText,
-  selectionAskLanguage = 'chinese'
+  selectionAskLanguage = 'chinese',
+  language = 'chinese'
 }) => {
   const [sortType, setSortType] = useState<SortType>('match')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
@@ -135,6 +137,25 @@ const RepoList: React.FC<RepoListProps> = ({
   })
 
   const askAiLabel = selectionAskLanguage === 'english' ? 'Ask AI?' : '问问AI？'
+  const labels = language === 'english'
+    ? {
+        matchTotal: 'Overall Match',
+        skill: 'Skill',
+        activity: 'Activity',
+        demand: 'Demand',
+        match: 'Match',
+        favorite: 'Favorite',
+        unfavorite: 'Unfavorite'
+      }
+    : {
+        matchTotal: '匹配总分',
+        skill: '技能',
+        activity: '活跃',
+        demand: '需求',
+        match: '匹配',
+        favorite: '收藏',
+        unfavorite: '取消收藏'
+      }
 
   return (
     <div className="flex h-full flex-col">
@@ -173,7 +194,7 @@ const RepoList: React.FC<RepoListProps> = ({
                 sortType === 'match' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
               }`}
             >
-              匹配总分
+              {labels.matchTotal}
             </button>
           )}
           <button
@@ -182,7 +203,7 @@ const RepoList: React.FC<RepoListProps> = ({
               sortType === 'skill' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
-            技能
+            {labels.skill}
           </button>
           <button
             onClick={() => setSortType('activity')}
@@ -190,7 +211,7 @@ const RepoList: React.FC<RepoListProps> = ({
               sortType === 'activity' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
-            活跃
+            {labels.activity}
           </button>
           <button
             onClick={() => setSortType('demand')}
@@ -198,7 +219,7 @@ const RepoList: React.FC<RepoListProps> = ({
               sortType === 'demand' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
-            需求
+            {labels.demand}
           </button>
         </div>
         {onOpenManualSearch && (
@@ -240,13 +261,13 @@ const RepoList: React.FC<RepoListProps> = ({
               isHighlighted ? 'border-primary ring-2 ring-primaryLight/60' : 'border-border'
             }`}
           >
-            <div className="mb-2 flex items-start justify-between">
-              <h3 className="m-0 text-lg font-semibold text-text">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="m-0 min-w-0 flex-1 text-lg font-semibold text-text">
                 <span
                   title={openRepoHintTitle}
                   role="link"
                   tabIndex={0}
-                  className="cursor-pointer rounded-sm hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="block max-w-full cursor-pointer truncate rounded-sm hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50"
                   onClick={(e) => {
                     if (!e.ctrlKey) return
                     e.stopPropagation()
@@ -270,25 +291,10 @@ const RepoList: React.FC<RepoListProps> = ({
                   {repo.name}
                 </span>
               </h3>
-              <div className="flex gap-2">
+              <div className="ml-2 flex max-w-[65%] shrink-0 flex-wrap items-center justify-end gap-2">
                 {canUseMatchSort && typeof repo.match_score === 'number' && (
-                  <span className="rounded px-2 py-1 text-xs font-medium text-white bg-primary">
-                    匹配{Math.round(repo.match_score * 100)}%
-                  </span>
-                )}
-                {typeof repo.breakdown?.skill === 'number' && (
-                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
-                    技能{Math.round(repo.breakdown.skill * 100)}%
-                  </span>
-                )}
-                {typeof repo.breakdown?.activity === 'number' && (
-                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
-                    活跃{Math.round(repo.breakdown.activity * 100)}%
-                  </span>
-                )}
-                {typeof repo.breakdown?.demand === 'number' && (
-                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
-                    需求{Math.round(repo.breakdown.demand * 100)}%
+                  <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-white bg-primary">
+                    {labels.match}{Math.round(repo.match_score * 100)}%
                   </span>
                 )}
                 {onToggleFavorite && (
@@ -299,13 +305,34 @@ const RepoList: React.FC<RepoListProps> = ({
                       onToggleFavorite(repo)
                     }}
                     className="inline-flex items-center justify-center rounded-full bg-transparent p-1 text-base text-border transition hover:text-accent"
-                    aria-label={repo.is_favorited ? '取消收藏' : '收藏'}
+                    aria-label={repo.is_favorited ? labels.unfavorite : labels.favorite}
                   >
                     <Star size={16} fill={repo.is_favorited ? 'currentColor' : 'none'} />
                   </button>
                 )}
               </div>
             </div>
+            {(typeof repo.breakdown?.skill === 'number' ||
+              typeof repo.breakdown?.activity === 'number' ||
+              typeof repo.breakdown?.demand === 'number') && (
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                {typeof repo.breakdown?.skill === 'number' && (
+                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                    {labels.skill}{Math.round(repo.breakdown.skill * 100)}%
+                  </span>
+                )}
+                {typeof repo.breakdown?.activity === 'number' && (
+                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                    {labels.activity}{Math.round(repo.breakdown.activity * 100)}%
+                  </span>
+                )}
+                {typeof repo.breakdown?.demand === 'number' && (
+                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                    {labels.demand}{Math.round(repo.breakdown.demand * 100)}%
+                  </span>
+                )}
+              </div>
+            )}
             <div className="relative mt-2 min-h-[2.75rem]">
               <p
                 data-repo-description
