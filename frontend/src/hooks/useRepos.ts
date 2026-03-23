@@ -13,7 +13,7 @@ function stripMatchFields(repo: RepoResponse): RepoResponse {
   return next
 }
 
-export const useRepos = (username: string | null) => {
+export const useRepos = (username: string | null, sessionReady = true) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
   const [reposMeta, setReposMeta] = useState<{ mode: string; source?: string }>({ mode: 'offline' })
   const [loading, setLoading] = useState(false)
@@ -96,6 +96,7 @@ export const useRepos = (username: string | null) => {
       setRepos(favList)
       setReposMeta({ mode: 'favorites', source: 'user_favorites' })
       setError(null)
+      setLoading(false)
       return
     }
     if (USE_MOCK) {
@@ -108,10 +109,13 @@ export const useRepos = (username: string | null) => {
         if (!isRequestCurrent(requestId, uname)) return
         const finalList = uname ? mergeWithFavorites(list, uname) : list
         setRepos(finalList)
+        setLoading(false)
         return
       }
     }
+    let ownedLoading = false
     setLoading(true)
+    ownedLoading = true
     setError(null)
     try {
       const response = await reposAPI.get({ limit: 10 })
@@ -143,8 +147,9 @@ export const useRepos = (username: string | null) => {
       const finalList = uname ? mergeWithFavorites(list, uname) : list
       setRepos(finalList)
     } finally {
-      if (!isRequestCurrent(requestId, uname)) return
-      setLoading(false)
+      if (ownedLoading) {
+        setLoading(false)
+      }
     }
   }, [username, beginRequest, isRequestCurrent, normalizeRepoName, applyMatchScores, mergeWithFavorites])
 
@@ -214,6 +219,7 @@ export const useRepos = (username: string | null) => {
   }, [username])
 
   useEffect(() => {
+    if (!sessionReady) return
     if (username !== null) return
     const preset = storage.getPresetRepos()
     if (preset && Array.isArray(preset) && preset.length > 0) {
@@ -224,11 +230,12 @@ export const useRepos = (username: string | null) => {
       setReposMeta({ mode: 'offline' })
     }
     setError(null)
-  }, [username])
+  }, [username, sessionReady])
 
   useEffect(() => {
+    if (!sessionReady) return
     loadPreset()
-  }, [loadPreset])
+  }, [sessionReady, loadPreset])
 
   const fetchRepos = useCallback(
     async (params?: { mode?: string; repo_ids?: string[]; limit?: number }) => {
@@ -268,8 +275,9 @@ export const useRepos = (username: string | null) => {
         console.error('Fetch repos error:', err)
         return undefined
       } finally {
-        if (!isRequestCurrent(requestId, uname)) return
-        setLoading(false)
+        if (isRequestCurrent(requestId, uname)) {
+          setLoading(false)
+        }
       }
     },
     [username, beginRequest, isRequestCurrent, mergeWithFavorites, applyMatchScores]

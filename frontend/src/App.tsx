@@ -26,8 +26,8 @@ const keywordsFingerprint = (kws: string[] | undefined): string =>
   (kws ?? []).map((k) => k.toLowerCase()).sort().join('\u0001')
 
 const App: React.FC = () => {
-  const { username, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username)
+  const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
+  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username, sessionReady)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)

@@ -3,8 +3,18 @@ import { storage } from '../utils/storage'
 import { profileAPI } from '../services/api'
 import type { UserProfile } from '../types'
 
+function readStoredUsername(): string | null {
+  try {
+    const u = localStorage.getItem('current_user')
+    return u && u.trim().length > 0 ? u.trim() : null
+  } catch {
+    return null
+  }
+}
+
 export const useUser = () => {
-  const [username, setUsername] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(readStoredUsername)
+  const [sessionReady, setSessionReady] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const profileModifiedRef = useRef<boolean>(false)
@@ -38,9 +48,12 @@ export const useUser = () => {
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem('current_user')
+    setSessionReady(true)
+  }, [])
+
+  useEffect(() => {
+    const saved = readStoredUsername()
     if (saved) {
-      setUsername(saved)
       loadProfile(saved)
     }
   }, [])
@@ -75,6 +88,7 @@ export const useUser = () => {
 
   return {
     username,
+    sessionReady,
     profile,
     loading,
     login,
