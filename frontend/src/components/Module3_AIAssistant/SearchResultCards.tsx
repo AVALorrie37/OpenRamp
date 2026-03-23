@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { storage } from '../../utils/storage'
 import type { RepoResponse } from '../../types'
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react'
@@ -20,6 +20,15 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
     return new Set(favs.map((f: any) => f.repo_id))
   })
 
+  useEffect(() => {
+    if (!username) {
+      setFavoritedIds(new Set())
+      return
+    }
+    const favs = storage.getUserFavorites(username) || []
+    setFavoritedIds(new Set(favs.map((f: any) => f.repo_id)))
+  }, [username, repos])
+
   const totalPages = Math.ceil(repos.length / pageSize)
   const pageRepos = repos.slice(page * pageSize, (page + 1) * pageSize)
 
@@ -34,7 +43,9 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({ repos, language =
     } else {
       next.add(repo.repo_id)
       const favs = storage.getUserFavorites(username) || []
-      favs.push({ ...repo, full_name: repo.name, is_favorited: true })
+      if (!favs.some((f: any) => f.repo_id === repo.repo_id)) {
+        favs.push({ ...repo, full_name: repo.name, is_favorited: true })
+      }
       storage.saveUserFavorites(username, favs)
       onFavorite?.(repo)
     }

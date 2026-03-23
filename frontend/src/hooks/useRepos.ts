@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { reposAPI, matchAPI } from '../services/api'
 import { storage, DEFAULT_MATCH_WEIGHTS } from '../utils/storage'
 import type { RepoResponse } from '../types'
@@ -18,6 +18,26 @@ export const useRepos = (username: string | null) => {
   const [reposMeta, setReposMeta] = useState<{ mode: string; source?: string }>({ mode: 'offline' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const usernameRef = useRef<string | null>(username)
+  const requestIdRef = useRef(0)
+
+  const beginRequest = useCallback(() => {
+    requestIdRef.current += 1
+    return requestIdRef.current
+  }, [])
+
+  const isRequestCurrent = useCallback((requestId: number, uname: string | null) => {
+    return requestId === requestIdRef.current && usernameRef.current === uname
+  }, [])
+
+  const normalizeRepoName = useCallback((repo: RepoResponse): RepoResponse => {
+    if (repo.name && repo.name.trim().length > 0) return repo
+    const full = (repo as any).full_name || repo.repo_id || ''
+    const parts = String(full).split('/')
+    const repoName = parts.length === 2 ? parts[1] : (parts[0] || '')
+    if (!repoName) return repo
+    return { ...repo, name: repoName }
+  }, [])
 
   const mergeWithFavorites = useCallback((list: RepoResponse[], uname: string | null): RepoResponse[] => {
     if (!uname) return list
@@ -36,15 +56,8 @@ export const useRepos = (username: string | null) => {
       const base: RepoResponse = existing || fav
       map.set(repoId, { ...base, ...fav, is_favorited: true })
     })
-    return Array.from(map.values()).map((r) => {
-      if (r.name && r.name.trim().length > 0) return r
-      const full = (r as any).full_name || r.repo_id || ''
-      const parts = String(full).split('/')
-      const repoName = parts.length === 2 ? parts[1] : (parts[0] || '')
-      if (!repoName) return r
-      return { ...r, name: repoName }
-    })
-  }, [])
+    return Array.from(map.values()).map(normalizeRepoName)
+  }, [normalizeRepoName])
 
   const applyMatchScores = useCallback(async (uname: string, list: RepoResponse[]): Promise<RepoResponse[]> => {
     const stored = storage.getUserMatchWeights(uname)
@@ -71,14 +84,29 @@ export const useRepos = (username: string | null) => {
   }, [])
 
   const loadPreset = useCallback(async () => {
+    const uname = username
+    const requestId = beginRequest()
+    const favorites = uname ? (storage.getUserFavorites(uname) || []) : []
+    if (uname && favorites.length > 0) {
+      let favList = favorites.map((r: RepoResponse) => normalizeRepoName({ ...r, is_favorited: true }))
+      if (favList.length > 0) {
+        favList = await applyMatchScores(uname, favList.map((r) => ({ ...r })))
+      }
+      if (!isRequestCurrent(requestId, uname)) return
+      setRepos(favList)
+      setReposMeta({ mode: 'favorites', source: 'user_favorites' })
+      setError(null)
+      return
+    }
     if (USE_MOCK) {
       const preset = storage.getPresetRepos()
       if (preset && preset.length > 0) {
         let list = preset as RepoResponse[]
-        if (username) {
-          list = await applyMatchScores(username, preset.map((r: RepoResponse) => ({ ...r })))
+        if (uname) {
+          list = await applyMatchScores(uname, preset.map((r: RepoResponse) => ({ ...r })))
         }
-        const finalList = username ? mergeWithFavorites(list, username) : list
+        if (!isRequestCurrent(requestId, uname)) return
+        const finalList = uname ? mergeWithFavorites(list, uname) : list
         setRepos(finalList)
         return
       }
@@ -87,41 +115,48 @@ export const useRepos = (username: string | null) => {
     setError(null)
     try {
       const response = await reposAPI.get({ limit: 10 })
+      if (!isRequestCurrent(requestId, uname)) return
       setReposMeta({ mode: response.mode, source: response.source })
       if (response.repos.length > 0) {
         storage.savePresetRepos(response.repos)
         let list = response.repos
-        if (username) {
-          list = await applyMatchScores(username, response.repos.map((r) => ({ ...r })))
+        if (uname) {
+          list = await applyMatchScores(uname, response.repos.map((r) => ({ ...r })))
         }
-        const finalList = username ? mergeWithFavorites(list, username) : list
+        if (!isRequestCurrent(requestId, uname)) return
+        const finalList = uname ? mergeWithFavorites(list, uname) : list
         setRepos(finalList)
       } else {
+        if (!isRequestCurrent(requestId, uname)) return
         setRepos([])
       }
     } catch (err: any) {
+      if (!isRequestCurrent(requestId, uname)) return
       setError(err.message || 'Failed to fetch repos')
       const fallback = storage.getPresetRepos()
       const raw = fallback && fallback.length > 0 ? fallback : []
       let list = raw as RepoResponse[]
-      if (username && list.length > 0) {
-        list = await applyMatchScores(username, raw.map((r: RepoResponse) => ({ ...r })))
+      if (uname && list.length > 0) {
+        list = await applyMatchScores(uname, raw.map((r: RepoResponse) => ({ ...r })))
       }
-      const finalList = username ? mergeWithFavorites(list, username) : list
+      if (!isRequestCurrent(requestId, uname)) return
+      const finalList = uname ? mergeWithFavorites(list, uname) : list
       setRepos(finalList)
     } finally {
+      if (!isRequestCurrent(requestId, uname)) return
       setLoading(false)
     }
-  }, [username, mergeWithFavorites, applyMatchScores])
+  }, [username, beginRequest, isRequestCurrent, normalizeRepoName, applyMatchScores, mergeWithFavorites])
 
   const refreshRepos = useCallback(async (): Promise<RepoResponse[] | undefined> => {
+    const uname = username
     if (USE_MOCK) {
-      if (username) {
-        const userRepos = storage.getUserRepos(username)
+      if (uname) {
+        const userRepos = storage.getUserRepos(uname)
         if (userRepos && userRepos.length > 0) {
-          const mergedBase = mergeWithFavorites(userRepos, username)
-          const updated = await applyMatchScores(username, mergedBase)
-          storage.saveUserRepos(username, updated)
+          const mergedBase = mergeWithFavorites(userRepos, uname)
+          const updated = await applyMatchScores(uname, mergedBase)
+          storage.saveUserRepos(uname, updated)
           setRepos(updated)
           return updated
         }
@@ -129,11 +164,15 @@ export const useRepos = (username: string | null) => {
       await loadPreset()
       return undefined
     }
-    if (username) {
+    if (uname) {
       setLoading(true)
       setError(null)
       try {
-        let baseList = storage.getUserRepos(username)
+        let baseList = storage.getUserRepos(uname)
+        const favorites = storage.getUserFavorites(uname) || []
+        if (favorites.length > 0) {
+          baseList = favorites
+        }
         if (!baseList || baseList.length === 0) {
           const preset = storage.getPresetRepos()
           if (preset && preset.length > 0) {
@@ -145,17 +184,17 @@ export const useRepos = (username: string | null) => {
           }
         }
 
-        const mergedBase = mergeWithFavorites(baseList, username)
-        const updated = await applyMatchScores(username, mergedBase)
+        const mergedBase = mergeWithFavorites(baseList, uname)
+        const updated = await applyMatchScores(uname, mergedBase)
 
-        storage.saveUserRepos(username, updated)
+        storage.saveUserRepos(uname, updated)
         setRepos(updated)
         return updated
       } catch (err: any) {
         setError(err.message || 'Failed to fetch repos')
-        const userRepos = storage.getUserRepos(username)
+        const userRepos = storage.getUserRepos(uname)
         if (userRepos && userRepos.length > 0) {
-          const merged = mergeWithFavorites(userRepos, username)
+          const merged = mergeWithFavorites(userRepos, uname)
           setRepos(merged)
         } else {
           await loadPreset()
@@ -168,6 +207,11 @@ export const useRepos = (username: string | null) => {
     await loadPreset()
     return undefined
   }, [username, loadPreset, mergeWithFavorites, applyMatchScores])
+
+  useEffect(() => {
+    usernameRef.current = username
+    requestIdRef.current += 1
+  }, [username])
 
   useEffect(() => {
     if (username !== null) return
@@ -188,18 +232,27 @@ export const useRepos = (username: string | null) => {
 
   const fetchRepos = useCallback(
     async (params?: { mode?: string; repo_ids?: string[]; limit?: number }) => {
+      const uname = username
+      const requestId = beginRequest()
       setLoading(true)
       setError(null)
       try {
         const response = await reposAPI.get(params || { limit: 10 })
+        if (!isRequestCurrent(requestId, uname)) return undefined
         setReposMeta({ mode: response.mode, source: response.source })
         const list = response.repos || []
-        let merged = mergeWithFavorites(list, username)
-        if (username && merged.length > 0) {
-          merged = await applyMatchScores(username, merged.map((r) => ({ ...r })))
+        let merged = mergeWithFavorites(list, uname)
+        const hasFavorites = !!uname && (storage.getUserFavorites(uname)?.length || 0) > 0
+        if (hasFavorites && !params?.repo_ids) {
+          const favoriteIds = new Set((storage.getUserFavorites(uname!) || []).map((r: any) => r.repo_id))
+          merged = merged.filter((r) => favoriteIds.has(r.repo_id))
         }
-        if (params?.repo_ids && params.repo_ids.length > 0 && username) {
-          storage.saveUserRepos(username, merged)
+        if (uname && merged.length > 0) {
+          merged = await applyMatchScores(uname, merged.map((r) => ({ ...r })))
+        }
+        if (!isRequestCurrent(requestId, uname)) return undefined
+        if (params?.repo_ids && params.repo_ids.length > 0 && uname) {
+          storage.saveUserRepos(uname, merged)
         }
         if (!params?.repo_ids && list.length > 0) {
           const preset = storage.getPresetRepos()
@@ -210,14 +263,16 @@ export const useRepos = (username: string | null) => {
         setRepos(merged)
         return merged
       } catch (err: any) {
+        if (!isRequestCurrent(requestId, uname)) return undefined
         setError(err.message || 'Failed to fetch repos')
         console.error('Fetch repos error:', err)
         return undefined
       } finally {
+        if (!isRequestCurrent(requestId, uname)) return
         setLoading(false)
       }
     },
-    [username, mergeWithFavorites, applyMatchScores]
+    [username, beginRequest, isRequestCurrent, mergeWithFavorites, applyMatchScores]
   )
 
   const refreshToPreset = useCallback(() => {
@@ -289,6 +344,10 @@ export const useRepos = (username: string | null) => {
         nextFavorites = [...favorites, { ...repo, is_favorited: true }]
       }
       storage.saveUserFavorites(username, nextFavorites)
+      if (nextFavorites.length > 0) {
+        const favoriteIds = new Set(nextFavorites.map((f: any) => f.repo_id))
+        return next.filter((r) => favoriteIds.has(r.repo_id))
+      }
       return next
     })
   }, [username])
