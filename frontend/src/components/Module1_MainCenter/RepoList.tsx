@@ -18,7 +18,7 @@ interface RepoListProps {
   selectionAskLanguage?: 'chinese' | 'english'
 }
 
-type SortType = 'match' | 'active' | 'friendly'
+type SortType = 'match' | 'skill' | 'activity' | 'demand'
 
 const REPO_ID_FOR_URL = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 
@@ -103,7 +103,7 @@ const RepoList: React.FC<RepoListProps> = ({
 
   useEffect(() => {
     if (!canUseMatch && sortType === 'match') {
-      setSortType('active')
+      setSortType('activity')
     }
   }, [canUseMatch, sortType])
 
@@ -114,20 +114,24 @@ const RepoList: React.FC<RepoListProps> = ({
     return b.active_score - a.active_score
   }
 
+  const compareByBreakdown = (k: 'skill' | 'activity' | 'demand') => (a: RepoResponse, b: RepoResponse) => {
+    const av = typeof a.breakdown?.[k] === 'number' ? a.breakdown![k] : -1
+    const bv = typeof b.breakdown?.[k] === 'number' ? b.breakdown![k] : -1
+    if (bv !== av) return bv - av
+    return compareMatchThenActive(a, b)
+  }
+
   const sortedRepos = [...repos].sort((a, b) => {
     if (sortType === 'match') {
       if (!canUseMatch) {
         return b.active_score - a.active_score
       }
       return compareMatchThenActive(a, b)
-    } else if (sortType === 'active') {
-      return b.active_score - a.active_score
-    } else {
-      if (!canUseMatch) {
-        return b.active_score - a.active_score
-      }
-      return compareMatchThenActive(a, b)
     }
+    if (!canUseMatch) return b.active_score - a.active_score
+    if (sortType === 'skill') return compareByBreakdown('skill')(a, b)
+    if (sortType === 'activity') return compareByBreakdown('activity')(a, b)
+    return compareByBreakdown('demand')(a, b)
   })
 
   const askAiLabel = selectionAskLanguage === 'english' ? 'Ask AI?' : '问问AI？'
@@ -173,20 +177,28 @@ const RepoList: React.FC<RepoListProps> = ({
             </button>
           )}
           <button
-            onClick={() => setSortType('active')}
+            onClick={() => setSortType('skill')}
             className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
-              sortType === 'active' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+              sortType === 'skill' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
-            活跃度
+            技能
           </button>
           <button
-            onClick={() => setSortType('friendly')}
+            onClick={() => setSortType('activity')}
             className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
-              sortType === 'friendly' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+              sortType === 'activity' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
-            新手友好度
+            活跃
+          </button>
+          <button
+            onClick={() => setSortType('demand')}
+            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+              sortType === 'demand' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            }`}
+          >
+            需求
           </button>
         </div>
         {onOpenManualSearch && (
@@ -264,12 +276,19 @@ const RepoList: React.FC<RepoListProps> = ({
                     匹配{Math.round(repo.match_score * 100)}%
                   </span>
                 )}
-                <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
-                  活跃度{Math.round(repo.active_score * 100)}%
-                </span>
-                {canUseMatchSort && typeof repo.match_score === 'number' && repo.match_score > 0.7 && (
-                  <span className="rounded bg-accent px-2 py-1 text-xs font-medium text-white">
-                    新手友好
+                {typeof repo.breakdown?.skill === 'number' && (
+                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                    技能{Math.round(repo.breakdown.skill * 100)}%
+                  </span>
+                )}
+                {typeof repo.breakdown?.activity === 'number' && (
+                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                    活跃{Math.round(repo.breakdown.activity * 100)}%
+                  </span>
+                )}
+                {typeof repo.breakdown?.demand === 'number' && (
+                  <span className="rounded bg-primaryLight px-2 py-1 text-xs font-medium text-text">
+                    需求{Math.round(repo.breakdown.demand * 100)}%
                   </span>
                 )}
                 {onToggleFavorite && (

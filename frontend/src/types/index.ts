@@ -55,6 +55,7 @@ export interface ChatMessage {
   content: string
   timestamp: number
   action?: string
+  notice?: boolean
   isSearching?: boolean
   searchId?: string
   searchResults?: RepoResponse[]

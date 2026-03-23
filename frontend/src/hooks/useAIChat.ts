@@ -163,7 +163,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       setSearchProgressSeconds(null)
       setSearchStage(null)
       setMessages(prev => {
-        const updated = prev.map((msg, idx) => 
+        const updatedBase = prev.map((msg, idx) => 
           idx === prev.length - 1 && msg.isSearching 
             ? {
                 ...msg,
@@ -177,6 +177,21 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
               }
             : msg
         )
+        const meta = searchCompleteMetaRef.current
+        const noticeText = meta
+          ? (
+            lang === 'chinese'
+              ? `搜索完成：共 ${meta.totalRepos} 个仓库，目标 ${meta.targetCount}，轮次 ${meta.rounds}。`
+              : `Search complete: ${meta.totalRepos} repos, target ${meta.targetCount}, rounds ${meta.rounds}.`
+          )
+          : (lang === 'chinese' ? '搜索完成。' : 'Search complete.')
+        const noticeMessage: ChatMessage = {
+          role: 'assistant',
+          content: noticeText,
+          notice: true,
+          timestamp: Date.now()
+        }
+        const updated = [...updatedBase, noticeMessage]
         storage.saveChatMessages(user_id, updated)
         return updated
       })

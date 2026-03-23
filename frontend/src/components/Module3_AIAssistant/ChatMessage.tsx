@@ -13,11 +13,14 @@ interface ChatMessageProps {
 const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese', username, onFavorite, onUnfavorite }) => {
   const isUser = message.role === 'user'
   const hasResults = !isUser && message.searchResults && message.searchResults.length > 0
+  const isNotice = !isUser && message.notice
 
   return (
     <div className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`rounded-lg px-4 py-3 text-base leading-6 whitespace-pre-wrap ${
+        className={`rounded-lg px-4 py-3 leading-6 whitespace-pre-wrap ${
+          isNotice ? 'text-xs text-text/70' : 'text-base'
+        } ${
           hasResults ? 'max-w-[85%]' : 'max-w-[70%]'
         } ${isUser ? 'bg-primary text-white' : 'bg-primaryLight text-text'}`}
       >
@@ -30,7 +33,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese'
             onFavorite={onFavorite}
             onUnfavorite={onUnfavorite}
             searchCompleted={message.searchCompleted}
-            searchCompleteMeta={message.searchCompleteMeta}
           />
         )}
       </div>

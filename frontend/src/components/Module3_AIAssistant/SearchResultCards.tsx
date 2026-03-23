@@ -11,11 +11,6 @@ interface SearchResultCardsProps {
   onFavorite?: (repo: RepoResponse) => void
   onUnfavorite?: (repoId: string) => void
   searchCompleted?: boolean
-  searchCompleteMeta?: {
-    totalRepos: number
-    targetCount: number
-    rounds: number
-  }
 }
 
 type SortMode = 'time' | 'match' | 'skill' | 'activity' | 'demand'
@@ -27,8 +22,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
   pageSize = 3,
   onFavorite,
   onUnfavorite,
-  searchCompleted = false,
-  searchCompleteMeta
+  searchCompleted = false
 }) => {
   const [page, setPage] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('time')
@@ -91,13 +85,6 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
 
   return (
     <div className="mt-2 w-full">
-      {searchCompleted && (
-        <div className="mb-2 text-[11px] text-text/60">
-          {language === 'chinese'
-            ? `搜索完成：共 ${searchCompleteMeta?.totalRepos ?? repos.length} 个仓库，目标 ${searchCompleteMeta?.targetCount ?? repos.length}，轮次 ${searchCompleteMeta?.rounds ?? '-'}。`
-            : `Search complete: ${searchCompleteMeta?.totalRepos ?? repos.length} repos, target ${searchCompleteMeta?.targetCount ?? repos.length}, rounds ${searchCompleteMeta?.rounds ?? '-'}.`}
-        </div>
-      )}
       {searchCompleted && repos.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           <button onClick={() => setSortMode('match')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'match' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>

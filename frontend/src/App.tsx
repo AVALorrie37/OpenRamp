@@ -25,7 +25,7 @@ const keywordsFingerprint = (kws: string[] | undefined): string =>
 
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchScore, toggleFavorite } = useRepos(username, sessionReady)
+  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchData, toggleFavorite } = useRepos(username, sessionReady)
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -258,7 +258,11 @@ const App: React.FC = () => {
           dynamic_weights: match.dynamic_weights
         })
         if (typeof match.match_score === 'number') {
-          updateRepoMatchScore(repo.repo_id, match.match_score)
+          updateRepoMatchData(repo.repo_id, {
+            match_score: match.match_score,
+            breakdown: match.breakdown,
+            dynamic_weights: match.dynamic_weights
+          })
         }
       } catch (error) {
         console.error('Match error:', error)
@@ -317,7 +321,14 @@ const App: React.FC = () => {
       ])
       if (enriched && enriched.repos && enriched.repos.length > 0) {
         const e = enriched.repos[0]
-        addRepo({ ...repo, ...e, description: repo.description || e.description })
+        addRepo({
+          ...e,
+          ...repo,
+          description: repo.description || e.description,
+          match_score: repo.match_score,
+          breakdown: repo.breakdown,
+          dynamic_weights: repo.dynamic_weights
+        })
       }
     } catch (error) {
       console.error('chat favorite enrich error:', error)
@@ -451,7 +462,11 @@ const App: React.FC = () => {
         try {
           const match = await matchAPI.calculate(username, repo.repo_id, weights)
           if (typeof match.match_score === 'number') {
-            updateRepoMatchScore(repo.repo_id, match.match_score)
+            updateRepoMatchData(repo.repo_id, {
+              match_score: match.match_score,
+              breakdown: match.breakdown,
+              dynamic_weights: match.dynamic_weights
+            })
           }
           setSelectedRepo((sel) => {
             if (sel?.repo_id !== repo.repo_id) return sel

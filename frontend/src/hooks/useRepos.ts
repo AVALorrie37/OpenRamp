@@ -13,6 +13,16 @@ function stripMatchFields(repo: RepoResponse): RepoResponse {
   return next
 }
 
+function hasCompleteMatchData(repo: RepoResponse): boolean {
+  const bd = repo.breakdown
+  return (
+    typeof repo.match_score === 'number' &&
+    typeof bd?.skill === 'number' &&
+    typeof bd?.activity === 'number' &&
+    typeof bd?.demand === 'number'
+  )
+}
+
 export const useRepos = (username: string | null, sessionReady = true) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
   const [reposMeta, setReposMeta] = useState<{ mode: string; source?: string }>({ mode: 'offline' })
@@ -65,6 +75,9 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     const weights = stored ?? DEFAULT_MATCH_WEIGHTS
     return Promise.all(
       list.map(async (repo) => {
+        if (hasCompleteMatchData(repo)) {
+          return repo
+        }
         const base = stripMatchFields(repo)
         try {
           const match = await matchAPI.calculate(uname, repo.repo_id, weights)
@@ -304,6 +317,39 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     })
   }, [username])
 
+  const updateRepoMatchData = useCallback((
+    repoId: string,
+    match: { match_score: number; breakdown?: RepoResponse['breakdown']; dynamic_weights?: RepoResponse['dynamic_weights'] }
+  ) => {
+    setRepos((prev) => {
+      const next = prev.map((r) =>
+        r.repo_id === repoId
+          ? {
+              ...r,
+              match_score: match.match_score,
+              breakdown: match.breakdown ?? r.breakdown,
+              dynamic_weights: match.dynamic_weights ?? r.dynamic_weights
+            }
+          : r
+      )
+      if (username) {
+        const userRepos = storage.getUserRepos(username) || []
+        const nextUserRepos = userRepos.map((r: any) =>
+          r.repo_id === repoId
+            ? {
+                ...r,
+                match_score: match.match_score,
+                breakdown: match.breakdown ?? r.breakdown,
+                dynamic_weights: match.dynamic_weights ?? r.dynamic_weights
+              }
+            : r
+        )
+        storage.saveUserRepos(username, nextUserRepos)
+      }
+      return next
+    })
+  }, [username])
+
   const addRepo = useCallback((repo: RepoResponse) => {
     setRepos((prev) => {
       if (prev.some((r) => r.repo_id === repo.repo_id)) {
@@ -372,6 +418,7 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     addRepo,
     deleteRepo,
     updateRepoMatchScore,
+    updateRepoMatchData,
     toggleFavorite
   }
 }
