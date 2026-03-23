@@ -3,7 +3,6 @@ import { AnimatePresence } from 'framer-motion'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
-import { useDebugLogs } from './hooks/useDebugLogs'
 import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
 import { storage, DEFAULT_MATCH_WEIGHTS } from './utils/storage'
 
@@ -16,7 +15,6 @@ import UserDropdown from './components/Module2_UserSystem/UserDropdown'
 import LoginModal from './components/Module2_UserSystem/LoginModal'
 import AIButton from './components/Module3_AIAssistant/AIButton'
 import AIChatWindow from './components/Module3_AIAssistant/AIChatWindow'
-import DebugLogWindow from './components/Module4_DebugWindow/DebugLogWindow'
 import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
@@ -31,7 +29,6 @@ const App: React.FC = () => {
   const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
-  const [showDebug, setShowDebug] = useState(false)
   const [showManualSearch, setShowManualSearch] = useState(false)
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
@@ -57,8 +54,6 @@ const App: React.FC = () => {
   }, [isLoggedIn, refreshRepos])
   const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
   const [activeKeywords, setActiveKeywords] = useState<string[]>([])
-  const { logs, clearLogs } = useDebugLogs(showDebug)
-
   const middleColumnRef = useRef<HTMLDivElement | null>(null)
   const dragStateRef = useRef<{ dragging: boolean; startY: number; startTopHeight: number; total: number } | null>(null)
   const [middleTopHeight, setMiddleTopHeight] = useState<number | null>(null)
@@ -525,15 +520,6 @@ const App: React.FC = () => {
             />
             {uiLanguage === 'english' ? 'Dark mode' : '深色模式'}
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-base text-text">
-            <input
-              type="checkbox"
-              checked={showDebug}
-              onChange={(e) => setShowDebug(e.target.checked)}
-              className="cursor-pointer"
-            />
-            {uiLanguage === 'english' ? 'View terminal' : '查看终端'}
-          </label>
           <UserDropdown
             username={username}
             profile={profile}
@@ -544,7 +530,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className={`flex flex-1 flex-col overflow-hidden ${showDebug ? 'pb-[300px]' : ''}`}>
+      <main className="flex flex-1 flex-col overflow-hidden">
         <div className="grid flex-1 grid-cols-1 gap-5 overflow-hidden p-5 md:grid-cols-2 xl:grid-cols-3">
           <div className="flex flex-col overflow-hidden rounded-md border border-border bg-surface">
             <RepoList
@@ -681,12 +667,6 @@ const App: React.FC = () => {
         username={username}
         onFavorite={handleChatFavorite}
         onUnfavorite={handleChatUnfavorite}
-      />
-
-      <DebugLogWindow
-        isOpen={showDebug}
-        logs={logs}
-        onClear={clearLogs}
       />
 
       <ManualSearchModal

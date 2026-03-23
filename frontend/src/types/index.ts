@@ -73,9 +73,3 @@ export interface ChatResponse {
   error?: string
   auto_search?: boolean
 }
-
-export interface LogEntry {
-  level: 'INFO' | 'WARNING' | 'ERROR'
-  message: string
-  timestamp: number
-}

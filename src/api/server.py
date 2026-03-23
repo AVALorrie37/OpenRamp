@@ -11,7 +11,6 @@ import time
 import queue
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Dict, Any, Tuple
-from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -69,23 +68,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-_log_buffer = deque(maxlen=200)
-_log_lock = asyncio.Lock()
-
-class LogHandler(logging.Handler):
-    def emit(self, record):
-        log_entry = {
-            "level": record.levelname,
-            "message": self.format(record),
-            "timestamp": datetime.now().isoformat()
-        }
-        _log_buffer.append(log_entry)
-
-_log_handler = LogHandler()
-_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(_log_handler)
-logging.getLogger().addHandler(_log_handler)
 
 # 全局缓存
 _offline_cache: Optional[List[dict]] = None
@@ -1492,22 +1474,6 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
     except Exception as e:
         logger.error(f"BULK_ENRICH_UNEXPECTED_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="BULK_ENRICH_UNEXPECTED_ERROR: Internal server error")
-
-
-@app.get("/api/logs/stream")
-async def stream_logs():
-    async def generate():
-        last_index = len(_log_buffer)
-        while True:
-            await asyncio.sleep(0.5)
-            current_logs = list(_log_buffer)
-            if len(current_logs) > last_index:
-                new_logs = current_logs[last_index:]
-                for log_entry in new_logs:
-                    yield f"data: {json.dumps(log_entry)}\n\n"
-                last_index = len(current_logs)
-    
-    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
