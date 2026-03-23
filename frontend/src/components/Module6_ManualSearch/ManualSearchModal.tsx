@@ -29,7 +29,7 @@ interface ManualSearchModalProps {
 }
 
 const DEFAULT_HOT_KEYWORDS = ['good-first-issue', 'beginner-friendly', 'python', 'javascript', 'typescript']
-type SortKey = 'best' | 'stars' | 'updated'
+type SortKey = 'best' | 'gh_stars' | 'gh_updated' | 'skill' | 'activity' | 'demand'
 const backfillLocks = new Set<string>()
 type ResultSource = 'keyword' | 'multi_round'
 
@@ -325,23 +325,59 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
     onClose(favorited)
   }
 
+  const hasCompleteMatch = (repo: ManualSearchRepo) => (
+    typeof repo.match_score === 'number' &&
+    typeof repo.breakdown?.skill === 'number' &&
+    typeof repo.breakdown?.activity === 'number' &&
+    typeof repo.breakdown?.demand === 'number'
+  )
+
+  const sortableMatchCount = useMemo(
+    () => results.filter((r) => hasCompleteMatch(r)).length,
+    [results]
+  )
+  const canSortByTags = sortableMatchCount >= 2
+
   const sortedResults = useMemo(() => {
-    if (sortKey === 'stars') {
+    if (sortKey === 'gh_stars') {
       return [...results].sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
     }
-    if (sortKey === 'updated') {
+    if (sortKey === 'gh_updated') {
       return [...results].sort((a, b) => {
         const ta = a.updated_at ? Date.parse(a.updated_at) : 0
         const tb = b.updated_at ? Date.parse(b.updated_at) : 0
         return tb - ta
       })
     }
-    return results
-  }, [results, sortKey])
+    if (sortKey === 'best') {
+      if (resultSource === 'keyword') return results
+      if (!canSortByTags) return results
+      return [...results].sort((a, b) => {
+        const av = hasCompleteMatch(a) ? (a.match_score ?? -1) : -1
+        const bv = hasCompleteMatch(b) ? (b.match_score ?? -1) : -1
+        if (bv !== av) return bv - av
+        return (b.stargazers_count || 0) - (a.stargazers_count || 0)
+      })
+    }
+    if (!canSortByTags) return results
+    const scoreOf = (r: ManualSearchRepo) => {
+      if (!hasCompleteMatch(r)) return -1
+      if (sortKey === 'skill') return r.breakdown?.skill ?? -1
+      if (sortKey === 'activity') return r.breakdown?.activity ?? -1
+      return r.breakdown?.demand ?? -1
+    }
+    return [...results].sort((a, b) => {
+      const va = scoreOf(a)
+      const vb = scoreOf(b)
+      if (vb !== va) return vb - va
+      return (b.stargazers_count || 0) - (a.stargazers_count || 0)
+    })
+  }, [results, sortKey, canSortByTags, resultSource])
 
   const totalPages = totalCount > 0 ? Math.min(Math.ceil(totalCount / perPage), 50) : (results.length > 0 ? page : 0)
   const canPrev = page > 1
   const canNext = totalPages > 0 && page < totalPages
+  const hasSearchResults = results.length > 0
 
   const handlePrevPage = () => {
     if (canPrev) {
@@ -400,7 +436,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                   setAutoLoading(true)
                   setError(null)
                   try {
-                    const data: any = await manualSearchAPI.autoMultiRoundSearch(keywords, perPage)
+                    const data: any = await manualSearchAPI.autoMultiRoundSearch(keywords, perPage, username || undefined)
                     const repos: ManualSearchRepo[] = ((data as any).repos || []).map((item: any) => ({
                       repo_id: item.repo_id || item.full_name,
                       full_name: item.full_name || item.repo_id,
@@ -413,7 +449,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                         avatar_url: item.owner?.avatar_url
                       },
                       match_score: item.match_score,
-                      breakdown: item.breakdown
+                      breakdown: item.breakdown || item.match_breakdown
                     }))
                     setResultSource('multi_round')
                     setResults(repos.map(applyCachedMatch))
@@ -441,7 +477,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                     key={k}
                     onClick={() => handleKeywordClick(k)}
                     className={`rounded-full border px-2.5 py-1 text-xs ${
-                      active ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                      active ? 'border-primary bg-primary text-white' : 'border-[#9AA6A0] bg-[#EEF2EF]/40 text-text'
                     }`}
                   >
                     {k}
@@ -479,28 +515,88 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
             <div className="flex items-center gap-2">
               <span className="text-xs text-text/80">排序:</span>
               <button
-                onClick={() => setSortKey('best')}
+                onClick={() => hasSearchResults && setSortKey('best')}
+                disabled={!hasSearchResults}
+                title={!hasSearchResults ? '搜索后解锁排序' : undefined}
                 className={`rounded-full border px-2 py-1 text-xs ${
-                  sortKey === 'best' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                  !hasSearchResults
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'best'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-primary/40 bg-primaryLight/60 text-text'
                 }`}
               >
                 综合
               </button>
               <button
-                onClick={() => setSortKey('stars')}
+                onClick={() => hasSearchResults && setSortKey('gh_stars')}
+                disabled={!hasSearchResults}
+                title={!hasSearchResults ? '搜索后解锁排序' : undefined}
                 className={`rounded-full border px-2 py-1 text-xs ${
-                  sortKey === 'stars' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                  !hasSearchResults
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'gh_stars'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-primary/40 bg-primaryLight/60 text-text'
                 }`}
               >
                 按Star
               </button>
               <button
-                onClick={() => setSortKey('updated')}
+                onClick={() => hasSearchResults && setSortKey('gh_updated')}
+                disabled={!hasSearchResults}
+                title={!hasSearchResults ? '搜索后解锁排序' : undefined}
                 className={`rounded-full border px-2 py-1 text-xs ${
-                  sortKey === 'updated' ? 'border-primary bg-primaryLight text-primary' : 'border-border bg-surface text-text'
+                  !hasSearchResults
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'gh_updated'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-primary/40 bg-primaryLight/60 text-text'
                 }`}
               >
                 按更新时间
+              </button>
+              <button
+                onClick={() => canSortByTags && setSortKey('skill')}
+                disabled={!canSortByTags}
+                title={!canSortByTags ? '多轮搜索后解锁排序' : undefined}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  !canSortByTags
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'skill'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-primary/40 bg-primaryLight/60 text-text'
+                }`}
+              >
+                技能
+              </button>
+              <button
+                onClick={() => canSortByTags && setSortKey('activity')}
+                disabled={!canSortByTags}
+                title={!canSortByTags ? '多轮搜索后解锁排序' : undefined}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  !canSortByTags
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'activity'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-primary/40 bg-primaryLight/60 text-text'
+                }`}
+              >
+                活跃
+              </button>
+              <button
+                onClick={() => canSortByTags && setSortKey('demand')}
+                disabled={!canSortByTags}
+                title={!canSortByTags ? '多轮搜索后解锁排序' : undefined}
+                className={`rounded-full border px-2 py-1 text-xs ${
+                  !canSortByTags
+                    ? 'cursor-not-allowed border-border bg-background text-text/50'
+                    : sortKey === 'demand'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-primary/40 bg-primaryLight/60 text-text'
+                }`}
+              >
+                需求
               </button>
             </div>
           </div>

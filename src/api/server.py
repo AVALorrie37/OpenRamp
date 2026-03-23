@@ -511,6 +511,7 @@ class SearchRequest(BaseModel):
 class KeywordSearchRequest(BaseModel):
     keywords: List[str]
     limit: Optional[int] = 10
+    user_id: Optional[str] = None
 
 
 class SearchCancelRequest(BaseModel):
@@ -1140,12 +1141,55 @@ async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
             max_iterations=10,
             github_batch_size=15,
         )
+        scorer = None
+        user_profile_obj = None
+        if request.user_id:
+            try:
+                handler, _ = get_conversation_handler(request.user_id)
+                profile = handler.get_current_profile()
+                if profile.get("skills") or profile.get("contribution_styles"):
+                    scorer = get_match_scorer()
+                    user_profile_obj = UserProfile.from_dict(
+                        {
+                            "skills": profile.get("skills", []),
+                            "contribution_style": profile.get("contribution_styles", [None])[0],
+                            "experience_level": _get_experience_level(profile),
+                        }
+                    )
+            except Exception:
+                scorer = None
+                user_profile_obj = None
         repos = []
         for r in result.repositories:
             parts = r.repo_id.split("/", 1)
             owner = parts[0] if len(parts) == 2 else ""
             name = parts[1] if len(parts) == 2 else r.repo_id
             html_url = f"https://github.com/{r.repo_id}"
+            match_score = r.match_score
+            breakdown = r.match_breakdown
+            dynamic_weights = None
+            if scorer is not None and user_profile_obj is not None:
+                try:
+                    repo_keywords = r.github_keywords or r.languages or []
+                    if not repo_keywords:
+                        repo_keywords = (r.description or "").split()
+                    repo_data = RepoData(
+                        keywords=repo_keywords,
+                        active_days_last_30=30,
+                        issues_new_last_30=int((r.demand_score or 0.0) * 50),
+                        openrank=(r.influence_score or 0.0) * 50,
+                        name=name,
+                        full_name=r.repo_id,
+                        precomputed_activity_score=r.active_score,
+                        precomputed_demand_score=r.demand_score,
+                        data_source="opendigger+github" if r.opendigger_metrics else "github_only",
+                    )
+                    match_result = scorer.calculate(user_profile_obj, repo_data)
+                    match_score = match_result.match_score
+                    breakdown = match_result.breakdown.to_dict()
+                    dynamic_weights = match_result.dynamic_weights.to_dict() if match_result.dynamic_weights else None
+                except Exception:
+                    pass
             repos.append({
                 "repo_id": r.repo_id,
                 "name": name,
@@ -1156,8 +1200,9 @@ async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
                 "influence_score": r.influence_score,
                 "demand_score": r.demand_score,
                 "composite_score": r.composite_score,
-                "match_score": r.match_score,
-                "match_breakdown": r.match_breakdown,
+                "match_score": match_score,
+                "breakdown": breakdown,
+                "dynamic_weights": dynamic_weights,
                 "source": "online_keywords",
                 "html_url": html_url,
                 "stargazers_count": getattr(r.metadata, "stars", 0),

@@ -59,8 +59,8 @@ export const manualSearchAPI = {
   bulkEnrich: async (repos: { repo_id: string; full_name: string }[]) => {
     return unwrap(api.post<ReposResponse>('/api/repos/bulk_enrich', { repos }))
   },
-  autoMultiRoundSearch: async (keywords: string[], limit: number = 20) => {
-    return unwrap(api.post('/api/search/keywords', { keywords, limit }))
+  autoMultiRoundSearch: async (keywords: string[], limit: number = 20, user_id?: string) => {
+    return unwrap(api.post('/api/search/keywords', { keywords, limit, user_id }))
   }
 }
 
