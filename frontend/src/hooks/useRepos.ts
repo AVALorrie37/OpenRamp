@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { reposAPI, matchAPI } from '../services/api'
 import { storage, DEFAULT_MATCH_WEIGHTS } from '../utils/storage'
 import type { RepoResponse } from '../types'
@@ -20,6 +20,7 @@ export const useRepos = (username: string | null, sessionReady = true) => {
   const [error, setError] = useState<string | null>(null)
   const usernameRef = useRef<string | null>(username)
   const requestIdRef = useRef(0)
+  usernameRef.current = username
 
   const beginRequest = useCallback(() => {
     requestIdRef.current += 1
@@ -213,12 +214,11 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     return undefined
   }, [username, loadPreset, mergeWithFavorites, applyMatchScores])
 
-  useEffect(() => {
-    usernameRef.current = username
+  useLayoutEffect(() => {
     requestIdRef.current += 1
   }, [username])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!sessionReady) return
     if (username !== null) return
     const preset = storage.getPresetRepos()
@@ -230,6 +230,7 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       setReposMeta({ mode: 'offline' })
     }
     setError(null)
+    setLoading(false)
   }, [username, sessionReady])
 
   useEffect(() => {
