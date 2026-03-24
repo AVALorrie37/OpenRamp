@@ -27,6 +27,28 @@ function searchStageToText(stage: string, data: Record<string, unknown>, lang: s
   }
 }
 
+function humanizePreference(preference: string, language: 'chinese' | 'english'): string {
+  const map = language === 'english'
+    ? {
+      bug_fix: 'Fixing code errors and defects',
+      feature: 'Developing new features',
+      docs: 'Improving project docs',
+      community: 'Answering questions and helping others',
+      review: 'Reviewing code quality',
+      test: 'Writing test cases'
+    }
+    : {
+      bug_fix: '修复代码错误和缺陷',
+      feature: '开发新功能和特性',
+      docs: '完善项目文档和说明',
+      community: '回答问题和帮助他人',
+      review: '审查代码质量',
+      test: '编写测试用例'
+    }
+  const key = String(preference || '').trim() as keyof typeof map
+  return map[key] || preference
+}
+
 export const useAIChat = (user_id: string | null, profile: UserProfile | null = null, isProfileModified?: () => boolean, resetProfileModified?: () => void, onSearchComplete?: (repos: any[]) => void) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -328,6 +350,42 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     }
   }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch])
 
+  const triggerLocalQueryIntent = useCallback(() => {
+    if (!user_id) return
+
+    const language = profile?.language || 'chinese'
+    const mockUserInput = language === 'english'
+      ? 'What are my current skills and preferences?'
+      : '我当前的技能和偏好是什么？'
+
+    const skills = profile?.skills || []
+    const preferences = profile?.preferences || []
+    const emptySkills = language === 'english' ? 'Not provided yet' : '暂未填写'
+    const emptyPreferences = language === 'english' ? 'Not provided yet' : '暂未填写'
+    const skillsText = skills.length > 0 ? skills.join(language === 'english' ? ', ' : '、') : emptySkills
+    const preferencesText = preferences.length > 0
+      ? preferences.map((p) => humanizePreference(p, language)).join(language === 'english' ? '; ' : '；')
+      : emptyPreferences
+
+    const assistantReply = language === 'english'
+      ? `Based on our conversation, your current profile:\nSkills: ${skillsText}\nContribution preferences: ${preferencesText}`
+      : `根据我们的对话，你目前的画像如下：\n技能：${skillsText}\n贡献偏好：${preferencesText}`
+
+    const now = Date.now()
+    const userMessage: ChatMessage = { role: 'user', content: mockUserInput, timestamp: now }
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: assistantReply,
+      timestamp: now + 1,
+      action: 'REPLY'
+    }
+    setMessages(prev => {
+      const updated = [...prev, userMessage, assistantMessage]
+      storage.saveChatMessages(user_id, updated)
+      return updated
+    })
+  }, [user_id, profile])
+
   const cancelSearch = useCallback(() => {
     const currentSearchId = searchIdRef.current
     if (searchAbortControllerRef.current) {
@@ -365,6 +423,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     searchProgressSeconds,
     searchStage,
     sendMessage,
+    triggerLocalQueryIntent,
     clearMessages,
     cancelSearch
   }

@@ -139,7 +139,16 @@ const App: React.FC = () => {
       setToast(uiLanguage === 'english' ? 'Search completed, check the home page' : '搜索完成，请查看主页')
     }
   }, [username, fetchRepos, uiLanguage])
-  const { messages, loading: chatLoading, loadingStage, searchProgressSeconds, searchStage, sendMessage, cancelSearch } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
+  const {
+    messages,
+    loading: chatLoading,
+    loadingStage,
+    searchProgressSeconds,
+    searchStage,
+    sendMessage,
+    triggerLocalQueryIntent,
+    cancelSearch
+  } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   const handleLogin = (user: string, language: 'chinese' | 'english') => {
     setSelectedRepo(null)
@@ -707,6 +716,7 @@ const App: React.FC = () => {
         searchProgressSeconds={searchProgressSeconds}
         searchStage={searchStage}
         onSendMessage={handleSendMessage}
+        onQueryCurrentProfile={triggerLocalQueryIntent}
         onCancelSearch={cancelSearch}
         language={profile?.language || 'chinese'}
         username={username}

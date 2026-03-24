@@ -15,6 +15,7 @@ interface AIChatWindowProps {
   searchProgressSeconds?: number | null
   searchStage?: string | null
   onSendMessage: (message: string) => Promise<any>
+  onQueryCurrentProfile?: () => void
   onCancelSearch?: () => void
   language?: 'chinese' | 'english'
   username?: string | null
@@ -46,6 +47,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   searchProgressSeconds = null,
   searchStage = null,
   onSendMessage,
+  onQueryCurrentProfile,
   onCancelSearch,
   language = 'chinese',
   username = null,
@@ -76,6 +78,24 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   }
 
   const handleSuggestion = async (suggestion: string) => {
+    if (suggestion === '当前技能' || suggestion === 'Current skills') {
+      onQueryCurrentProfile?.()
+      setInput('')
+      return
+    }
+    if (suggestion === '更新个人信息' || suggestion === 'Update my profile') {
+      const prefix = language === 'english'
+        ? 'I want to add more info about me: '
+        : '我想补充我的信息：'
+      setInput(prefix)
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          inputRef.current.setSelectionRange(prefix.length, prefix.length)
+        }
+      }, 0)
+      return
+    }
     setInput(suggestion)
     await onSendMessage(suggestion)
   }

@@ -213,11 +213,16 @@ class ConversationHandler:
                 user_input, user_language, stage, include_profile_context=False
             )
 
-        stage("intent_recognizing", {})
-        intent = self._recognize_intent(user_input)
+        force_profile_update = '补充' in user_input
+        if force_profile_update:
+            intent = 'update_profile'
+            stage("intent_done", {"intent": intent, "next": "generating_reply"})
+        else:
+            stage("intent_recognizing", {})
+            intent = self._recognize_intent(user_input)
         user_action = self._detect_user_action(user_input)
 
-        if intent == 'query_status' or self._is_query_intent(user_input, user_language):
+        if (not force_profile_update) and (intent == 'query_status' or self._is_query_intent(user_input, user_language)):
             stage("intent_done", {"intent": intent, "next": "query_status"})
             result = self._handle_query_intent(user_language)
             result.setdefault('data', {}).update({'intent': 'query_status'})
@@ -565,9 +570,9 @@ class ConversationHandler:
 
     def _is_query_intent(self, user_input: str, language: str) -> bool:
         query_patterns = [
-            r'我的技能|我的信息|显示.*技能|查看.*偏好|我有什么|告诉我|列出.*技能|列出.*偏好',
+            r'我的技能|显示.*技能|查看.*偏好|我有什么|告诉我|列出.*技能|列出.*偏好',
             r'技能.*什么|偏好.*什么|信息.*什么|现在的技能|当前的技能|我的偏好|我的贡献偏好',
-            r'my skills|my profile|show me|what are my|tell me|list my',
+            r'my skills|show me|what are my|tell me|list my',
             r'what.*skills|what.*preferences|what.*profile|current skills|my preferences|my contribution'
         ]
         lower_input = user_input.lower()

@@ -8,20 +8,21 @@ interface SuggestionButtonsProps {
 const SuggestionButtons: React.FC<SuggestionButtonsProps> = ({ onSuggestionClick, language = 'chinese' }) => {
   const suggestions = language === 'english'
     ? [
-      'Confirm skills',
+      'Current skills',
       'Search matching projects',
-      'Update contribution preferences'
+      'Update my profile'
     ]
     : [
-      '确认技能',
+      '当前技能',
       '搜索匹配项目',
-      '更新贡献偏好'
+      '更新个人信息'
     ]
 
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {suggestions.map((suggestion) => (
         <button
+          type="button"
           key={suggestion}
           onClick={() => onSuggestionClick(suggestion)}
           className="cursor-pointer rounded-full border border-border bg-background px-3 py-1.5 text-xs text-text transition hover:border-primary hover:bg-primaryLight"
