@@ -91,16 +91,16 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
     <div className="mt-2 w-full">
       {searchCompleted && repos.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
-          <button onClick={() => setSortMode('match')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'match' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+          <button data-selection-excluded onClick={() => setSortMode('match')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'match' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
             {language === 'chinese' ? '综合（匹配总分）' : 'Overall (Match)'}
           </button>
-          <button onClick={() => setSortMode('skill')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'skill' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+          <button data-selection-excluded onClick={() => setSortMode('skill')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'skill' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
             {language === 'chinese' ? '技能' : 'Skill'}
           </button>
-          <button onClick={() => setSortMode('activity')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'activity' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+          <button data-selection-excluded onClick={() => setSortMode('activity')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'activity' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
             {language === 'chinese' ? '活跃' : 'Activity'}
           </button>
-          <button onClick={() => setSortMode('demand')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'demand' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
+          <button data-selection-excluded onClick={() => setSortMode('demand')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'demand' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
             {language === 'chinese' ? '需求' : 'Demand'}
           </button>
         </div>
@@ -111,6 +111,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
           <div key={repo.repo_id} className="mb-2 rounded-md border border-border bg-surface px-3 py-2.5 transition hover:shadow-panel">
             <div className="mb-1 flex items-center justify-between gap-2">
               <a
+                data-selection-excluded
                 href={repoUrl(repo)}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -120,6 +121,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
                 {repo.name}
               </a>
               <button
+                data-selection-excluded
                 onClick={() => toggleFavorite(repo)}
                 className={`flex-shrink-0 bg-transparent px-1 text-lg ${username ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
                 title={language === 'chinese' ? (isFav ? '取消收藏' : '收藏') : (isFav ? 'Unfavorite' : 'Favorite')}
@@ -153,7 +155,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
               )}
             </div>
             {repo.description && (
-              <div className="line-clamp-2 text-xs leading-5 text-text/75">
+              <div data-chat-selectable className="line-clamp-2 text-xs leading-5 text-text/75">
                 {repo.description}
               </div>
             )}
@@ -163,6 +165,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
       {totalPages > 1 && (
         <div className="mt-1 flex items-center justify-center gap-2">
           <button
+            data-selection-excluded
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
             className={`inline-flex items-center justify-center bg-transparent px-1.5 py-0.5 ${page === 0 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}
@@ -174,6 +177,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
             {page + 1} / {totalPages}
           </span>
           <button
+            data-selection-excluded
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
             className={`inline-flex items-center justify-center bg-transparent px-1.5 py-0.5 ${page >= totalPages - 1 ? 'cursor-not-allowed text-border' : 'cursor-pointer text-primary'}`}

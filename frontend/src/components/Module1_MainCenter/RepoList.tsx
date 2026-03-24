@@ -164,7 +164,7 @@ const RepoList: React.FC<RepoListProps> = ({
         createPortal(
           <button
             type="button"
-            className="pointer-events-auto rounded-md border border-primary bg-surface px-2 py-1 text-xs font-medium text-primary shadow-md transition hover:bg-primary/10"
+            className="pointer-events-auto rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-white shadow-md transition hover:bg-primaryDark"
             style={{
               position: 'fixed',
               top: Math.max(8, askAiBubble.top - 30),

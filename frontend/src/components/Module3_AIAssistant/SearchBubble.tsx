@@ -22,11 +22,12 @@ const SearchBubble: React.FC<SearchBubbleProps> = ({ onCancel, language = 'chine
         <span className="inline-flex text-primary" aria-hidden="true">
           <Search size={16} />
         </span>
-        <span className="flex-1">
+        <span className="flex-1" data-chat-selectable>
           {progressText}
         </span>
         <button
           onClick={onCancel}
+          data-selection-excluded
           className="inline-flex items-center justify-center px-1 text-text/70 transition hover:text-text"
           title={language === 'chinese' ? '终止搜索' : 'Cancel search'}
           aria-label={language === 'chinese' ? '终止搜索' : 'Cancel search'}

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Send, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ChatMessage from './ChatMessage'
@@ -17,6 +18,7 @@ interface AIChatWindowProps {
   onSendMessage: (message: string) => Promise<any>
   onQueryCurrentProfile?: () => void
   onCancelSearch?: () => void
+  onAskAIAboutText?: (text: string) => void
   language?: 'chinese' | 'english'
   username?: string | null
   onFavorite?: (repo: any) => void
@@ -49,20 +51,82 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   onSendMessage,
   onQueryCurrentProfile,
   onCancelSearch,
+  onAskAIAboutText,
   language = 'chinese',
   username = null,
   onFavorite,
   onUnfavorite
 }) => {
   const [input, setInput] = useState('')
+  const [askAiBubble, setAskAiBubble] = useState<{ text: string; top: number; left: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const syncSelectionBubble = useCallback(() => {
+    if (!isOpen || !onAskAIAboutText) {
+      setAskAiBubble(null)
+      return
+    }
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      setAskAiBubble(null)
+      return
+    }
+    const text = sel.toString().trim()
+    if (text.length < 2) {
+      setAskAiBubble(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    const fromNode = (node: Node | null): Element | null => {
+      const el =
+        node?.nodeType === Node.TEXT_NODE ? (node as Text).parentElement : (node as Element | null)
+      if (!el) return null
+      if (el.closest('[data-selection-excluded],button,a,input,textarea,select,[role="button"]')) return null
+      return el.closest('[data-chat-selectable]') ?? null
+    }
+    const a = fromNode(sel.anchorNode)
+    const f = fromNode(sel.focusNode)
+    if (!a || a !== f || !a.contains(range.commonAncestorContainer)) {
+      setAskAiBubble(null)
+      return
+    }
+    const rect = range.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      setAskAiBubble(null)
+      return
+    }
+    setAskAiBubble({ text, top: rect.top, left: rect.right })
+  }, [isOpen, onAskAIAboutText])
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen || !onAskAIAboutText) return
+    let t: number
+    const onSel = () => {
+      window.clearTimeout(t)
+      t = window.setTimeout(syncSelectionBubble, 20)
+    }
+    document.addEventListener('selectionchange', onSel)
+    document.addEventListener('mouseup', onSel)
+    return () => {
+      window.clearTimeout(t)
+      document.removeEventListener('selectionchange', onSel)
+      document.removeEventListener('mouseup', onSel)
+    }
+  }, [isOpen, onAskAIAboutText, syncSelectionBubble])
+
+  useEffect(() => {
+    if (!isOpen || !onAskAIAboutText) return
+    const onScroll = () => setAskAiBubble(null)
+    window.addEventListener('scroll', onScroll, true)
+    return () => window.removeEventListener('scroll', onScroll, true)
+  }, [isOpen, onAskAIAboutText])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -104,6 +168,32 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
     <AnimatePresence>
       {isOpen && (
         <>
+          {askAiBubble &&
+            onAskAIAboutText &&
+            createPortal(
+              <button
+                type="button"
+                className="pointer-events-auto rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-white shadow-md transition hover:bg-primaryDark"
+                style={{
+                  position: 'fixed',
+                  top: Math.max(8, askAiBubble.top - 30),
+                  left: askAiBubble.left + 4,
+                  zIndex: 1002
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const t = askAiBubble.text
+                  setAskAiBubble(null)
+                  window.getSelection()?.removeAllRanges()
+                  onAskAIAboutText(t)
+                }}
+              >
+                {language === 'english' ? 'Ask AI?' : '问问AI？'}
+              </button>,
+              document.body
+            )}
           <motion.div
             className="fixed inset-0 z-[1000] bg-black/30"
             onClick={onClose}
@@ -161,7 +251,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 <div className="flex justify-start">
                   <div className="flex items-center gap-2 rounded-lg bg-primaryLight px-4 py-3">
                     <LoadingSpinner />
-                    <span className="text-xs text-text/70">
+                    <span className="text-xs text-text/70" data-chat-selectable>
                       {stageLabel(loadingStage, language)}
                     </span>
                   </div>

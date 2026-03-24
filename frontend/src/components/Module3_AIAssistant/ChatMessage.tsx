@@ -24,7 +24,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese'
           hasResults ? 'max-w-[85%]' : 'max-w-[70%]'
         } ${isUser ? 'bg-primary text-white' : 'bg-primaryLight text-text'}`}
       >
-        {message.content}
+        <div data-chat-selectable>
+          {message.content}
+        </div>
         {hasResults && (
           <SearchResultCards
             repos={message.searchResults!}

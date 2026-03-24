@@ -718,6 +718,7 @@ const App: React.FC = () => {
         onSendMessage={handleSendMessage}
         onQueryCurrentProfile={triggerLocalQueryIntent}
         onCancelSearch={cancelSearch}
+        onAskAIAboutText={handleAskAIAboutSelection}
         language={profile?.language || 'chinese'}
         username={username}
         onFavorite={handleChatFavorite}
