@@ -14,7 +14,7 @@ OpenRamp 通过 **AI 对话画像 + 多维度数据评分**，帮你在茫茫仓
 - **智能匹配算法**：综合技能匹配度、项目活跃度、社区需求热度，给出直观的匹配分  
 - **数据驱动**：基于 GitHub API + OpenDigger 指标，结合本地缓存数据  
 - **可视化体验**：包含仓库列表、时间序列趋势、词云、匹配度雷达图等多种可视化  
-- **桌面级体验**：React + Electron 打包，支持桌面应用形态
+- **Web 体验**：React + Vite，浏览器中即可使用
 
 ## 你可以做什么？
 
@@ -62,7 +62,7 @@ uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 
 后端默认运行在：`http://localhost:8000`
 
-### 3. 启动前端（Web / Electron）
+### 3. 启动前端（Web）
 
 ```bash
 cd frontend
@@ -71,10 +71,7 @@ npm install
 # Web 开发模式
 npm run dev
 
-# Electron 桌面开发（优化中）
-npm run electron:dev
-
-# 构建前端产物（优化中）
+# 构建前端产物
 npm run build
 ```
 
@@ -84,7 +81,7 @@ npm run build
 
 ## 技术栈一览
 
-- **前端**：React 18、Vite、TypeScript、Chart.js / Recharts、Electron  
+- **前端**：React 18、Vite、TypeScript、Chart.js / Recharts  
 - **后端**：FastAPI、Pydantic、httpx  
 - **AI 层**：自研 `OllamaProvider` 封装（对话、多 Agent 提示词体系）  
 - **数据层**：OpenDigger 指标离线/在线加载、GitHub 元数据缓存与补全  
