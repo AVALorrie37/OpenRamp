@@ -3,38 +3,40 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #84a98c;
-  --color-primaryDark: #6b8576;
-  --color-primaryLight: #c5d4c8;
-  --color-accent: #7a9e85;
-  --color-background: #f0f2f5;
-  --color-text: #222222;
+  --color-primary: #829c83;
+  --color-primaryDark: #5f7162;
+  --color-primaryLight: #b5c4b6;
+  --color-accent: #707a6f;
+  --color-tertiary: #b58a93;
+  --color-background: #f8f9f8;
+  --color-text: #1c1f1e;
   --color-error: #c97d60;
   --color-warning: #d4a574;
-  --color-border: #e0e0e0;
-  --color-hover: #769880;
+  --color-border: #dfe2df;
+  --color-hover: #6f8572;
   --color-surface: #ffffff;
-  --color-surface2: #f4f5f7;
-  --color-grid: rgba(224, 224, 224, 0.65);
+  --color-surface2: #eef0ee;
+  --color-grid: rgba(112, 122, 111, 0.28);
   --shadow-panel: rgba(0, 0, 0, 0.1);
   --shadow-modal: rgba(0, 0, 0, 0.2);
 }
 
 .dark {
-  --color-primary: #7FB069;
-  --color-primaryDark: #A8D5A3;
-  --color-primaryLight: rgba(127, 176, 105, 0.22);
-  --color-accent: #8FC075;
-  --color-background: #0B110D;
-  --color-text: #E6EFE7;
-  --color-error: #E38C72;
-  --color-warning: #E6C07A;
-  --color-border: rgba(230, 239, 231, 0.18);
-  --color-hover: rgba(127, 176, 105, 0.18);
-  --color-surface: #121B15;
-  --color-surface2: #18231B;
-  --color-grid: rgba(230, 239, 231, 0.28);
-  --shadow-panel: rgba(0, 0, 0, 0.35);
+  --color-primary: #829c83;
+  --color-primaryDark: #9eb0a0;
+  --color-primaryLight: rgba(130, 156, 131, 0.22);
+  --color-accent: #8fa3b0;
+  --color-tertiary: #4a635d;
+  --color-background: #0f141a;
+  --color-text: #e8eaed;
+  --color-error: #e5989b;
+  --color-warning: #e6c07a;
+  --color-border: rgba(232, 234, 237, 0.14);
+  --color-hover: rgba(130, 156, 131, 0.22);
+  --color-surface: #151d26;
+  --color-surface2: #1c2630;
+  --color-grid: rgba(232, 234, 237, 0.12);
+  --shadow-panel: rgba(0, 0, 0, 0.45);
   --shadow-modal: rgba(0, 0, 0, 0.55);
 }
 

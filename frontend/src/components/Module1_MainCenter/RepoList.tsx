@@ -9,6 +9,7 @@ interface RepoListProps {
   onToggleFavorite?: (repo: RepoResponse) => void
   onOpenManualSearch?: () => void
   highlightedRepoIds?: string[]
+  selectedRepoId?: string | null
   onBackgroundClick?: () => void
   canUseMatchSort?: boolean
   onDeleteRepo?: (repoId: string) => void
@@ -29,6 +30,7 @@ const RepoList: React.FC<RepoListProps> = ({
   onToggleFavorite,
   onOpenManualSearch,
   highlightedRepoIds,
+  selectedRepoId,
   onBackgroundClick,
   canUseMatchSort,
   onDeleteRepo,
@@ -237,10 +239,13 @@ const RepoList: React.FC<RepoListProps> = ({
         onClick={onBackgroundClick}
       >
         {sortedRepos.map((repo: RepoResponse) => {
-          const isHighlighted = highlightedRepoIds?.includes(repo.repo_id)
+          const isKeywordHighlight = !!highlightedRepoIds?.includes(repo.repo_id)
+          const isSelected = selectedRepoId != null && selectedRepoId === repo.repo_id
+          const isActiveCard = isSelected || isKeywordHighlight
           return (
           <div
             key={repo.repo_id}
+            data-selected={isSelected ? 'true' : undefined}
             onClickCapture={(e) => {
               if (deleteTargetId !== repo.repo_id || !onDeleteRepo) return
               const raw = e.target
@@ -257,8 +262,10 @@ const RepoList: React.FC<RepoListProps> = ({
               e.stopPropagation()
               setDeleteTargetId(repo.repo_id)
             }}
-            className={`mb-3 cursor-pointer rounded-md border-2 bg-surface p-4 transition hover:border-primary hover:shadow-panel ${
-              isHighlighted ? 'border-primary ring-2 ring-primaryLight/60' : 'border-border'
+            className={`mb-3 cursor-pointer rounded-md border-2 bg-surface p-4 transition hover:border-text/20 hover:bg-surface2/90 hover:shadow-sm ${
+              isActiveCard
+                ? 'border-text/25 bg-surface2 shadow-sm ring-2 ring-black/[0.07] dark:border-white/22 dark:bg-white/[0.06] dark:ring-white/[0.12]'
+                : 'border-border'
             }`}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -267,7 +274,7 @@ const RepoList: React.FC<RepoListProps> = ({
                   title={openRepoHintTitle}
                   role="link"
                   tabIndex={0}
-                  className="block max-w-full cursor-pointer truncate rounded-sm hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="block max-w-full cursor-pointer truncate rounded-sm hover:underline focus:outline-none"
                   onClick={(e) => {
                     if (!e.ctrlKey) return
                     e.stopPropagation()

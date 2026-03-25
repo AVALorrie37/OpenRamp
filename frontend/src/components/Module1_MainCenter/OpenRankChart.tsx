@@ -50,7 +50,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
       }
     })
 
-    const primary = cssVar('--color-primary') || '#84a98c'
+    const primary = cssVar('--color-primary') || '#829c83'
     return {
       labels,
       datasets: [
@@ -98,11 +98,11 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                   display: false
                 },
                 tooltip: {
-                  backgroundColor: cssVar('--color-background') || '#f0f2f5',
-                  borderColor: cssVar('--color-primary') || '#84a98c',
+                  backgroundColor: cssVar('--color-background') || '#f8f9f8',
+                  borderColor: cssVar('--color-primary') || '#829c83',
                   borderWidth: 1,
-                  titleColor: cssVar('--color-text') || '#222222',
-                  bodyColor: cssVar('--color-text') || '#222222',
+                  titleColor: cssVar('--color-text') || '#1c1f1e',
+                  bodyColor: cssVar('--color-text') || '#1c1f1e',
                   padding: 12
                 }
               },
@@ -112,7 +112,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                     color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
                   },
                   ticks: {
-                    color: cssVar('--color-text') || '#222222',
+                    color: cssVar('--color-text') || '#1c1f1e',
                     maxRotation: 45,
                     minRotation: 45,
                     font: { size: 10 }
@@ -124,7 +124,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                     color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
                   },
                   ticks: {
-                    color: cssVar('--color-text') || '#222222'
+                    color: cssVar('--color-text') || '#1c1f1e'
                   }
                 }
               }

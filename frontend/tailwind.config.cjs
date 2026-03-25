@@ -9,6 +9,7 @@ module.exports = {
         primaryDark: 'var(--color-primaryDark)',
         primaryLight: 'var(--color-primaryLight)',
         accent: 'var(--color-accent)',
+        tertiary: 'var(--color-tertiary)',
         background: 'var(--color-background)',
         text: 'var(--color-text)',
         error: 'var(--color-error)',

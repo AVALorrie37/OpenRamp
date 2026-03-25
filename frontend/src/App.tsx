@@ -591,6 +591,7 @@ const App: React.FC = () => {
               onToggleFavorite={(repo) => toggleFavorite(repo.repo_id)}
               onBackgroundClick={handleRepoBackgroundClick}
               highlightedRepoIds={highlightedRepoIds}
+              selectedRepoId={selectedRepo?.repo_id ?? null}
               canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
               openRepoHintTitle={
                 uiLanguage === 'english'

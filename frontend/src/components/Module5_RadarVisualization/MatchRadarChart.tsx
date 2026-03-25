@@ -50,8 +50,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   language = 'chinese'
 }) => {
   if (!matchData) return null
-  const primary = cssVar('--color-primary') || '#84a98c'
-  const text = cssVar('--color-text') || '#222222'
+  const primary = cssVar('--color-primary') || '#829c83'
+  const text = cssVar('--color-text') || '#1c1f1e'
   const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
 
   const defaultBase = {
@@ -166,10 +166,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
 
   const chartContent = (
     <div className={`flex h-full flex-col items-center ${embedded ? 'p-5' : 'p-10'}`}>
-      <h2 className="mb-5 mt-0 text-3xl font-semibold text-text">
+      <h2 className="mb-5 mt-0 text-2xl font-semibold text-text">
         {matchData.repoName}
       </h2>
-      <div className="mb-4 text-xl font-semibold text-primary">
+      <div className="mb-4 text-3xl font-semibold text-primary">
         {labels.overallMatch}: {Math.round(matchData.matchScore * 100)}%
       </div>
       <div className={`w-full ${embedded ? 'h-[200px]' : 'h-[300px]'}`} key={themeVersion}>
