@@ -1,14 +1,14 @@
 export const theme = {
-  primary: '#7FB069',
-  primaryDark: '#5A8A4A',
-  primaryLight: '#A8D5A3',
-  accent: '#4A7C59',
-  background: '#F5F7F6',
-  text: '#2C3E2D',
+  primary: '#84a98c',
+  primaryDark: '#6b8576',
+  primaryLight: '#c5d4c8',
+  accent: '#7a9e85',
+  background: '#f0f2f5',
+  text: '#222222',
   error: '#C97D60',
   warning: '#D4A574',
   white: '#FFFFFF',
   overlay: 'rgba(0,0,0,0.3)',
-  border: '#D1D9D3',
-  hover: '#8FC075'
+  border: '#e0e0e0',
+  hover: '#769880'
 }

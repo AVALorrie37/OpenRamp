@@ -131,9 +131,9 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
       )
     }
 
-    const primary = cssVar('--color-primary') || '#7FB069'
-    const text = cssVar('--color-text') || '#2C3E2D'
-    const bg = cssVar('--color-background') || '#F5F7F6'
+    const primary = cssVar('--color-primary') || '#84a98c'
+    const text = cssVar('--color-text') || '#222222'
+    const bg = cssVar('--color-background') || '#f0f2f5'
     const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
     const chartData = buildChartData(state.data, label, primary)
     if (!chartData.labels.length) {

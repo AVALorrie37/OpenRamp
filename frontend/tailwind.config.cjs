@@ -24,7 +24,7 @@ module.exports = {
         lg: '12px'
       },
       boxShadow: {
-        panel: '0 4px 12px var(--shadow-panel)',
+        panel: '0 4px 6px -1px var(--shadow-panel)',
         modal: '0 8px 32px var(--shadow-modal)'
       },
       fontSize: {

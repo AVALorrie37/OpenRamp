@@ -50,8 +50,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   language = 'chinese'
 }) => {
   if (!matchData) return null
-  const primary = cssVar('--color-primary') || '#7FB069'
-  const text = cssVar('--color-text') || '#2C3E2D'
+  const primary = cssVar('--color-primary') || '#84a98c'
+  const text = cssVar('--color-text') || '#222222'
   const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
 
   const defaultBase = {
