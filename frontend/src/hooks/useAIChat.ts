@@ -61,7 +61,47 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const searchStartTimeRef = useRef<number>(0)
   const searchIdRef = useRef<string | null>(null)
   const searchCompleteMetaRef = useRef<{ totalRepos: number; targetCount: number; rounds: number } | null>(null)
+  const aiHealthCacheRef = useRef<{ ts: number; ok: boolean; code?: string } | null>(null)
+  const [aiIssue, setAiIssue] = useState<{ code: string; message: string } | null>(null)
   const agentType = 'agent1'
+
+  const getAiUnavailableText = useCallback((code: string) => {
+    const lang = profile?.language || 'chinese'
+    if (lang === 'english') {
+      if (code === 'OLLAMA_NOT_RUNNING') return 'I cannot connect to Ollama yet. Please start Ollama, then click retry.'
+      if (code === 'OLLAMA_MODEL_MISSING') return 'Ollama is running but the configured model is missing. Please pull the model, then retry.'
+      if (code === 'OLLAMA_UNREACHABLE') return 'Ollama is temporarily unreachable. Please check local service status and retry.'
+      return 'AI service is temporarily unavailable. Please retry later.'
+    }
+    if (code === 'OLLAMA_NOT_RUNNING') return '暂时连不上 Ollama。请先启动 Ollama，然后点击重试。'
+    if (code === 'OLLAMA_MODEL_MISSING') return 'Ollama 已启动，但缺少配置模型。请先拉取模型后重试。'
+    if (code === 'OLLAMA_UNREACHABLE') return 'Ollama 当前不可达。请检查本地服务状态后重试。'
+    return 'AI 服务暂时不可用，请稍后重试。'
+  }, [profile?.language])
+
+  const checkAIHealth = useCallback(async (force = false) => {
+    const now = Date.now()
+    if (!force && aiHealthCacheRef.current && now - aiHealthCacheRef.current.ts < 60000) {
+      return aiHealthCacheRef.current.ok
+    }
+    try {
+      const health = await (chatAPI as any).health()
+      const ok = !!health?.ollama_available
+      aiHealthCacheRef.current = { ts: now, ok, code: health?.code }
+      if (!ok) {
+        const code = health?.code || 'AI_SERVICE_ERROR'
+        setAiIssue({ code, message: getAiUnavailableText(code) })
+      } else {
+        setAiIssue(null)
+      }
+      return ok
+    } catch (e: any) {
+      const code = e?.code || 'AI_SERVICE_ERROR'
+      aiHealthCacheRef.current = { ts: now, ok: false, code }
+      setAiIssue({ code, message: getAiUnavailableText(code) })
+      return false
+    }
+  }, [getAiUnavailableText])
 
   useEffect(() => {
     const initChat = async () => {
@@ -84,6 +124,19 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
 
       try {
         const lang = profile?.language || 'chinese'
+        const canUseAI = await checkAIHealth()
+        if (!canUseAI) {
+          const text = aiIssue?.message || getAiUnavailableText(aiHealthCacheRef.current?.code || 'AI_SERVICE_ERROR')
+          const warmupMessage: ChatMessage = {
+            role: 'assistant',
+            content: text,
+            timestamp: Date.now()
+          }
+          const messagesWithWarmup = [warmupMessage]
+          setMessages(messagesWithWarmup)
+          storage.saveChatMessages(user_id, messagesWithWarmup)
+          return
+        }
         const res = await (chatAPI as any).greeting(user_id, lang, savedSessionId, agentType)
         const welcomeMessage: ChatMessage = {
           role: 'assistant',
@@ -97,12 +150,13 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
           setSessionId(res.session_id)
           storage.saveSessionId(user_id, res.session_id)
         }
-      } catch {
+      } catch (e: any) {
+        const code = e?.code || 'AI_SERVICE_ERROR'
+        const friendly = getAiUnavailableText(code)
+        setAiIssue({ code, message: friendly })
         const fallbackMessage: ChatMessage = {
           role: 'assistant',
-          content: profile?.language === 'english'
-            ? 'Welcome to the open source contribution assistant! To help match suitable projects, please briefly introduce your tech stack, experience level, and open source interests.'
-            : '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
+          content: friendly,
           timestamp: Date.now()
         }
         const messagesWithWelcome = [fallbackMessage]
@@ -112,7 +166,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     }
 
     initChat()
-  }, [user_id, profile?.language])
+  }, [user_id, profile?.language, checkAIHealth, aiIssue?.message, getAiUnavailableText])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
     if (profile?.skills && profile.skills.length > 0) {
@@ -291,6 +345,21 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     setLoadingStage(opts?.skipIntent ? 'concept_explaining' : 'intent_recognizing')
 
     try {
+      const canUseAI = await checkAIHealth()
+      if (!canUseAI) {
+        const code = aiHealthCacheRef.current?.code || 'AI_SERVICE_ERROR'
+        const friendly: ChatMessage = {
+          role: 'assistant',
+          content: getAiUnavailableText(code),
+          timestamp: Date.now()
+        }
+        setMessages(prev => {
+          const updated = [...prev, friendly]
+          storage.saveChatMessages(user_id, updated)
+          return updated
+        })
+        return null
+      }
       const response = await chatAPI.send(
         user_id,
         content,
@@ -331,11 +400,13 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       }
 
       return response
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error)
+      const code = error?.code || 'AI_SERVICE_ERROR'
+      setAiIssue({ code, message: getAiUnavailableText(code) })
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: '抱歉，发生了错误。请稍后再试。',
+        content: getAiUnavailableText(code),
         timestamp: Date.now()
       }
       setMessages(prev => {
@@ -348,7 +419,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       setLoading(false)
       setLoadingStage(null)
     }
-  }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch])
+  }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch, checkAIHealth, getAiUnavailableText])
 
   const triggerLocalQueryIntent = useCallback(() => {
     if (!user_id) return
@@ -425,6 +496,8 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     sendMessage,
     triggerLocalQueryIntent,
     clearMessages,
-    cancelSearch
+    cancelSearch,
+    aiIssue,
+    checkAIHealth
   }
 }

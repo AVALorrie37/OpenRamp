@@ -19,6 +19,8 @@ interface AIChatWindowProps {
   onQueryCurrentProfile?: () => void
   onCancelSearch?: () => void
   onAskAIAboutText?: (text: string) => void
+  onRetryAIHealth?: () => void
+  aiIssueMessage?: string | null
   language?: 'chinese' | 'english'
   username?: string | null
   onFavorite?: (repo: any) => void
@@ -52,6 +54,8 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   onQueryCurrentProfile,
   onCancelSearch,
   onAskAIAboutText,
+  onRetryAIHealth,
+  aiIssueMessage = null,
   language = 'chinese',
   username = null,
   onFavorite,
@@ -223,6 +227,28 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto bg-background p-5">
+              {aiIssueMessage && (
+                <div className="mb-3 rounded-md border border-yellow-400/40 bg-yellow-300/15 px-3 py-2 text-sm text-text">
+                  <div>{aiIssueMessage}</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRetryAIHealth?.()}
+                      className="rounded-md border border-border px-2 py-1 text-xs"
+                    >
+                      {language === 'english' ? 'Retry' : '重试检测'}
+                    </button>
+                    <a
+                      href="https://ollama.com/download"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary underline"
+                    >
+                      {language === 'english' ? 'Install Ollama' : '查看 Ollama 安装'}
+                    </a>
+                  </div>
+                </div>
+              )}
               {messages.length === 0 && (
                 <div className="mt-10 text-center text-text/60">
                   {language === 'english' ? 'Start chatting!' : '开始对话吧！'}

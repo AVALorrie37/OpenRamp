@@ -147,7 +147,9 @@ const App: React.FC = () => {
     searchStage,
     sendMessage,
     triggerLocalQueryIntent,
-    cancelSearch
+    cancelSearch,
+    aiIssue,
+    checkAIHealth
   } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
 
   const handleLogin = (user: string, language: 'chinese' | 'english') => {
@@ -719,6 +721,8 @@ const App: React.FC = () => {
         onQueryCurrentProfile={triggerLocalQueryIntent}
         onCancelSearch={cancelSearch}
         onAskAIAboutText={handleAskAIAboutSelection}
+        onRetryAIHealth={() => checkAIHealth(true)}
+        aiIssueMessage={aiIssue?.message || null}
         language={profile?.language || 'chinese'}
         username={username}
         onFavorite={handleChatFavorite}

@@ -7,7 +7,8 @@
         "mock": "cross-env VITE_USE_MOCK=true npm --prefix frontend run dev",
         "backend": "cross-env PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python -m src.api.server",
         "frontend:dev": "npm --prefix frontend run dev",
-        "ollama": "ollama serve"
+        "ollama": "ollama serve",
+        "desktop:package": "node scripts/package-desktop.cjs"
     },
     "devDependencies": {
         "concurrently": "^8.2.0",

@@ -159,6 +159,17 @@ export const mockChatAPI = {
       session_id: session_id || `${user_id}_agent1_${Date.now()}`,
       language: language || 'chinese'
     }
+  },
+  health: async () => {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    return {
+      status: 'ok',
+      ollama_available: true,
+      model: 'mock',
+      model_available: true,
+      code: 'OK',
+      detail: 'mock'
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import sys
 import json
 import os
 import asyncio
+import socket
 import time
 import queue
 from concurrent.futures import ThreadPoolExecutor
@@ -447,6 +448,15 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/api/ai/health")
+async def ai_health_check():
+    ollama = _check_ollama_status()
+    return {
+        "status": "ok" if ollama.get("ollama_available") else "degraded",
+        **ollama,
+    }
+
+
 @app.post("/api/chat/greeting")
 async def chat_greeting(request: 'GreetingRequest' = Body(...)):
     try:
@@ -466,7 +476,15 @@ async def chat_greeting(request: 'GreetingRequest' = Body(...)):
         }
     except Exception as e:
         logger.error(f"CHAT_GREETING_ERROR: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"CHAT_GREETING_ERROR: {str(e)}")
+        ai_error = _classify_ai_error(e)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": ai_error["code"],
+                "user_message": ai_error["user_message"],
+                "detail": ai_error["detail"],
+            },
+        )
 
 
 class ChatRequest(BaseModel):
@@ -525,6 +543,88 @@ _integrated_search: Optional[IntegratedRepoSearch] = None
 _http_client: Optional[httpx.AsyncClient] = None
 _github_activity_cache: Dict[str, Dict[str, Any]] = {}
 _running_searches: Dict[str, asyncio.Event] = {}
+
+
+def _ollama_base_url() -> str:
+    return os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+
+
+def _check_ollama_status() -> Dict[str, Any]:
+    base_url = _ollama_base_url()
+    model = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            resp = client.get(f"{base_url}/api/tags")
+            resp.raise_for_status()
+            payload = resp.json() or {}
+            models = payload.get("models") or []
+            model_names = [m.get("name") for m in models if isinstance(m, dict)]
+            model_available = model in model_names
+            return {
+                "ollama_available": True,
+                "model": model,
+                "model_available": model_available,
+                "code": "OK" if model_available else "OLLAMA_MODEL_MISSING",
+                "detail": "ok" if model_available else f"model_not_found:{model}",
+            }
+    except httpx.ConnectError:
+        return {
+            "ollama_available": False,
+            "model": model,
+            "model_available": False,
+            "code": "OLLAMA_NOT_RUNNING",
+            "detail": "connection_refused",
+        }
+    except httpx.TimeoutException:
+        return {
+            "ollama_available": False,
+            "model": model,
+            "model_available": False,
+            "code": "OLLAMA_UNREACHABLE",
+            "detail": "timeout",
+        }
+    except Exception as e:
+        return {
+            "ollama_available": False,
+            "model": model,
+            "model_available": False,
+            "code": "OLLAMA_UNREACHABLE",
+            "detail": str(e),
+        }
+
+
+def _classify_ai_error(e: Exception) -> Dict[str, str]:
+    text = str(e or "")
+    lower = text.lower()
+    if "model_not_found" in lower or "not found, try pulling it first" in lower:
+        return {
+            "code": "OLLAMA_MODEL_MISSING",
+            "user_message": "AI model is not ready. Please start Ollama and pull the configured model.",
+            "detail": text,
+        }
+    if "connection refused" in lower or "failed to establish a new connection" in lower:
+        return {
+            "code": "OLLAMA_NOT_RUNNING",
+            "user_message": "Ollama is not running. Please start Ollama and retry.",
+            "detail": text,
+        }
+    if "timeout" in lower:
+        return {
+            "code": "OLLAMA_UNREACHABLE",
+            "user_message": "Unable to connect to Ollama right now. Please retry in a moment.",
+            "detail": text,
+        }
+    if isinstance(e, (ConnectionError, TimeoutError, socket.timeout)):
+        return {
+            "code": "OLLAMA_UNREACHABLE",
+            "user_message": "Unable to connect to Ollama right now. Please retry in a moment.",
+            "detail": text,
+        }
+    return {
+        "code": "AI_SERVICE_ERROR",
+        "user_message": "AI service is temporarily unavailable. Please try again later.",
+        "detail": text,
+    }
 
 
 def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
@@ -715,7 +815,13 @@ async def chat_stream(request: ChatRequest = Body(...)):
                     )
                     sync_q.put({"type": "result", "result": result, "session_id": session_id})
                 except Exception as e:
-                    sync_q.put({"type": "error", "detail": str(e)})
+                    ai_error = _classify_ai_error(e)
+                    sync_q.put({
+                        "type": "error",
+                        "detail": ai_error["detail"],
+                        "code": ai_error["code"],
+                        "user_message": ai_error["user_message"],
+                    })
 
             loop = asyncio.get_event_loop()
             fut = _stream_executor.submit(run)
@@ -741,11 +847,12 @@ async def chat_stream(request: ChatRequest = Body(...)):
                     yield f"data: {json.dumps(payload)}\n\n"
                     break
                 else:
-                    yield f"data: {json.dumps({'stage': 'error', 'detail': item.get('detail', 'unknown')})}\n\n"
+                    yield f"data: {json.dumps({'stage': 'error', 'detail': item.get('detail', 'unknown'), 'code': item.get('code', 'AI_SERVICE_ERROR'), 'user_message': item.get('user_message', 'AI service is temporarily unavailable.')})}\n\n"
                     break
         except Exception as e:
             logger.error(f"Chat stream error: {e}", exc_info=True)
-            yield f"data: {json.dumps({'stage': 'error', 'detail': str(e)})}\n\n"
+            ai_error = _classify_ai_error(e)
+            yield f"data: {json.dumps({'stage': 'error', 'detail': ai_error['detail'], 'code': ai_error['code'], 'user_message': ai_error['user_message']})}\n\n"
 
     return StreamingResponse(
         event_stream(),

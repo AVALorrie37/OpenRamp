@@ -17,6 +17,26 @@ const api = axios.create({
   timeout: 30000
 })
 
+type ApiErrorWithCode = Error & { code?: string; status?: number; user_message?: string }
+
+const toApiError = (err: unknown): ApiErrorWithCode => {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status
+    const detail = (err.response?.data as any)?.detail
+    if (detail && typeof detail === 'object') {
+      const e = new Error(detail.user_message || detail.detail || err.message) as ApiErrorWithCode
+      e.code = detail.code
+      e.status = status
+      e.user_message = detail.user_message
+      return e
+    }
+    const e = new Error((err.response?.data as any)?.detail || err.message) as ApiErrorWithCode
+    e.status = status
+    return e
+  }
+  return err as ApiErrorWithCode
+}
+
 const isNetworkError = (error: unknown): error is AxiosError => {
   return axios.isAxiosError(error) && (!!error.code || error.message === 'Network Error')
 }
@@ -91,6 +111,7 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type?: string
   ) => Promise<ChatGreetingResponse>
+  health: () => Promise<{ status: string; ollama_available: boolean; model: string; model_available: boolean; code: string; detail: string }>
 } = USE_MOCK ? mockChatAPI : {
   send: async (
     user_id: string,
@@ -132,7 +153,11 @@ export const chatAPI: typeof mockChatAPI | {
           const payload = JSON.parse(m[1].trim()) as Record<string, unknown>
           const stage = payload.stage as string
           if (stage === 'reply') return payload as unknown as ChatResponse
-          if (stage === 'error') throw new Error((payload.detail as string) || 'Unknown error')
+          if (stage === 'error') {
+            const e = new Error((payload.user_message as string) || (payload.detail as string) || 'Unknown error') as ApiErrorWithCode
+            e.code = payload.code as string
+            throw e
+          }
           onStage?.(stage, payload)
         } catch (e) {
           if (e instanceof Error && e.message !== 'Unknown error') throw e
@@ -147,13 +172,25 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type: string = 'agent1'
   ): Promise<ChatGreetingResponse> => {
-    const response = await api.post('/api/chat/greeting', {
-      user_id,
-      language,
-      session_id,
-      agent_type
-    })
-    return response.data
+    try {
+      const response = await api.post('/api/chat/greeting', {
+        user_id,
+        language,
+        session_id,
+        agent_type
+      })
+      return response.data
+    } catch (err) {
+      throw toApiError(err)
+    }
+  },
+  health: async () => {
+    try {
+      const response = await api.get('/api/ai/health')
+      return response.data
+    } catch (err) {
+      throw toApiError(err)
+    }
   }
 }
 
