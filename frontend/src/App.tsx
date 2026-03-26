@@ -25,6 +25,9 @@ const keywordsFingerprint = (kws: string[] | undefined): string =>
 
 type HomeColSizes = { left: number; middle: number; right: number }
 const HOME_COLS_STORAGE_KEY = 'openramp_home_cols_v1'
+const THIRD_COL_MIN_HEIGHT_PX = 600
+const THIRD_COL_MAX_HEIGHT_PX = 680
+const THIRD_COL_IDEAL_VH = 70
 
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
@@ -653,6 +656,14 @@ const App: React.FC = () => {
     !!reposMeta.source &&
     String(reposMeta.source).startsWith('online')
 
+  const alignToThirdColStyle = useMemo(() => {
+    if (!isXl) return undefined
+    return {
+      height: '100%',
+      minHeight: `clamp(${THIRD_COL_MIN_HEIGHT_PX}px, ${THIRD_COL_IDEAL_VH}vh, ${THIRD_COL_MAX_HEIGHT_PX}px)`
+    } as React.CSSProperties
+  }, [isXl])
+
   const handleKeywordCloudRepoLabelClick = async (repo: RepoResponse) => {
     const prevFp = keywordsFingerprint(repo.keywords)
     try {
@@ -908,9 +919,15 @@ const App: React.FC = () => {
           if (!showResizable) {
             return (
               <div ref={colsContainerRef} className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-2 xl:grid-cols-3">
-                {leftPanel}
-                {middlePanel}
-                {rightPanel}
+                <div style={alignToThirdColStyle} className="h-full overflow-hidden">
+                  {leftPanel}
+                </div>
+                <div style={alignToThirdColStyle} className="h-full overflow-hidden">
+                  {middlePanel}
+                </div>
+                <div style={alignToThirdColStyle} className="h-full">
+                  {rightPanel}
+                </div>
               </div>
             )
           }
@@ -923,7 +940,7 @@ const App: React.FC = () => {
                 gridTemplateColumns: `${homeColSizes.left}px 8px ${homeColSizes.middle}px 8px ${homeColSizes.right}px`
               }}
             >
-              <div className="pr-2.5">
+              <div className="pr-2.5" style={alignToThirdColStyle}>
                 {leftPanel}
               </div>
 
@@ -950,7 +967,7 @@ const App: React.FC = () => {
                 <div className="absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
               </div>
 
-              <div className="px-2.5">
+              <div className="px-2.5" style={alignToThirdColStyle}>
                 {middlePanel}
               </div>
 
@@ -978,7 +995,9 @@ const App: React.FC = () => {
               </div>
 
               <div className="pl-2.5">
-                {rightPanel}
+                <div style={alignToThirdColStyle} className="h-full">
+                  {rightPanel}
+                </div>
               </div>
             </div>
           )

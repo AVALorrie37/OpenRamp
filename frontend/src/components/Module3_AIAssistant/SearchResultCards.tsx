@@ -92,7 +92,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
       {searchCompleted && repos.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           <button data-selection-excluded onClick={() => setSortMode('match')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'match' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
-            {language === 'chinese' ? '综合（匹配总分）' : 'Overall (Match)'}
+            {language === 'chinese' ? '综合' : 'Composite'}
           </button>
           <button data-selection-excluded onClick={() => setSortMode('skill')} className={`rounded px-2 py-0.5 text-xs ${sortMode === 'skill' ? 'bg-primary text-white' : 'bg-surface text-text border border-border'}`}>
             {language === 'chinese' ? '技能' : 'Skill'}

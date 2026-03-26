@@ -253,28 +253,18 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
     normalizedPreview
   ])
 
-  const formulaHtml = useMemo(
-    () =>
-      katex.renderToString(
-        "\\mathrm{MatchScore} = w_1' \\cdot S_{\\mathrm{skill}} + w_2' \\cdot S_{\\mathrm{activity}} + w_3' \\cdot S_{\\mathrm{demand}}",
-        { displayMode: false, throwOnError: false }
-      ),
-    []
-  )
-
-  const weightHtml = useMemo(
-    () =>
-      katex.renderToString(
-        `\\begin{aligned}
-    w_1' &= ${Math.round(normalizedPreview.w_skill * 100) / 100} \\quad
-    w_2' &= ${Math.round(normalizedPreview.w_activity * 100) / 100}  \\quad
-    w_3' &= ${Math.round(normalizedPreview.w_demand * 100) / 100} \\quad
-    ${cData != null ? `C_{\\mathrm{data}} &= ${Math.round(cData * 100)}\\%` : ''}
-    \\end{aligned}`,
-        { displayMode: false, throwOnError: false }
-      ),
-    [normalizedPreview, cData]
-  )
+  const weightKeyLabelHtml = useMemo(() => {
+    const map: Record<WeightKey, string> = {
+      w_skill: "w_{skill}",
+      w_activity: "w_{activity}",
+      w_demand: "w_{demand}"
+    }
+    return {
+      w_skill: katex.renderToString(map.w_skill, { displayMode: false, throwOnError: false }),
+      w_activity: katex.renderToString(map.w_activity, { displayMode: false, throwOnError: false }),
+      w_demand: katex.renderToString(map.w_demand, { displayMode: false, throwOnError: false })
+    } as Record<WeightKey, string>
+  }, [])
 
   const envelopeName = useMemo(
     () => (language === 'english' ? 'Weight envelope (S=1)' : '权重外轮廓 (S=1)'),
@@ -477,15 +467,6 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         </ResponsiveContainer>
       </div>
       <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text">
-        <div
-          className="text-center text-base leading-8"
-          dangerouslySetInnerHTML={{ __html: formulaHtml }}
-        />
-        <div
-          className="text-center text-xs leading-5"
-          dangerouslySetInnerHTML={{ __html: weightHtml }}
-        />
-
         {onBaseWeightsChange && (
           <div className="mt-3 flex w-full justify-center px-1">
             <div className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-panel">
@@ -493,7 +474,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               <div className="flex flex-col gap-4">
                 {WEIGHT_KEYS.map(({ key, label }) => (
                   <div key={key} className="flex items-center gap-3">
-                    <span className="w-[4.5rem] shrink-0 font-mono text-[11px] text-text/85">{label}</span>
+                    <span
+                      className="w-[4.5rem] shrink-0 font-mono text-[11px] text-text/85"
+                      dangerouslySetInnerHTML={{ __html: weightKeyLabelHtml[key] }}
+                    />
                     <input
                       type="range"
                       min={0}

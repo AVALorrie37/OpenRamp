@@ -141,7 +141,7 @@ const RepoList: React.FC<RepoListProps> = ({
   const askAiLabel = selectionAskLanguage === 'english' ? 'Ask AI?' : '问问AI？'
   const labels = language === 'english'
     ? {
-        matchTotal: 'Overall Match',
+        matchTotal: 'Composite',
         skill: 'Skill',
         activity: 'Activity',
         demand: 'Demand',
@@ -150,7 +150,7 @@ const RepoList: React.FC<RepoListProps> = ({
         unfavorite: 'Unfavorite'
       }
     : {
-        matchTotal: '匹配总分',
+        matchTotal: '综合',
         skill: '技能',
         activity: '活跃',
         demand: '需求',
