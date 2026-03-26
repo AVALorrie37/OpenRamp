@@ -23,6 +23,9 @@ import type { RepoResponse, MatchResult, UserProfile } from './types'
 const keywordsFingerprint = (kws: string[] | undefined): string =>
   (kws ?? []).map((k) => k.toLowerCase()).sort().join('\u0001')
 
+type HomeColSizes = { left: number; middle: number; right: number }
+const HOME_COLS_STORAGE_KEY = 'openramp_home_cols_v1'
+
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
   const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchData, toggleFavorite } = useRepos(username, sessionReady)
@@ -54,6 +57,30 @@ const App: React.FC = () => {
   }, [isLoggedIn, refreshRepos])
   const [highlightedRepoIds, setHighlightedRepoIds] = useState<string[]>([])
   const [activeKeywords, setActiveKeywords] = useState<string[]>([])
+  const colsContainerRef = useRef<HTMLDivElement | null>(null)
+  const colDragRef = useRef<{
+    dragging: boolean
+    which: 'left' | 'right'
+    startX: number
+    start: HomeColSizes
+    total: number
+  } | null>(null)
+  const [isXl, setIsXl] = useState(false)
+  const [homeColSizes, setHomeColSizes] = useState<HomeColSizes | null>(() => {
+    try {
+      const raw = window.localStorage.getItem(HOME_COLS_STORAGE_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as Partial<HomeColSizes> | null
+      const l = typeof parsed?.left === 'number' ? parsed.left : NaN
+      const m = typeof parsed?.middle === 'number' ? parsed.middle : NaN
+      const r = typeof parsed?.right === 'number' ? parsed.right : NaN
+      if (!Number.isFinite(l) || !Number.isFinite(m) || !Number.isFinite(r)) return null
+      if (l <= 0 || m <= 0 || r <= 0) return null
+      return { left: l, middle: m, right: r }
+    } catch {
+      return null
+    }
+  })
   const middleColumnRef = useRef<HTMLDivElement | null>(null)
   const dragStateRef = useRef<{ dragging: boolean; startY: number; startTopHeight: number; total: number } | null>(null)
   const [middleTopHeight, setMiddleTopHeight] = useState<number | null>(null)
@@ -75,6 +102,94 @@ const App: React.FC = () => {
       root.classList.remove('dark')
     }
   }, [])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 640px)')
+    const apply = () => setIsXl(!!mql.matches)
+    apply()
+    const onChange = () => apply()
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange)
+      return () => mql.removeEventListener('change', onChange)
+    }
+    ;(mql as unknown as { addListener: (cb: () => void) => void }).addListener(onChange)
+    return () => {
+      ;(mql as unknown as { removeListener: (cb: () => void) => void }).removeListener(onChange)
+    }
+  }, [])
+
+  const clampHomeCols = useCallback((sizes: HomeColSizes, available: number): HomeColSizes => {
+    const minLeft = 260
+    const minMiddle = 360
+    const minRight = 300
+    const minTotal = minLeft + minMiddle + minRight
+    const a = Math.max(available, minTotal)
+
+    let left = Math.max(minLeft, Math.round(sizes.left))
+    let middle = Math.max(minMiddle, Math.round(sizes.middle))
+    let right = Math.max(minRight, Math.round(sizes.right))
+
+    let sum = left + middle + right
+    if (!Number.isFinite(sum) || sum <= 0) {
+      const dL = Math.round(a * 0.28)
+      const dM = Math.round(a * 0.44)
+      const dR = a - dL - dM
+      return {
+        left: Math.max(minLeft, dL),
+        middle: Math.max(minMiddle, dM),
+        right: Math.max(minRight, dR)
+      }
+    }
+
+    if (sum !== a) {
+      const scale = a / sum
+      left = Math.max(minLeft, Math.round(left * scale))
+      middle = Math.max(minMiddle, Math.round(middle * scale))
+      right = Math.max(minRight, a - left - middle)
+      sum = left + middle + right
+      if (sum !== a) {
+        middle = Math.max(minMiddle, middle + (a - sum))
+      }
+    }
+
+    const finalSum = left + middle + right
+    if (finalSum > a) {
+      const extra = finalSum - a
+      const shrinkRight = Math.min(extra, right - minRight)
+      right -= shrinkRight
+      const shrinkMiddle = Math.min(extra - shrinkRight, middle - minMiddle)
+      middle -= shrinkMiddle
+      const shrinkLeft = Math.min(extra - shrinkRight - shrinkMiddle, left - minLeft)
+      left -= shrinkLeft
+    } else if (finalSum < a) {
+      middle += a - finalSum
+    }
+
+    return { left, middle, right }
+  }, [])
+
+  useEffect(() => {
+    if (!isXl) return
+    const el = colsContainerRef.current
+    if (!el) return
+    const handleW = 8
+    const totalHandle = handleW * 2
+    const ro = new ResizeObserver(() => {
+      const rect = el.getBoundingClientRect()
+      const available = Math.max(0, Math.floor(rect.width - totalHandle))
+      setHomeColSizes((prev) => {
+        const base = prev ?? { left: available * 0.28, middle: available * 0.44, right: available * 0.28 }
+        const next = clampHomeCols(base, available)
+        try {
+          window.localStorage.setItem(HOME_COLS_STORAGE_KEY, JSON.stringify(next))
+        } catch {
+        }
+        return next
+      })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [clampHomeCols, isXl])
 
   useEffect(() => {
     const el = middleColumnRef.current
@@ -120,6 +235,64 @@ const App: React.FC = () => {
       window.removeEventListener('pointerup', onUp)
     }
   }, [])
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const ds = colDragRef.current
+      if (!ds?.dragging) return
+      const handleW = 8
+      const available = Math.max(0, Math.floor(ds.total - handleW * 2))
+
+      const minLeft = 260
+      const minMiddle = 360
+      const minRight = 300
+
+      const dx = e.clientX - ds.startX
+      if (ds.which === 'left') {
+        const minDelta = minLeft - ds.start.left
+        const maxDelta = ds.start.middle - minMiddle
+        const delta = Math.min(Math.max(dx, minDelta), maxDelta)
+        const next: HomeColSizes = {
+          left: ds.start.left + delta,
+          middle: ds.start.middle - delta,
+          right: ds.start.right
+        }
+        const clamped = clampHomeCols(next, available)
+        setHomeColSizes(clamped)
+        try {
+          window.localStorage.setItem(HOME_COLS_STORAGE_KEY, JSON.stringify(clamped))
+        } catch {
+        }
+      } else {
+        const minDelta = minMiddle - ds.start.middle
+        const maxDelta = ds.start.right - minRight
+        const delta = Math.min(Math.max(dx, minDelta), maxDelta)
+        const next: HomeColSizes = {
+          left: ds.start.left,
+          middle: ds.start.middle + delta,
+          right: ds.start.right - delta
+        }
+        const clamped = clampHomeCols(next, available)
+        setHomeColSizes(clamped)
+        try {
+          window.localStorage.setItem(HOME_COLS_STORAGE_KEY, JSON.stringify(clamped))
+        } catch {
+        }
+      }
+    }
+    const onUp = () => {
+      const ds = colDragRef.current
+      if (ds) {
+        ds.dragging = false
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [clampHomeCols])
 
   const middleStyles = useMemo(() => {
     if (typeof middleTopHeight !== 'number') {
@@ -544,7 +717,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
+      <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-3">
         <h1 className="m-0 text-xl font-bold text-primary">
           OpenRamp
         </h1>
@@ -583,150 +756,236 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <div className="grid flex-1 grid-cols-1 gap-5 overflow-hidden p-5 md:grid-cols-2 xl:grid-cols-3">
-          <div className="flex flex-col overflow-hidden rounded-md border border-border bg-surface">
-            <RepoList
-              repos={repos}
-              onRepoClick={handleRepoClick}
-              onToggleFavorite={(repo) => toggleFavorite(repo.repo_id)}
-              onBackgroundClick={handleRepoBackgroundClick}
-              highlightedRepoIds={highlightedRepoIds}
-              selectedRepoId={selectedRepo?.repo_id ?? null}
-              canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
-              openRepoHintTitle={
-                uiLanguage === 'english'
-                  ? 'Ctrl+click to open this repository on GitHub'
-                  : '按住 Ctrl 并点击，在浏览器中查看 GitHub 仓库'
-              }
-              onOpenManualSearch={() => setShowManualSearch(true)}
-              onDeleteRepo={(repoId) => {
-                deleteRepo(repoId)
-                if (selectedRepo && selectedRepo.repo_id === repoId) {
-                  setSelectedRepo(null)
-                  setMatchData(null)
-                }
-                setHighlightedRepoIds((prev) => prev.filter((id) => id !== repoId))
-              }}
-              onDescriptionRefresh={async (repo) => {
-                try {
-                  const enriched = await manualSearchAPI.bulkEnrich([
-                    { repo_id: repo.repo_id, full_name: repo.repo_id }
-                  ])
-                  if (enriched && enriched.repos && enriched.repos.length > 0) {
-                    const updated = enriched.repos[0]
-                    fetchRepos({ repo_ids: [updated.repo_id], limit: 1 })
-                  }
-                } catch (e) {
-                  console.error('Description refresh failed:', e)
-                }
-              }}
-              onAskAIAboutText={handleAskAIAboutSelection}
-              selectionAskLanguage={uiLanguage}
-              language={uiLanguage}
-            />
-          </div>
+        {(() => {
+          const showResizable = isXl && !!homeColSizes
 
-          <div ref={middleColumnRef} className="flex h-full flex-col">
-            <div
-              className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
-              style={middleStyles.top}
-            >
-              <RepoActivityTabs
-                repo={selectedRepo || repos[0]}
-                themeVersion={themeVersion}
-                onOpenRankRefresh={async (repoId) => {
+          const leftPanel = (
+            <div className="flex h-full flex-col overflow-hidden rounded-md border border-border bg-surface">
+              <RepoList
+                repos={repos}
+                onRepoClick={handleRepoClick}
+                onToggleFavorite={(repo) => toggleFavorite(repo.repo_id)}
+                onBackgroundClick={handleRepoBackgroundClick}
+                highlightedRepoIds={highlightedRepoIds}
+                selectedRepoId={selectedRepo?.repo_id ?? null}
+                canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
+                openRepoHintTitle={
+                  uiLanguage === 'english'
+                    ? 'Ctrl+click to open this repository on GitHub'
+                    : '按住 Ctrl 并点击，在浏览器中查看 GitHub 仓库'
+                }
+                onOpenManualSearch={() => setShowManualSearch(true)}
+                onDeleteRepo={(repoId) => {
+                  deleteRepo(repoId)
+                  if (selectedRepo && selectedRepo.repo_id === repoId) {
+                    setSelectedRepo(null)
+                    setMatchData(null)
+                  }
+                  setHighlightedRepoIds((prev) => prev.filter((id) => id !== repoId))
+                }}
+                onDescriptionRefresh={async (repo) => {
                   try {
                     const enriched = await manualSearchAPI.bulkEnrich([
-                      { repo_id: repoId, full_name: repoId }
+                      { repo_id: repo.repo_id, full_name: repo.repo_id }
                     ])
-                    const updated = enriched?.repos?.[0] as any
-                    if (updated && updated.repo_id) {
-                      addRepo({ ...updated, is_favorited: (selectedRepo?.is_favorited ?? false) } as any)
-                      if (selectedRepo?.repo_id === repoId) {
-                        setSelectedRepo((prev) => (prev && prev.repo_id === repoId ? { ...prev, ...updated } : prev))
-                      }
+                    if (enriched && enriched.repos && enriched.repos.length > 0) {
+                      const updated = enriched.repos[0]
+                      fetchRepos({ repo_ids: [updated.repo_id], limit: 1 })
                     }
                   } catch (e) {
-                    console.error('openrank refresh enrich failed:', e)
-                  }
-
-                  if (isLoggedIn && username && profile?.skills && profile.skills.length > 0) {
-                    try {
-                      const match = await matchAPI.calculate(username, repoId, weights)
-                      updateRepoMatchData(repoId, {
-                        match_score: match.match_score,
-                        breakdown: match.breakdown,
-                        dynamic_weights: match.dynamic_weights
-                      })
-                      if (selectedRepo?.repo_id === repoId) {
-                        setMatchData((md) => {
-                          if (!md) {
-                            return {
-                              match_score: match.match_score,
-                              breakdown: match.breakdown,
-                              repo_name: selectedRepo?.name || repoId.split('/')[1] || 'repo',
-                              repo_full_name: repoId,
-                              dynamic_weights: match.dynamic_weights
-                            }
-                          }
-                          return { ...md, dynamic_weights: match.dynamic_weights }
-                        })
-                      }
-                    } catch (e) {
-                      console.error('openrank refresh match failed:', e)
-                    }
+                    console.error('Description refresh failed:', e)
                   }
                 }}
+                onAskAIAboutText={handleAskAIAboutSelection}
+                selectionAskLanguage={uiLanguage}
+                language={uiLanguage}
               />
             </div>
-            <div
-              className="group relative h-[10px] cursor-row-resize select-none"
-              onPointerDown={(e) => {
-                const el = middleColumnRef.current
-                if (!el) return
-                const rect = el.getBoundingClientRect()
-                const total = rect.height
-                const currentTop = typeof middleTopHeight === 'number' ? middleTopHeight : Math.max(200, Math.round(total * 0.4))
-                dragStateRef.current = { dragging: true, startY: e.clientY, startTopHeight: currentTop, total }
-                ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
-              }}
-              aria-label="Resize middle panels"
-              role="separator"
-              aria-orientation="horizontal"
-            >
-              <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border transition group-hover:bg-primary" />
-              <div className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
-            </div>
-            <div
-              className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
-              style={middleStyles.bottom}
-              onClick={handleKeywordAreaClick}
-            >
-              <KeywordCloud
-                repos={repos}
-                selectedRepo={selectedRepo}
-                onKeywordClick={handleKeywordClick}
-                activeKeywords={activeKeywords}
-                skipDescriptionKeywordFallback={skipDescriptionKeywordFallback}
-                onSingleRepoLabelClick={handleKeywordCloudRepoLabelClick}
-              />
-            </div>
-          </div>
+          )
 
-          <div className="relative flex items-center justify-center rounded-md border border-border bg-surface">
-            <RadarPlaceholder
-              isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
-              matchData={matchData}
-              baseWeights={weights}
-              onBaseWeightsChange={handleWeightsChange}
-              themeVersion={themeVersion}
-              language={uiLanguage}
-            />
-          </div>
-          </div>
+          const middlePanel = (
+            <div ref={middleColumnRef} className="flex h-full flex-col">
+              <div
+                className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
+                style={middleStyles.top}
+              >
+                <RepoActivityTabs
+                  repo={selectedRepo || repos[0]}
+                  themeVersion={themeVersion}
+                  onOpenRankRefresh={async (repoId) => {
+                    try {
+                      const enriched = await manualSearchAPI.bulkEnrich([
+                        { repo_id: repoId, full_name: repoId }
+                      ])
+                      const updated = enriched?.repos?.[0] as any
+                      if (updated && updated.repo_id) {
+                        addRepo({ ...updated, is_favorited: (selectedRepo?.is_favorited ?? false) } as any)
+                        if (selectedRepo?.repo_id === repoId) {
+                          setSelectedRepo((prev) => (prev && prev.repo_id === repoId ? { ...prev, ...updated } : prev))
+                        }
+                      }
+                    } catch (e) {
+                      console.error('openrank refresh enrich failed:', e)
+                    }
+
+                    if (isLoggedIn && username && profile?.skills && profile.skills.length > 0) {
+                      try {
+                        const match = await matchAPI.calculate(username, repoId, weights)
+                        updateRepoMatchData(repoId, {
+                          match_score: match.match_score,
+                          breakdown: match.breakdown,
+                          dynamic_weights: match.dynamic_weights
+                        })
+                        if (selectedRepo?.repo_id === repoId) {
+                          setMatchData((md) => {
+                            if (!md) {
+                              return {
+                                match_score: match.match_score,
+                                breakdown: match.breakdown,
+                                repo_name: selectedRepo?.name || repoId.split('/')[1] || 'repo',
+                                repo_full_name: repoId,
+                                dynamic_weights: match.dynamic_weights
+                              }
+                            }
+                            return { ...md, dynamic_weights: match.dynamic_weights }
+                          })
+                        }
+                      } catch (e) {
+                        console.error('openrank refresh match failed:', e)
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div
+                className="group relative h-[10px] cursor-row-resize select-none"
+                onPointerDown={(e) => {
+                  const el = middleColumnRef.current
+                  if (!el) return
+                  const rect = el.getBoundingClientRect()
+                  const total = rect.height
+                  const currentTop = typeof middleTopHeight === 'number' ? middleTopHeight : Math.max(200, Math.round(total * 0.4))
+                  dragStateRef.current = { dragging: true, startY: e.clientY, startTopHeight: currentTop, total }
+                  ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+                }}
+                aria-label="Resize middle panels"
+                role="separator"
+                aria-orientation="horizontal"
+              >
+                <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border transition group-hover:bg-primary" />
+                <div className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
+              </div>
+              <div
+                className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
+                style={middleStyles.bottom}
+                onClick={handleKeywordAreaClick}
+              >
+                <KeywordCloud
+                  repos={repos}
+                  selectedRepo={selectedRepo}
+                  onKeywordClick={handleKeywordClick}
+                  activeKeywords={activeKeywords}
+                  skipDescriptionKeywordFallback={skipDescriptionKeywordFallback}
+                  onSingleRepoLabelClick={handleKeywordCloudRepoLabelClick}
+                />
+              </div>
+            </div>
+          )
+
+          const rightPanel = (
+            <div className="relative flex h-full items-center justify-center rounded-md border border-border bg-surface">
+              <RadarPlaceholder
+                isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
+                matchData={matchData}
+                baseWeights={weights}
+                onBaseWeightsChange={handleWeightsChange}
+                themeVersion={themeVersion}
+                language={uiLanguage}
+              />
+            </div>
+          )
+
+          if (!showResizable) {
+            return (
+              <div ref={colsContainerRef} className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 md:grid-cols-2 xl:grid-cols-3">
+                {leftPanel}
+                {middlePanel}
+                {rightPanel}
+              </div>
+            )
+          }
+
+          return (
+            <div
+              ref={colsContainerRef}
+              className="grid flex-1 items-stretch overflow-hidden p-4"
+              style={{
+                gridTemplateColumns: `${homeColSizes.left}px 8px ${homeColSizes.middle}px 8px ${homeColSizes.right}px`
+              }}
+            >
+              <div className="pr-2.5">
+                {leftPanel}
+              </div>
+
+              <div
+                className="group relative w-[8px] cursor-col-resize select-none"
+                onPointerDown={(e) => {
+                  const el = colsContainerRef.current
+                  if (!el || !homeColSizes) return
+                  const rect = el.getBoundingClientRect()
+                  colDragRef.current = {
+                    dragging: true,
+                    which: 'left',
+                    startX: e.clientX,
+                    start: homeColSizes,
+                    total: rect.width
+                  }
+                  ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+                }}
+                aria-label="Resize left and middle columns"
+                role="separator"
+                aria-orientation="vertical"
+              >
+                <div className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary" />
+                <div className="absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
+              </div>
+
+              <div className="px-2.5">
+                {middlePanel}
+              </div>
+
+              <div
+                className="group relative w-[8px] cursor-col-resize select-none"
+                onPointerDown={(e) => {
+                  const el = colsContainerRef.current
+                  if (!el || !homeColSizes) return
+                  const rect = el.getBoundingClientRect()
+                  colDragRef.current = {
+                    dragging: true,
+                    which: 'right',
+                    startX: e.clientX,
+                    start: homeColSizes,
+                    total: rect.width
+                  }
+                  ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+                }}
+                aria-label="Resize middle and right columns"
+                role="separator"
+                aria-orientation="vertical"
+              >
+                <div className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-border transition group-hover:bg-primary" />
+                <div className="absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
+              </div>
+
+              <div className="pl-2.5">
+                {rightPanel}
+              </div>
+            </div>
+          )
+        })()}
       </main>
 
-      <div className="overflow-hidden whitespace-nowrap border-t border-border bg-primaryLight/25 px-5 py-3 text-center text-sm text-text">
+      <div className="overflow-hidden whitespace-nowrap border-t border-border bg-primaryLight/25 px-5 py-2 text-center text-sm text-text">
         <div className="inline-block animate-[scroll_20s_linear_infinite]">
           {uiLanguage === 'english'
             ? 'Tip: Log in to get personalized recommendations | Click a repo to view match details | Chat with the AI assistant to confirm your skills'
