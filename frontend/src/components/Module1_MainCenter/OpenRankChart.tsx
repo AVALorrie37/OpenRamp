@@ -43,12 +43,29 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
     const entries = openrankStr.split(',').slice(-30)
     const labels: string[] = []
     const data: number[] = []
+    const isQuarterLabel = (s: string) => {
+      const t = String(s || '').trim()
+      return /^\d{4}\s*Q[1-4]$/i.test(t) || /^\d{4}-Q[1-4]$/i.test(t) || /^\d{4}Q[1-4]$/i.test(t)
+    }
+    const parseDayOrMonth = (s: string) => {
+      const t = String(s || '').trim()
+      const m1 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t)
+      if (m1) return `${m1[1]}-${m1[2]}-${m1[3]}`
+      const m2 = /^(\d{4})-(\d{2})$/.exec(t)
+      if (m2) return `${m2[1]}-${m2[2]}-01`
+      return null
+    }
 
     entries.forEach(entry => {
       const [date, value] = entry.split(':')
       if (date && value) {
-        labels.push(date)
-        data.push(parseFloat(value))
+        if (isQuarterLabel(date)) return
+        const normalized = parseDayOrMonth(date)
+        if (!normalized) return
+        const v = parseFloat(value)
+        if (!Number.isFinite(v)) return
+        labels.push(normalized)
+        data.push(v)
       }
     })
 
@@ -86,6 +103,29 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
   }, [repo, themeVersion])
 
   const hasData = chartData.labels.length > 0
+  const labelsArr = (chartData.labels ?? []) as string[]
+  const toYm = (s: string) => {
+    const t = String(s || '').trim()
+    const m = /^(\d{4})-(\d{2})/.exec(t)
+    return m ? `${m[1]}-${m[2]}` : t
+  }
+  const parseYmd = (s: string) => {
+    const [yy, mm, dd] = String(s || '').split('-')
+    const y = Number(yy)
+    const m = Number(mm)
+    const d = Number(dd)
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+    return { y, m, d }
+  }
+  const first = labelsArr.length ? parseYmd(labelsArr[0]) : null
+  const last = labelsArr.length ? parseYmd(labelsArr[labelsArr.length - 1]) : null
+  const spanMonths = first && last ? Math.abs((last.y - first.y) * 12 + (last.m - first.m)) : 0
+  const showDay = spanMonths <= 3
+  const showYear = spanMonths >= 12
+  const monthAbbr = (m: number) =>
+    (['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const)[
+      Math.max(1, Math.min(12, m)) - 1
+    ]
   const rawNote = (repo?.raw_metrics as any)?.note as string | undefined
   const statusText =
     !repo
@@ -122,7 +162,13 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                   borderWidth: 1,
                   titleColor: cssVar('--color-text') || '#1c1f1e',
                   bodyColor: cssVar('--color-text') || '#1c1f1e',
-                  padding: 12
+                  padding: 12,
+                  callbacks: {
+                    title: (items: any[]) => {
+                      const raw = items?.[0]?.label ?? ''
+                      return toYm(String(raw))
+                    }
+                  }
                 }
               },
               scales: {
@@ -132,9 +178,31 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                   },
                   ticks: {
                     color: cssVar('--color-text') || '#1c1f1e',
-                    maxRotation: 45,
-                    minRotation: 45,
-                    font: { size: 10 }
+                    maxRotation: 0,
+                    minRotation: 0,
+                    autoSkip: false,
+                    maxTicksLimit: 6,
+                    padding: 6,
+                    font: { size: 10 },
+                    callback: function (_value: any, index: number, ticks: any[]) {
+                      const n = Array.isArray(ticks) ? ticks.length : 0
+                      if (n && index === n - 1) return ''
+                      const desired = 6
+                      const step = n > desired ? Math.ceil(n / desired) : 1
+                      if (step > 1 && index % step !== 0) return ''
+
+                      const raw = labelsArr[index] ?? ''
+                      const p = parseYmd(raw)
+                      if (!p) return raw
+                      const dd = String(p.d).padStart(2, '0')
+                      if (index === 0 || p.d === 1) {
+                        const mon = monthAbbr(p.m)
+                        if (!showYear) return mon
+                        return [`${p.y}`, mon]
+                      }
+                      if (!showDay) return ''
+                      return dd
+                    }
                   }
                 },
                 y: {

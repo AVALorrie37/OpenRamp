@@ -247,6 +247,25 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
         ? buildCommitFallbackPoints(12)
         : (state.data ?? [])
     const chartData = buildChartData(points, label, primary)
+    const labelsArr = (chartData.labels ?? []) as string[]
+    const parseYmd = (s: string) => {
+      const [yy, mm, dd] = String(s || '').split('-')
+      const y = Number(yy)
+      const m = Number(mm)
+      const d = Number(dd)
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+      return { y, m, d }
+    }
+    const first = labelsArr.length ? parseYmd(labelsArr[0]) : null
+    const last = labelsArr.length ? parseYmd(labelsArr[labelsArr.length - 1]) : null
+    const spanMonths =
+      first && last ? Math.abs((last.y - first.y) * 12 + (last.m - first.m)) : 0
+    const showDay = spanMonths <= 3
+    const showYear = spanMonths >= 12
+    const monthAbbr = (m: number) =>
+      (['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const)[
+        Math.max(1, Math.min(12, m)) - 1
+      ]
 
     return (
       <div className="relative flex h-full w-full flex-col px-2 pb-2">
@@ -277,9 +296,31 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
                 },
                 ticks: {
                   color: text,
-                  maxRotation: 45,
-                  minRotation: 45,
-                  font: { size: 10 }
+                  maxRotation: 0,
+                  minRotation: 0,
+                  autoSkip: false,
+                  maxTicksLimit: 6,
+                  padding: 6,
+                  font: { size: 10 },
+                  callback: function (_value: any, index: number, ticks: any[]) {
+                    const n = Array.isArray(ticks) ? ticks.length : 0
+                    if (n && index === n - 1) return ''
+                    const desired = 6
+                    const step = n > desired ? Math.ceil(n / desired) : 1
+                    if (step > 1 && index % step !== 0) return ''
+
+                    const raw = labelsArr[index] ?? ''
+                    const p = parseYmd(raw)
+                    if (!p) return raw
+                    const dd = String(p.d).padStart(2, '0')
+                    if (index === 0 || p.d === 1) {
+                      const mon = monthAbbr(p.m)
+                      if (!showYear) return mon
+                      return [`${p.y}`, mon]
+                    }
+                    if (!showDay) return ''
+                    return dd
+                  }
                 }
               },
               y: {
