@@ -631,7 +631,53 @@ const App: React.FC = () => {
               className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-surface"
               style={middleStyles.top}
             >
-              <RepoActivityTabs repo={selectedRepo || repos[0]} themeVersion={themeVersion} />
+              <RepoActivityTabs
+                repo={selectedRepo || repos[0]}
+                themeVersion={themeVersion}
+                onOpenRankRefresh={async (repoId) => {
+                  try {
+                    const enriched = await manualSearchAPI.bulkEnrich([
+                      { repo_id: repoId, full_name: repoId }
+                    ])
+                    const updated = enriched?.repos?.[0] as any
+                    if (updated && updated.repo_id) {
+                      addRepo({ ...updated, is_favorited: (selectedRepo?.is_favorited ?? false) } as any)
+                      if (selectedRepo?.repo_id === repoId) {
+                        setSelectedRepo((prev) => (prev && prev.repo_id === repoId ? { ...prev, ...updated } : prev))
+                      }
+                    }
+                  } catch (e) {
+                    console.error('openrank refresh enrich failed:', e)
+                  }
+
+                  if (isLoggedIn && username && profile?.skills && profile.skills.length > 0) {
+                    try {
+                      const match = await matchAPI.calculate(username, repoId, weights)
+                      updateRepoMatchData(repoId, {
+                        match_score: match.match_score,
+                        breakdown: match.breakdown,
+                        dynamic_weights: match.dynamic_weights
+                      })
+                      if (selectedRepo?.repo_id === repoId) {
+                        setMatchData((md) => {
+                          if (!md) {
+                            return {
+                              match_score: match.match_score,
+                              breakdown: match.breakdown,
+                              repo_name: selectedRepo?.name || repoId.split('/')[1] || 'repo',
+                              repo_full_name: repoId,
+                              dynamic_weights: match.dynamic_weights
+                            }
+                          }
+                          return { ...md, dynamic_weights: match.dynamic_weights }
+                        })
+                      }
+                    } catch (e) {
+                      console.error('openrank refresh match failed:', e)
+                    }
+                  }
+                }}
+              />
             </div>
             <div
               className="group relative h-[10px] cursor-row-resize select-none"

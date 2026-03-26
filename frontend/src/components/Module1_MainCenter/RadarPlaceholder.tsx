@@ -38,7 +38,8 @@ const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData
         baseWeights={baseWeights}
         dynamicWeights={matchData.dynamic_weights}
         onBaseWeightsChange={onBaseWeightsChange}
-        embedded={true}  // 启用内嵌模式
+        repoId={matchData.repo_full_name}
+        embedded={true}
         themeVersion={themeVersion}
         language={language}
       />

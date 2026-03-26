@@ -51,6 +51,9 @@ class OpenDiggerClient:
         "issues_new",
     ]
 
+    # Negative-cache TTL for confirmed "no data" (seconds): 14 days
+    _NEGATIVE_CACHE_TTL_SECONDS: int = 14 * 24 * 60 * 60
+
     def __init__(
         self,
         connect_timeout: float = 5.0,
@@ -156,6 +159,64 @@ class OpenDiggerClient:
         # 使用 repo_id 的 hash 作为子目录，避免文件名包含特殊字符
         safe_repo_id = repo_id.replace("/", "_")
         return self._cache_dir / safe_repo_id / f"{metric}.json"
+
+    def _get_negative_cache_path(self, repo_id: str, metric: str) -> Path:
+        safe_repo_id = repo_id.replace("/", "_")
+        return self._cache_dir / safe_repo_id / f"{metric}.missing.json"
+
+    def _is_negative_cached(self, repo_id: str, metric: str) -> bool:
+        """
+        Check negative-cache marker for (repo, metric).
+        Auto-cleans expired/corrupt markers.
+        """
+        if not self._use_cache:
+            return False
+        p = self._get_negative_cache_path(repo_id, metric)
+        if not p.exists():
+            return False
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                payload = json.load(f) or {}
+            ts = float(payload.get("ts", 0.0))
+        except Exception:
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return False
+        if ts <= 0:
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return False
+        if (time.time() - ts) >= self._NEGATIVE_CACHE_TTL_SECONDS:
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return False
+        return True
+
+    def _write_negative_cache(self, repo_id: str, metric: str, reason: str) -> None:
+        if not self._use_cache:
+            return
+        p = self._get_negative_cache_path(repo_id, metric)
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump({"missing": True, "ts": time.time(), "reason": reason}, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"Warning: Failed to write negative cache for {repo_id}/{metric}: {e}")
+
+    def _clear_negative_cache(self, repo_id: str, metric: str) -> None:
+        if not self._use_cache:
+            return
+        p = self._get_negative_cache_path(repo_id, metric)
+        try:
+            p.unlink(missing_ok=True)
+        except Exception:
+            pass
     
     def _read_from_cache(self, repo_id: str, metric: str) -> Optional[Any]:
         """
@@ -264,6 +325,10 @@ class OpenDiggerClient:
             RuntimeError: API 返回非 200 状态码
             requests.exceptions.RequestException: 网络请求失败
         """
+        # 0. 负缓存：若近期已确认无数据，直接短路（并由 TTL 自动清理）
+        if self._is_negative_cached(repo_id, metric):
+            raise RuntimeError("OpenDigger has no data")
+
         # 1. 先尝试从缓存读取
         cached_data = self._read_from_cache(repo_id, metric)
         if cached_data is not None:
@@ -286,12 +351,13 @@ class OpenDiggerClient:
                             data = self._filter_active_dates_recent_months(data, months=6)
                         # 成功后写入缓存（已过滤的数据）
                         self._write_to_cache(repo_id, metric, data)
+                        # 成功则清除负缓存标记（若存在）
+                        self._clear_negative_cache(repo_id, metric)
                         return data
                     elif status == 404:
-                        # 404 不重试，直接抛出
-                        raise RuntimeError(
-                            f"OpenDigger API request failed with status code {status}"
-                        )
+                        # 404 不重试：写入负缓存（2周），并抛出“无数据”
+                        self._write_negative_cache(repo_id, metric, reason="404")
+                        raise RuntimeError("OpenDigger has no data")
                     elif status == 429:
                         raise RuntimeError("OpenDigger API rate limit exceeded")
                     else:
@@ -333,7 +399,11 @@ class OpenDiggerClient:
                             data = self._filter_active_dates_recent_months(data, months=6)
                         # 成功后写入缓存（已过滤的数据）
                         self._write_to_cache(repo_id, metric, data)
+                        self._clear_negative_cache(repo_id, metric)
                         return data
+                    elif status == 404:
+                        self._write_negative_cache(repo_id, metric, reason="404")
+                        raise RuntimeError("OpenDigger has no data")
                     elif status == 429:
                         raise RuntimeError("OpenDigger API rate limit exceeded")
                     else:

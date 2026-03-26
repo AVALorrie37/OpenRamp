@@ -3,41 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #829c83;
-  --color-primaryDark: #5f7162;
-  --color-primaryLight: #b5c4b6;
-  --color-accent: #707a6f;
-  --color-tertiary: #b58a93;
-  --color-background: #f8f9f8;
-  --color-text: #1c1f1e;
-  --color-error: #c97d60;
-  --color-warning: #d4a574;
-  --color-border: #dfe2df;
-  --color-hover: #6f8572;
+  --color-primary: #1bb3ad;
+  --color-primaryDark: #128b86;
+  --color-primaryLight: rgba(27, 179, 173, 0.14);
+  --color-accent: #2b7cff;
+  --color-tertiary: #6b7280;
+  --color-background: #f6f8fb;
+  --color-text: #0f172a;
+  --color-error: #dc4b4b;
+  --color-warning: #d97706;
+  --color-border: rgba(15, 23, 42, 0.12);
+  --color-hover: rgba(27, 179, 173, 0.12);
   --color-surface: #ffffff;
-  --color-surface2: #eef0ee;
-  --color-grid: rgba(112, 122, 111, 0.28);
-  --shadow-panel: rgba(0, 0, 0, 0.1);
-  --shadow-modal: rgba(0, 0, 0, 0.2);
+  --color-surface2: #eef3f8;
+  --color-grid: rgba(15, 23, 42, 0.08);
+  --shadow-panel: rgba(15, 23, 42, 0.08);
+  --shadow-modal: rgba(15, 23, 42, 0.22);
 }
 
 .dark {
-  --color-primary: #829c83;
-  --color-primaryDark: #9eb0a0;
-  --color-primaryLight: rgba(130, 156, 131, 0.22);
-  --color-accent: #8fa3b0;
-  --color-tertiary: #4a635d;
-  --color-background: #0f141a;
-  --color-text: #e8eaed;
-  --color-error: #e5989b;
-  --color-warning: #e6c07a;
-  --color-border: rgba(232, 234, 237, 0.14);
-  --color-hover: rgba(130, 156, 131, 0.22);
-  --color-surface: #151d26;
-  --color-surface2: #1c2630;
-  --color-grid: rgba(232, 234, 237, 0.12);
-  --shadow-panel: rgba(0, 0, 0, 0.45);
-  --shadow-modal: rgba(0, 0, 0, 0.55);
+  --color-primary: #58d6cf;
+  --color-primaryDark: #2fb8b1;
+  --color-primaryLight: rgba(88, 214, 207, 0.18);
+  --color-accent: #8bd3ff;
+  --color-tertiary: #0b3c57;
+  --color-background: #071524;
+  --color-text: #e7edf6;
+  --color-error: #ff6b6b;
+  --color-warning: #f2b84b;
+  --color-border: rgba(231, 237, 246, 0.12);
+  --color-hover: rgba(88, 214, 207, 0.16);
+  --color-surface: #0b1f33;
+  --color-surface2: #0f2a42;
+  --color-grid: rgba(231, 237, 246, 0.10);
+  --shadow-panel: rgba(0, 0, 0, 0.55);
+  --shadow-modal: rgba(0, 0, 0, 0.65);
 }
 
 * {
@@ -95,6 +95,65 @@ input, textarea {
 .katex,
 .katex * {
   color: inherit !important;
+}
+
+input[type='range'].weight-slider {
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='range'].weight-slider:focus {
+  outline: none;
+}
+
+input[type='range'].weight-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--color-primary) 0%,
+    var(--color-primary) var(--weight-slider-pct, 50%),
+    var(--color-border) var(--weight-slider-pct, 50%),
+    var(--color-border) 100%
+  );
+}
+
+input[type='range'].weight-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+input[type='range'].weight-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+
+input[type='range'].weight-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+
+input[type='range'].weight-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
 }
 
 @keyframes toastIn {

@@ -78,9 +78,6 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center p-4">
-      <h4 className="mb-4 mt-0 text-base text-text">
-        OpenRank活跃度图（近30天）
-      </h4>
       {statusText ? (
         <div className="flex h-[200px] items-center justify-center text-text/50">
           {statusText}

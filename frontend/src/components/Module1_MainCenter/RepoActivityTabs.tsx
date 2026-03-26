@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -28,6 +28,7 @@ ChartJS.register(
 interface RepoActivityTabsProps {
   repo: RepoResponse | null
   themeVersion?: number
+  onOpenRankRefresh?: (repoId: string) => void
 }
 
 type TrendPoint = { date: string; count: number }
@@ -38,12 +39,49 @@ interface TrendState {
   data: TrendPoint[] | null
 }
 
-const buildChartData = (points: TrendPoint[] | null, label: string, primary: string) => {
-  if (!points || points.length === 0) {
-    return { labels: [], datasets: [] }
+type ActivityTab = 'commits' | 'issues' | 'openrank'
+
+const _lastTabKey = 'openramp_repo_activity_last_tab'
+
+const readLastTab = (): ActivityTab | null => {
+  try {
+    const raw = window.localStorage.getItem(_lastTabKey)
+    if (raw === 'commits' || raw === 'issues' || raw === 'openrank') return raw
+    return null
+  } catch {
+    return null
   }
-  const labels = points.map(p => p.date)
-  const data = points.map(p => p.count)
+}
+
+const writeLastTab = (tab: ActivityTab) => {
+  try {
+    window.localStorage.setItem(_lastTabKey, tab)
+  } catch {
+  }
+}
+
+const _isoDate = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const buildCommitFallbackPoints = (weeks: number = 12): TrendPoint[] => {
+  const now = new Date()
+  const points: TrendPoint[] = []
+  for (let i = weeks - 1; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i * 7)
+    points.push({ date: _isoDate(d), count: 0 })
+  }
+  return points
+}
+
+const buildChartData = (points: TrendPoint[] | null, label: string, primary: string) => {
+  const safePoints = points ?? []
+  const labels = safePoints.map(p => p.date)
+  const data = safePoints.map(p => p.count)
   return {
     labels,
     datasets: [
@@ -58,39 +96,98 @@ const buildChartData = (points: TrendPoint[] | null, label: string, primary: str
   }
 }
 
-const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion = 0 }) => {
-  const [activeTab, setActiveTab] = useState<'commits' | 'issues' | 'openrank'>('commits')
+const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion = 0, onOpenRankRefresh }) => {
+  const [activeTab, setActiveTab] = useState<ActivityTab>('commits')
   const [commitTrend, setCommitTrend] = useState<TrendState>({ loading: false, error: null, data: null })
   const [issueTrend, setIssueTrend] = useState<TrendState>({ loading: false, error: null, data: null })
 
+  const trendCacheRef = useRef<{
+    commits: Record<string, TrendPoint[]>
+    issues: Record<string, TrendPoint[]>
+  }>({ commits: {}, issues: {} })
+
+  const isNetworkError = (e: any) => {
+    const msg = String(e?.message || e || '')
+    return msg === 'NETWORK_UNAVAILABLE' || msg.includes('NETWORK_UNAVAILABLE')
+  }
+
+  const setTab = (tab: ActivityTab) => {
+    setActiveTab(tab)
+    writeLastTab(tab)
+  }
+
   useEffect(() => {
     if (!repo) return
-    setActiveTab('commits')
-    setCommitTrend({ loading: false, error: null, data: null })
-    setIssueTrend({ loading: false, error: null, data: null })
-    loadTrend('commits', repo.repo_id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const repoId = repo.repo_id
+    const last = readLastTab()
+    const initial: ActivityTab = last ?? 'commits'
+    setTab(initial)
+
+    const cachedCommits = trendCacheRef.current.commits[repoId]
+    const cachedIssues = trendCacheRef.current.issues[repoId]
+    setCommitTrend({ loading: false, error: null, data: cachedCommits ?? null })
+    setIssueTrend({ loading: false, error: null, data: cachedIssues ?? null })
+
+    if (!last || last === 'commits') {
+      void loadTrend('commits', repoId, { force: true })
+    } else if (last === 'issues') {
+      void loadTrend('issues', repoId, { force: true })
+    } else {
+      if (repoId && onOpenRankRefresh) onOpenRankRefresh(repoId)
+    }
   }, [repo?.repo_id])
 
-  const loadTrend = async (type: 'commits' | 'issues', repoId: string) => {
+  const loadTrend = async (
+    type: 'commits' | 'issues',
+    repoId: string,
+    opts?: { force?: boolean }
+  ) => {
     if (!repoId) return
     if (type === 'commits') {
-      if (commitTrend.data || commitTrend.loading) return
+      if (!opts?.force) {
+        const cached = trendCacheRef.current.commits[repoId]
+        if (cached) {
+          setCommitTrend({ loading: false, error: null, data: cached })
+          return
+        }
+      }
       setCommitTrend(s => ({ ...s, loading: true, error: null }))
       try {
         const res = await activityAPI.getCommitTrend(repoId)
-        setCommitTrend({ loading: false, error: null, data: res.points || [] })
+        const pts = (res.points || []) as TrendPoint[]
+        trendCacheRef.current.commits[repoId] = pts
+        setCommitTrend({ loading: false, error: null, data: pts })
       } catch (e: any) {
-        setCommitTrend({ loading: false, error: e?.message || '加载失败', data: null })
+        if (isNetworkError(e)) {
+          setCommitTrend({ loading: false, error: '网络错误，请稍后重试', data: null })
+        } else {
+          const pts: TrendPoint[] = []
+          trendCacheRef.current.commits[repoId] = pts
+          setCommitTrend({ loading: false, error: null, data: pts })
+        }
       }
     } else {
-      if (issueTrend.data || issueTrend.loading) return
+      if (!opts?.force) {
+        const cached = trendCacheRef.current.issues[repoId]
+        if (cached) {
+          setIssueTrend({ loading: false, error: null, data: cached })
+          return
+        }
+      }
       setIssueTrend(s => ({ ...s, loading: true, error: null }))
       try {
         const res = await activityAPI.getIssueTrend(repoId)
-        setIssueTrend({ loading: false, error: null, data: res.points || [] })
+        const pts = (res.points || []) as TrendPoint[]
+        trendCacheRef.current.issues[repoId] = pts
+        setIssueTrend({ loading: false, error: null, data: pts })
       } catch (e: any) {
-        setIssueTrend({ loading: false, error: e?.message || '加载失败', data: null })
+        if (isNetworkError(e)) {
+          setIssueTrend({ loading: false, error: '网络错误，请稍后重试', data: null })
+        } else {
+          const pts: TrendPoint[] = []
+          trendCacheRef.current.issues[repoId] = pts
+          setIssueTrend({ loading: false, error: null, data: pts })
+        }
       }
     }
   }
@@ -112,20 +209,10 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
 
     const state = activeTab === 'commits' ? commitTrend : issueTrend
     const label = activeTab === 'commits' ? '提交次数' : 'Issue 数量'
-    const title = activeTab === 'commits' ? 'Commit 趋势图' : 'Issue 趋势图'
-
-    if (state.loading) {
-      return (
-        <div className="flex h-[200px] items-center justify-center text-text/70">
-          加载中...
-        </div>
-      )
-    }
 
     if (state.error) {
       return (
-        <div className="flex h-[200px] flex-col items-center justify-center text-xs text-text/70">
-          <div className="mb-2">{title}</div>
+        <div className="flex h-[200px] items-center justify-center text-xs text-text/70">
           <div>{state.error}</div>
         </div>
       )
@@ -135,19 +222,14 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
     const text = cssVar('--color-text') || '#1c1f1e'
     const bg = cssVar('--color-background') || '#f8f9f8'
     const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
-    const chartData = buildChartData(state.data, label, primary)
-    if (!chartData.labels.length) {
-      return (
-        <div className="flex h-[200px] flex-col items-center justify-center text-text/50">
-          <div className="mb-2">{title}</div>
-          <div>暂无数据</div>
-        </div>
-      )
-    }
+    const points =
+      activeTab === 'commits' && (state.data == null || state.data.length === 0)
+        ? buildCommitFallbackPoints(12)
+        : (state.data ?? [])
+    const chartData = buildChartData(points, label, primary)
 
     return (
-      <div className="flex h-full w-full flex-col px-2 pb-2">
-        <div className="mb-2 shrink-0 text-xs text-text">{title}</div>
+      <div className="relative flex h-full w-full flex-col px-2 pb-2">
         <div className="min-h-0 flex-1 overflow-hidden">
         <Line
           key={themeVersion}
@@ -191,6 +273,13 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
           }}
         />
         </div>
+        {state.loading && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-surface/40 backdrop-blur-sm">
+            <div className="rounded-md border border-border bg-surface/70 px-3 py-1.5 text-xs text-text/80">
+              加载中...
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -205,8 +294,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
             activeTab === 'commits' ? 'border-primary text-primary' : 'border-transparent text-text'
           }`}
           onClick={() => {
-            setActiveTab('commits')
-            if (repoId) loadTrend('commits', repoId)
+            setTab('commits')
+            if (repoId) void loadTrend('commits', repoId)
           }}
         >
           Commit
@@ -216,8 +305,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
             activeTab === 'issues' ? 'border-primary text-primary' : 'border-transparent text-text'
           }`}
           onClick={() => {
-            setActiveTab('issues')
-            if (repoId) loadTrend('issues', repoId)
+            setTab('issues')
+            if (repoId) void loadTrend('issues', repoId)
           }}
         >
           Issues
@@ -227,7 +316,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
             activeTab === 'openrank' ? 'border-primary text-primary' : 'border-transparent text-text'
           }`}
           onClick={() => {
-            setActiveTab('openrank')
+            setTab('openrank')
+            if (repoId && onOpenRankRefresh) onOpenRankRefresh(repoId)
           }}
         >
           openRank
