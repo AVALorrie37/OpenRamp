@@ -6,6 +6,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -18,6 +19,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -58,8 +60,26 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
           label: '贡献者数量',
           data,
           borderColor: primary,
-          backgroundColor: `${primary}40`,
-          tension: 0.4
+          backgroundColor: (ctx: any) => {
+            const chart = ctx?.chart
+            const area = chart?.chartArea
+            if (!area) return `${primary}33`
+            const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+            g.addColorStop(0, `${primary}88`)
+            g.addColorStop(0.7, `${primary}66`)
+            g.addColorStop(1, `${primary}00`)
+            return g
+          },
+          fill: true,
+          borderWidth: 1.5,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          pointHitRadius: 10,
+          pointBackgroundColor: primary,
+          pointHoverBackgroundColor: primary,
+          pointBorderWidth: 0,
+          pointHoverBorderWidth: 0
         }
       ]
     }
@@ -90,6 +110,8 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
             options={{
               responsive: true,
               maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              hover: { mode: 'index', intersect: false },
               plugins: {
                 legend: {
                   display: false

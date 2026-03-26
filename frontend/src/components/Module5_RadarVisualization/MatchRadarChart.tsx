@@ -149,6 +149,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const [editDraft, setEditDraft] = useState('')
   const valueInputRef = useRef<HTMLInputElement>(null)
   const radarDotPatternId = useId().replace(/:/g, '')
+  const radarEnvelopeFillId = useId().replace(/:/g, '')
 
   const primary = cssVar('--color-primary') || '#829c83'
 
@@ -395,6 +396,11 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                           fillOpacity={0.58}
                         />
                       </pattern>
+                      <linearGradient id={radarEnvelopeFillId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={primary} stopOpacity={0.28} />
+                        <stop offset="65%" stopColor={primary} stopOpacity={0.14} />
+                        <stop offset="100%" stopColor={primary} stopOpacity={0.02} />
+                      </linearGradient>
                     </defs>
                     <circle cx={cx} cy={cy} r={rr} fill={`url(#${radarDotPatternId})`} />
                   </g>
@@ -427,8 +433,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               dataKey="envelope"
               stroke={primary}
               strokeOpacity={0.38}
-              fill={primary}
-              fillOpacity={0.14}
+              fill={`url(#${radarEnvelopeFillId})`}
+              fillOpacity={1}
               strokeWidth={2.75}
               dot={false}
               isAnimationActive={false}
