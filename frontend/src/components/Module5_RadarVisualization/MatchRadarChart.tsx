@@ -153,6 +153,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const radarCenterGlowId = useId().replace(/:/g, '')
 
   const primary = cssVar('--color-primary') || '#829c83'
+  const primaryDeep = cssVar('--color-primaryDeep') || '#3daecd'
   const textMain = cssVar('--color-text') || '#dbe7ff'
   const textSubtle = `${textMain}99`
   const borderSoft = cssVar('--color-border') || 'rgba(120, 154, 197, 0.24)'
@@ -176,8 +177,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             communityDemand: 'Demand',
             overallMatch: 'Overall Match',
             matchDegree: 'Match',
-            weightAdjust: 'Weight Adjustment',
-            applyAll: 'Apply to all repositories',
+            weightAdjust: 'Weights',
+            applyAll: 'Apply to All',
             tooltipRaw: 'Raw',
             tooltipWeight: 'w′'
           }
@@ -187,7 +188,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             communityDemand: '需求',
             overallMatch: '匹配总分',
             matchDegree: '匹配度',
-            weightAdjust: '权重调节',
+            weightAdjust: '权重',
             applyAll: '应用到所有仓库',
             tooltipRaw: '原始',
             tooltipWeight: '权重 w′'
@@ -281,35 +282,44 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
     (tp: Record<string, unknown>) => {
       const x = typeof tp.x === 'number' ? tp.x : 0
       const y = typeof tp.y === 'number' ? tp.y : 0
-      const textAnchor = typeof tp.textAnchor === 'string' ? tp.textAnchor : 'middle'
+      const cx = typeof tp.cx === 'number' ? tp.cx : 0
+      const cy = typeof tp.cy === 'number' ? tp.cy : 0
       const index = typeof tp.index === 'number' ? tp.index : 0
       const payload = tp.payload as { value?: string } | undefined
       const row = data.find((d) => d.subject === payload?.value) ?? data[index]
       if (!row) return <g />
       const title = language === 'english' ? row.subject.toUpperCase() : row.subject
-      const skillOffset = row.subject === labels.skillMatch ? -4 : 0
+      const dx = x - cx
+      const dy = y - cy
+      const len = Math.hypot(dx, dy) || 1
+      const radialOffset = 16
+      const globalLabelYShift = 10
+      const sideLabelXSpread = 12
+      const sideXShift = Math.abs(dx) > Math.abs(dy) * 0.8 ? Math.sign(dx) * sideLabelXSpread : 0
+      const tx = x + (dx / len) * radialOffset + sideXShift
+      const ty = y + (dy / len) * radialOffset + globalLabelYShift
       return (
-        <g transform={`translate(${x},${y + skillOffset})`}>
+        <g transform={`translate(${tx},${ty})`}>
           <text
-            textAnchor={textAnchor as 'start' | 'middle' | 'end'}
-            dy={-10}            
-            fill={textSubtle}
-            style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em' }}
-          >
-            {title}
-          </text>
-          <text
-            textAnchor={textAnchor as 'start' | 'middle' | 'end'}
-            dy={12}
+            textAnchor="middle"
+            dy={-2}
             fill={primary}
             style={{ fontSize: 24, fontWeight: 700 }}
           >
             {row.rawPct}%
           </text>
+          <text
+            textAnchor="middle"
+            dy={12}
+            fill={textSubtle}
+            style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em' }}
+          >
+            {title}
+          </text>
         </g>
       )
     },
-    [data, language, primary, labels.skillMatch, textSubtle]
+    [data, language, primary, textSubtle]
   )
 
   const tooltipFormatter = useCallback(
@@ -360,8 +370,9 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
       <h2 className="mb-3 mt-0 text-xl font-semibold tracking-tight text-text/90">
         {matchData.repoName}
       </h2>
-      <div className="mb-4 text-4xl font-bold leading-none text-primary">
-        {labels.overallMatch}: {Math.round(previewMatchScore * 100)}%
+      <div className="mb-4 flex items-baseline gap-2 text-4xl font-bold leading-none">
+        <span className="text-text/90">{labels.overallMatch}:</span>
+        <span className="text-primary">{Math.round(previewMatchScore * 100)}%</span>
       </div>
       <div
         className={`w-full overflow-hidden rounded-2xl p-1 ${
@@ -402,9 +413,9 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                         />
                       </pattern>
                       <linearGradient id={radarEnvelopeFillId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={primary} stopOpacity={0.22} />
-                        <stop offset="65%" stopColor={primary} stopOpacity={0.11} />
-                        <stop offset="100%" stopColor={primary} stopOpacity={0.02} />
+                        <stop offset="0%" stopColor={primaryDeep} stopOpacity={0.24} />
+                        <stop offset="65%" stopColor={primaryDeep} stopOpacity={0.12} />
+                        <stop offset="100%" stopColor={primaryDeep} stopOpacity={0.03} />
                       </linearGradient>
                       <radialGradient id={radarCenterGlowId} cx="50%" cy="53%" r="36%">
                         <stop offset="0%" stopColor={primary} stopOpacity={0.2} />
@@ -442,7 +453,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             <Radar
               name={envelopeName}
               dataKey="envelope"
-              stroke={primary}
+              stroke={primaryDeep}
               strokeOpacity={0.3}
               fill={`url(#${radarEnvelopeFillId})`}
               fillOpacity={1}
@@ -486,13 +497,16 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
       <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text/90">
         {onBaseWeightsChange && (
           <div className="mt-3 flex w-full justify-center px-1">
-            <div className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg border border-border/80 bg-surface p-4 shadow-panel">
+            <div
+              className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg bg-surface p-4 shadow-panel"
+              style={{ border: '1px solid rgba(219, 231, 255, 0.16)' }}
+            >
               <div className="text-sm font-semibold tracking-wide text-text/85">{labels.weightAdjust}</div>
               <div className="flex flex-col gap-4">
                 {WEIGHT_KEYS.map(({ key, label }) => (
                   <div key={key} className="flex items-center gap-3">
                     <span
-                      className="w-[4.5rem] shrink-0 font-mono text-[11px] text-text/85"
+                      className="w-[4.5rem] shrink-0 font-mono text-[13px] text-text/85"
                       dangerouslySetInnerHTML={{ __html: weightKeyLabelHtml[key] }}
                     />
                     <input
@@ -505,7 +519,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                       className="weight-slider min-w-0 flex-1"
                       style={
                         {
-                          ['--weight-slider-pct' as string]: `${localWeights[key] * 100}%`
+                          ['--weight-slider-pct' as string]: `${localWeights[key] * 100}%`,
+                          accentColor: primaryDeep
                         } as React.CSSProperties
                       }
                       aria-label={label}
@@ -545,7 +560,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               <button
                 type="button"
                 onClick={handleApplyToAll}
-                className="mt-1 w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-white transition hover:bg-primaryDark"
+                className="mt-1 w-full rounded-xl py-2.5 text-base font-medium text-[#06222e] transition hover:brightness-95"
+                style={{ backgroundColor: primaryDeep }}
               >
                 {labels.applyAll}
               </button>
