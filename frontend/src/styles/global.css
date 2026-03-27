@@ -22,22 +22,22 @@
 }
 
 .dark {
-  --color-primary: #58d6cf;
-  --color-primaryDark: #2fb8b1;
-  --color-primaryLight: rgba(88, 214, 207, 0.18);
-  --color-accent: #8bd3ff;
-  --color-tertiary: #0b3c57;
-  --color-background: #071524;
-  --color-text: #e7edf6;
+  --color-primary: #66e9dd;
+  --color-primaryDark: #4ed9cc;
+  --color-primaryLight: rgba(102, 233, 221, 0.16);
+  --color-accent: #a7d9ff;
+  --color-tertiary: #153757;
+  --color-background: #07142b;
+  --color-text: #dbe7ff;
   --color-error: #ff6b6b;
   --color-warning: #f2b84b;
-  --color-border: rgba(231, 237, 246, 0.12);
-  --color-hover: rgba(88, 214, 207, 0.16);
-  --color-surface: #0b1f33;
-  --color-surface2: #0f2a42;
-  --color-grid: rgba(231, 237, 246, 0.10);
-  --shadow-panel: rgba(0, 0, 0, 0.55);
-  --shadow-modal: rgba(0, 0, 0, 0.65);
+  --color-border: rgba(120, 154, 197, 0.24);
+  --color-hover: rgba(102, 233, 221, 0.12);
+  --color-surface: #0b1b36;
+  --color-surface2: #102344;
+  --color-grid: rgba(120, 154, 197, 0.14);
+  --shadow-panel: rgba(0, 0, 0, 0.50);
+  --shadow-modal: rgba(0, 0, 0, 0.62);
 }
 
 * {

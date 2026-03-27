@@ -150,8 +150,13 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const valueInputRef = useRef<HTMLInputElement>(null)
   const radarDotPatternId = useId().replace(/:/g, '')
   const radarEnvelopeFillId = useId().replace(/:/g, '')
+  const radarCenterGlowId = useId().replace(/:/g, '')
 
   const primary = cssVar('--color-primary') || '#829c83'
+  const textMain = cssVar('--color-text') || '#dbe7ff'
+  const textSubtle = `${textMain}99`
+  const borderSoft = cssVar('--color-border') || 'rgba(120, 154, 197, 0.24)'
+  const surface = cssVar('--color-surface') || '#0b1b36'
 
   useEffect(() => {
     setLocalWeights(baseWeights || defaultBase)
@@ -288,8 +293,8 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
           <text
             textAnchor={textAnchor as 'start' | 'middle' | 'end'}
             dy={-10}            
-            fill={primary}
-            style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em' }}
+            fill={textSubtle}
+            style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em' }}
           >
             {title}
           </text>
@@ -297,14 +302,14 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             textAnchor={textAnchor as 'start' | 'middle' | 'end'}
             dy={12}
             fill={primary}
-            style={{ fontSize: 18, fontWeight: 700 }}
+            style={{ fontSize: 24, fontWeight: 700 }}
           >
             {row.rawPct}%
           </text>
         </g>
       )
     },
-    [data, language, primary, labels.skillMatch]
+    [data, language, primary, labels.skillMatch, textSubtle]
   )
 
   const tooltipFormatter = useCallback(
@@ -352,10 +357,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
 
   const chartContent = (
     <div className={`flex h-full flex-col items-center ${embedded ? 'p-5' : 'p-10'}`}>
-      <h2 className="mb-5 mt-0 text-2xl font-semibold text-text">
+      <h2 className="mb-3 mt-0 text-xl font-semibold tracking-tight text-text/90">
         {matchData.repoName}
       </h2>
-      <div className="mb-4 text-3xl font-semibold text-primary">
+      <div className="mb-4 text-4xl font-bold leading-none text-primary">
         {labels.overallMatch}: {Math.round(previewMatchScore * 100)}%
       </div>
       <div
@@ -397,12 +402,17 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                         />
                       </pattern>
                       <linearGradient id={radarEnvelopeFillId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={primary} stopOpacity={0.28} />
-                        <stop offset="65%" stopColor={primary} stopOpacity={0.14} />
+                        <stop offset="0%" stopColor={primary} stopOpacity={0.22} />
+                        <stop offset="65%" stopColor={primary} stopOpacity={0.11} />
                         <stop offset="100%" stopColor={primary} stopOpacity={0.02} />
                       </linearGradient>
+                      <radialGradient id={radarCenterGlowId} cx="50%" cy="53%" r="36%">
+                        <stop offset="0%" stopColor={primary} stopOpacity={0.2} />
+                        <stop offset="100%" stopColor={primary} stopOpacity={0} />
+                      </radialGradient>
                     </defs>
                     <circle cx={cx} cy={cy} r={rr} fill={`url(#${radarDotPatternId})`} />
+                    <circle cx={cx} cy={cy} r={rr * 0.75} fill={`url(#${radarCenterGlowId})`} />
                   </g>
                 )
               }}
@@ -422,9 +432,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             <Tooltip
               contentStyle={{
                 borderRadius: 10,
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-surface)',
-                fontSize: 12
+                border: `1px solid ${borderSoft}`,
+                background: surface,
+                fontSize: 12,
+                color: textMain
               }}
               formatter={tooltipFormatter}
             />
@@ -432,10 +443,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               name={envelopeName}
               dataKey="envelope"
               stroke={primary}
-              strokeOpacity={0.38}
+              strokeOpacity={0.3}
               fill={`url(#${radarEnvelopeFillId})`}
               fillOpacity={1}
-              strokeWidth={2.75}
+              strokeWidth={2.2}
               dot={false}
               isAnimationActive={false}
             />
@@ -443,9 +454,9 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               name={labels.matchDegree}
               dataKey="value"
               stroke={primary}
-              strokeWidth={2.75}
+              strokeWidth={2.4}
               fill={primary}
-              fillOpacity={0.58}
+              fillOpacity={0.46}
               isAnimationActive={false}
             />
             <Customized
@@ -461,7 +472,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                       r={r}
                       fill="none"
                       stroke={primary}
-                      strokeOpacity={0.4}
+                      strokeOpacity={0.28}
                       strokeWidth={0.5}
                     />
                     <circle cx={cx} cy={cy} r={1.5} fill={primary} />
@@ -472,11 +483,11 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text">
+      <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text/90">
         {onBaseWeightsChange && (
           <div className="mt-3 flex w-full justify-center px-1">
-            <div className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-panel">
-              <div className="text-sm font-semibold text-text">{labels.weightAdjust}</div>
+            <div className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg border border-border/80 bg-surface p-4 shadow-panel">
+              <div className="text-sm font-semibold tracking-wide text-text/85">{labels.weightAdjust}</div>
               <div className="flex flex-col gap-4">
                 {WEIGHT_KEYS.map(({ key, label }) => (
                   <div key={key} className="flex items-center gap-3">

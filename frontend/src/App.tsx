@@ -942,7 +942,7 @@ const App: React.FC = () => {
           )
 
           const rightPanel = (
-            <div className="relative flex h-full items-center justify-center rounded-md border border-border bg-surface">
+            <div className="relative flex h-full items-center justify-center rounded-md border border-border/80 bg-gradient-to-b from-surface to-surface2/80 shadow-panel">
               <RadarPlaceholder
                 isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
                 matchData={matchData}
