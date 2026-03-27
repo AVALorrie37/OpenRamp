@@ -28,6 +28,9 @@ const HOME_COLS_STORAGE_KEY = 'openramp_home_cols_v1'
 const THIRD_COL_MIN_HEIGHT_PX = 600
 const THIRD_COL_MAX_HEIGHT_PX = 680
 const THIRD_COL_IDEAL_VH = 70
+const HOME_LEFT_MIN_WIDTH_PX = 340
+const HOME_MIDDLE_MIN_WIDTH_PX = 360
+const HOME_RIGHT_MIN_WIDTH_PX = 350
 
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
@@ -122,9 +125,9 @@ const App: React.FC = () => {
   }, [])
 
   const clampHomeCols = useCallback((sizes: HomeColSizes, available: number): HomeColSizes => {
-    const minLeft = 260
-    const minMiddle = 360
-    const minRight = 300
+    const minLeft = HOME_LEFT_MIN_WIDTH_PX
+    const minMiddle = HOME_MIDDLE_MIN_WIDTH_PX
+    const minRight = HOME_RIGHT_MIN_WIDTH_PX
     const minTotal = minLeft + minMiddle + minRight
     const a = Math.max(available, minTotal)
 
@@ -246,13 +249,13 @@ const App: React.FC = () => {
       const handleW = 8
       const available = Math.max(0, Math.floor(ds.total - handleW * 2))
 
-      const minLeft = 260
-      const minMiddle = 360
-      const minRight = 300
+      const minMiddle = HOME_MIDDLE_MIN_WIDTH_PX
+      const minRight = HOME_RIGHT_MIN_WIDTH_PX
+      const safeMinLeft = HOME_LEFT_MIN_WIDTH_PX
 
       const dx = e.clientX - ds.startX
       if (ds.which === 'left') {
-        const minDelta = minLeft - ds.start.left
+        const minDelta = safeMinLeft - ds.start.left
         const maxDelta = ds.start.middle - minMiddle
         const delta = Math.min(Math.max(dx, minDelta), maxDelta)
         const next: HomeColSizes = {
@@ -823,6 +826,7 @@ const App: React.FC = () => {
                 <RepoActivityTabs
                   repo={selectedRepo || repos[0]}
                   themeVersion={themeVersion}
+                  language={uiLanguage}
                   onOpenRankRefresh={async (repoId) => {
                     try {
                       const enriched = await manualSearchAPI.bulkEnrich([
@@ -894,6 +898,7 @@ const App: React.FC = () => {
                 <KeywordCloud
                   repos={repos}
                   selectedRepo={selectedRepo}
+                  language={uiLanguage}
                   onKeywordClick={handleKeywordClick}
                   activeKeywords={activeKeywords}
                   skipDescriptionKeywordFallback={skipDescriptionKeywordFallback}

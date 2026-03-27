@@ -525,6 +525,64 @@ _integrated_search: Optional[IntegratedRepoSearch] = None
 _http_client: Optional[httpx.AsyncClient] = None
 _github_activity_cache: Dict[str, Dict[str, Any]] = {}
 _running_searches: Dict[str, asyncio.Event] = {}
+_github_activity_cache_file = (
+    project_root / "src" / "data_layer" / "data" / "runtime_cache" / "github_activity_cache.json"
+)
+
+
+def _load_github_activity_cache_from_disk() -> Dict[str, Dict[str, Any]]:
+    p = _github_activity_cache_file
+    if not p.exists():
+        return {}
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        cleaned: Dict[str, Dict[str, Any]] = {}
+        for k, v in data.items():
+            if isinstance(k, str) and isinstance(v, dict):
+                cleaned[k] = v
+        return cleaned
+    except Exception:
+        logger.warning("Failed to load github activity cache from disk", exc_info=True)
+        return {}
+
+
+def _persist_github_activity_cache_to_disk() -> None:
+    p = _github_activity_cache_file
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_github_activity_cache, f, ensure_ascii=False)
+        tmp.replace(p)
+    except Exception:
+        logger.warning("Failed to persist github activity cache to disk", exc_info=True)
+
+
+def _prune_two_days_old_activity_cache(
+    kind: str,
+    repo_id: str,
+    today_key: str,
+    days: Optional[int] = None,
+) -> None:
+    try:
+        today_dt = datetime.strptime(today_key, "%Y-%m-%d")
+    except ValueError:
+        return
+    target_date = (today_dt - timedelta(days=2)).strftime("%Y-%m-%d")
+    if kind == "issue":
+        if days is None:
+            return
+        stale_key = _github_activity_cache_key(kind, repo_id, f"{target_date}:{days}")
+    else:
+        stale_key = _github_activity_cache_key(kind, repo_id, target_date)
+    if stale_key in _github_activity_cache:
+        _github_activity_cache.pop(stale_key, None)
+
+
+_github_activity_cache = _load_github_activity_cache_from_disk()
 
 
 def get_conversation_handler(user_id: str, agent_type: str = 'agent1', user_language: str = None, session_id: Optional[str] = None) -> Tuple[ConversationHandler, str]:
@@ -1288,8 +1346,54 @@ class TrendResponse(BaseModel):
     points: List[TrendPoint]
 
 
+class TrendCacheFallbackResponse(BaseModel):
+    repo_id: str
+    points: List[TrendPoint]
+    cache_date: str
+
+
 def _today_key() -> str:
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def _find_latest_cached_trend_before_today(
+    kind: str,
+    repo_id: str,
+    days: Optional[int] = None
+) -> Optional[Tuple[str, Dict[str, Any]]]:
+    today = _today_key()
+    prefix = f"{kind}:{repo_id}:"
+    latest_date = ""
+    latest_payload: Optional[Dict[str, Any]] = None
+
+    for cache_key, payload in _github_activity_cache.items():
+        if not cache_key.startswith(prefix):
+            continue
+        rest = cache_key[len(prefix):]
+        date_part = rest.split(":", 1)[0]
+        if len(date_part) != 10:
+            continue
+        if date_part >= today:
+            continue
+
+        if kind == "issue":
+            parts = rest.split(":", 1)
+            if len(parts) != 2:
+                continue
+            try:
+                key_days = int(parts[1])
+            except ValueError:
+                continue
+            if days is not None and key_days != days:
+                continue
+
+        if date_part > latest_date:
+            latest_date = date_part
+            latest_payload = payload
+
+    if not latest_payload or not latest_date:
+        return None
+    return latest_date, latest_payload
 
 
 @app.get("/api/github/commit_trend", response_model=TrendResponse)
@@ -1322,6 +1426,8 @@ async def github_commit_trend(
           points.append(TrendPoint(date=date_str, count=int(total)))
         result = TrendResponse(repo_id=repo_id, points=points)
         _github_activity_cache[cache_key] = json.loads(result.model_dump_json())
+        _prune_two_days_old_activity_cache("commit", repo_id, today_key)
+        _persist_github_activity_cache_to_disk()
         return result
     except httpx.HTTPStatusError as e:
         logger.error(f"GITHUB_COMMIT_TREND_HTTP_ERROR: {e}", exc_info=True)
@@ -1332,6 +1438,22 @@ async def github_commit_trend(
     except Exception as e:
         logger.error(f"GITHUB_COMMIT_TREND_UNEXPECTED_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="GITHUB_COMMIT_TREND_UNEXPECTED_ERROR: Internal server error")
+
+
+@app.get("/api/github/commit_trend/cached_fallback", response_model=TrendCacheFallbackResponse)
+async def github_commit_trend_cached_fallback(
+    repo_id: str = Query(..., description="owner/repo")
+):
+    _validate_repo_id(repo_id)
+    found = _find_latest_cached_trend_before_today("commit", repo_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="GITHUB_COMMIT_TREND_CACHED_FALLBACK_NOT_FOUND")
+    cache_date, payload = found
+    return TrendCacheFallbackResponse(
+        repo_id=payload.get("repo_id", repo_id),
+        points=payload.get("points", []),
+        cache_date=cache_date,
+    )
 
 
 @app.get("/api/github/issue_trend", response_model=TrendResponse)
@@ -1395,6 +1517,8 @@ async def github_issue_trend(
         points = [TrendPoint(date=d, count=counter.get(d, 0)) for d in dates]
         result = TrendResponse(repo_id=repo_id, points=points)
         _github_activity_cache[cache_key] = json.loads(result.model_dump_json())
+        _prune_two_days_old_activity_cache("issue", repo_id, today_key, days)
+        _persist_github_activity_cache_to_disk()
         return result
     except httpx.HTTPStatusError as e:
         logger.error(f"GITHUB_ISSUE_TREND_HTTP_ERROR: {e}", exc_info=True)
@@ -1405,6 +1529,23 @@ async def github_issue_trend(
     except Exception as e:
         logger.error(f"GITHUB_ISSUE_TREND_UNEXPECTED_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="GITHUB_ISSUE_TREND_UNEXPECTED_ERROR: Internal server error")
+
+
+@app.get("/api/github/issue_trend/cached_fallback", response_model=TrendCacheFallbackResponse)
+async def github_issue_trend_cached_fallback(
+    repo_id: str = Query(..., description="owner/repo"),
+    days: int = Query(30, ge=1, le=90)
+):
+    _validate_repo_id(repo_id)
+    found = _find_latest_cached_trend_before_today("issue", repo_id, days)
+    if not found:
+        raise HTTPException(status_code=404, detail="GITHUB_ISSUE_TREND_CACHED_FALLBACK_NOT_FOUND")
+    cache_date, payload = found
+    return TrendCacheFallbackResponse(
+        repo_id=payload.get("repo_id", repo_id),
+        points=payload.get("points", []),
+        cache_date=cache_date,
+    )
 
 
 @app.post("/api/repos/bulk_enrich")

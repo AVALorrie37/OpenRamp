@@ -9,6 +9,7 @@ interface KeywordCloudProps {
   activeKeywords: string[]
   skipDescriptionKeywordFallback?: boolean
   onSingleRepoLabelClick?: (repo: RepoResponse) => void
+  language?: 'chinese' | 'english'
 }
 // frontend/src/components/Module1_MainCenter/KeywordCloud.tsx
 const KeywordCloud: React.FC<KeywordCloudProps> = ({
@@ -17,7 +18,8 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
   onKeywordClick,
   activeKeywords,
   skipDescriptionKeywordFallback = false,
-  onSingleRepoLabelClick
+  onSingleRepoLabelClick,
+  language = 'chinese'
 }) => {
   const keywordData = useMemo(() => {
     const allKeywords: string[] = []
@@ -45,7 +47,9 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
   }, [repos, selectedRepo, skipDescriptionKeywordFallback])
 
   const isSingleRepo = !!selectedRepo
-  const modeLabel = isSingleRepo ? (selectedRepo?.name || '单个仓库') : '所有仓库'
+  const modeLabel = isSingleRepo
+    ? (selectedRepo?.name || (language === 'english' ? 'Single Repo' : '单个仓库'))
+    : (language === 'english' ? 'All Repos' : '所有仓库')
 
   const getFontSize = (count: number, maxCount: number) => {
     const minSize = 12

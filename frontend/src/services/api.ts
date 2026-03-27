@@ -70,6 +70,12 @@ export const activityAPI = {
   },
   getIssueTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
     return unwrap(api.get('/api/github/issue_trend', { params: { repo_id } }))
+  },
+  getCommitTrendCachedFallback: async (repo_id: string): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
+    return unwrap(api.get('/api/github/commit_trend/cached_fallback', { params: { repo_id } }))
+  },
+  getIssueTrendCachedFallback: async (repo_id: string, days: number = 30): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
+    return unwrap(api.get('/api/github/issue_trend/cached_fallback', { params: { repo_id, days } }))
   }
 }
 
