@@ -100,7 +100,9 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
             <span
               key={word}
               className={`cursor-pointer rounded px-2 py-1 transition ${sizeClass} ${weightClass} ${
-                isActive ? 'bg-primary text-white' : 'bg-surface2 text-primary hover:bg-primaryLight/60'
+                isActive
+                  ? 'bg-gradient-to-br from-primary/88 to-primaryDeep/82 text-white backdrop-blur-sm'
+                  : 'bg-gradient-to-br from-surface/92 to-surface2/72 text-primary backdrop-blur-sm hover:from-primaryLight/55 hover:to-surface2/78'
               }`}
               onClick={(e) => {
                 e.stopPropagation()

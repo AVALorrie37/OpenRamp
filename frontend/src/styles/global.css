@@ -28,17 +28,17 @@
   --color-primaryDark: #2e7871;
   --color-primaryLight: rgba(102, 233, 221, 0.16);
   --color-accent: #a7d9ff;
-  --color-tertiary: #153757;
-  --color-background: #07142b;
+  --color-tertiary: #213a5f;
+  --color-background: #06122a;
   --color-text: #dbe7ff;
   --color-error: #ff6b6b;
   --color-warning: #f2b84b;
-  --color-border: rgba(120, 154, 197, 0.24);
+  --color-border: rgba(164, 187, 222, 0.2);
   --color-hover: rgba(102, 233, 221, 0.12);
-  --color-surface: #0b1b36;
-  --color-surface2: #102344;
+  --color-surface: #2a3550;
+  --color-surface2: #232e48;
   --color-grid: rgba(120, 154, 197, 0.14);
-  --shadow-panel: rgba(0, 0, 0, 0.50);
+  --shadow-panel: rgba(2, 8, 24, 0.46);
   --shadow-modal: rgba(0, 0, 0, 0.62);
 }
 

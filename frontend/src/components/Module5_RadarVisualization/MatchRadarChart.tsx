@@ -498,7 +498,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
         {onBaseWeightsChange && (
           <div className="mt-3 flex w-full justify-center px-1">
             <div
-              className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg bg-surface p-4 shadow-panel"
+              className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg bg-gradient-to-br from-surface/90 to-surface2/70 p-4 shadow-panel backdrop-blur-md"
               style={{ border: '1px solid rgba(219, 231, 255, 0.16)' }}
             >
               <div className="text-sm font-semibold tracking-wide text-text/85">{labels.weightAdjust}</div>
