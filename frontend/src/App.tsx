@@ -755,8 +755,41 @@ const App: React.FC = () => {
                 setColorMode(next)
                 setThemeVersion((v) => v + 1)
               }}
-              className="cursor-pointer"
+              className="peer sr-only"
             />
+            <span
+              className={`inline-flex h-4 w-4 items-center justify-center transition-colors duration-200 ease-out peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 ${
+                colorMode === 'dark' ? 'text-primary' : 'text-primary'
+              }`}
+            >
+              {colorMode === 'dark' ? (
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    d="M2,2 L22,2 L22,22 L2,22 L2,2 Z M5,13 L10,17 L19,6"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 32 32"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M4,4h2v2H4V4z M8,6h4V4H8V6z M14,6h4V4h-4V6z M20,6h4V4h-4V6z M26,4v2h2V4H26z M8,28h4v-2H8V28z M14,28h4v-2h-4V28z M20,28h4v-2h-4V28z M26,12h2V8h-2V12z M26,18h2v-4h-2V18z M26,24h2v-4h-2V24z M26,28h2v-2h-2V28z M4,12h2V8H4V12z M4,18h2v-4H4V18z M4,24h2v-4H4V24z M4,28h2v-2H4V28z"
+                  />
+                </svg>
+              )}
+            </span>
             {uiLanguage === 'english' ? 'Dark mode' : '深色模式'}
           </label>
           <UserDropdown
