@@ -807,7 +807,7 @@ const App: React.FC = () => {
           const showResizable = isXl && !!homeColSizes
 
           const leftPanel = (
-            <div className="flex h-full flex-col overflow-hidden rounded-md border border-border bg-gradient-to-b from-surface to-surface2/80">
+            <div className="glass-card glass-card--large flex h-full flex-col overflow-hidden">
               <RepoList
                 repos={repos}
                 onRepoClick={handleRepoClick}
@@ -853,7 +853,7 @@ const App: React.FC = () => {
           const middlePanel = (
             <div ref={middleColumnRef} className="flex h-full flex-col">
               <div
-                className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-gradient-to-b from-surface to-surface2/80"
+                className="glass-card glass-card--large relative min-h-[200px] overflow-hidden"
                 style={middleStyles.top}
               >
                 <RepoActivityTabs
@@ -924,7 +924,7 @@ const App: React.FC = () => {
                 <div className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
               </div>
               <div
-                className="relative min-h-[200px] overflow-hidden rounded-md border border-border bg-gradient-to-b from-surface to-surface2/80"
+                className="glass-card glass-card--large relative min-h-[200px] overflow-hidden"
                 style={middleStyles.bottom}
                 onClick={handleKeywordAreaClick}
               >
@@ -942,7 +942,7 @@ const App: React.FC = () => {
           )
 
           const rightPanel = (
-            <div className="relative flex h-full items-center justify-center rounded-md border border-transparent bg-gradient-to-b from-surface to-surface2/80 shadow-panel">
+            <div className="glass-card glass-card--large relative flex h-full items-center justify-center">
               <RadarPlaceholder
                 isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
                 matchData={matchData}

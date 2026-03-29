@@ -83,9 +83,9 @@ function parseRadarGeom(p: Record<string, unknown>): { cx: number; cy: number; r
   return { cx, cy, r }
 }
 
-/** Shared tile size for radar dot pattern (userSpaceOnUse); larger = sparser dots. */
-const RADAR_DOT_TILE = 18
-const RADAR_DOT_RADIUS = 0.9
+function clampInt(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(n)))
+}
 
 const WEIGHT_KEYS: { key: WeightKey; label: string }[] = [
   { key: 'w_skill', label: 'w_skill' },
@@ -148,12 +148,34 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const [editingKey, setEditingKey] = useState<WeightKey | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const valueInputRef = useRef<HTMLInputElement>(null)
-  const radarDotPatternId = useId().replace(/:/g, '')
   const radarEnvelopeFillId = useId().replace(/:/g, '')
   const radarCenterGlowId = useId().replace(/:/g, '')
+  const radarMatchFillId = useId().replace(/:/g, '')
+  const radarMatchGlowFilterId = useId().replace(/:/g, '')
 
   const primary = cssVar('--color-primary') || '#829c83'
   const primaryDeep = cssVar('--color-primaryDeep') || '#3daecd'
+  const radarRingColor = cssVar('--color-radarRing') || 'rgba(62, 140, 132, 0.72)'
+  const radarGlowRadius = cssVar('--radar-glow-radius') || '36%'
+  const radarGlowColor = cssVar('--color-radarGlow') || primary
+  const radarGlowCenterOp = parseFloat(cssVar('--radar-glow-center-opacity') || '0.24')
+  const radarGlowMidOp = parseFloat(cssVar('--radar-glow-mid-opacity') || '0.12')
+  const radarGlowEdgeOp = parseFloat(cssVar('--radar-glow-edge-opacity') || '0')
+  const radarGlowMidOffset = cssVar('--radar-glow-mid-offset') || '55%'
+  const radarRingOpacity = parseFloat(cssVar('--radar-ring-opacity') || '0.36')
+  const radarRingWidth = parseFloat(cssVar('--radar-ring-width') || '0.55')
+  const radarRingCount = clampInt(
+    parseInt(cssVar('--radar-ring-count') || '5', 10) || 5,
+    3,
+    8
+  )
+  const matchGlowBlur = parseFloat(cssVar('--radar-match-glow-blur') || '3')
+  const matchGlowFloodOp = parseFloat(cssVar('--radar-match-glow-flood-opacity') || '0.45')
+  const matchFillTopOp = parseFloat(cssVar('--radar-match-fill-top-opacity') || '0.55')
+  const matchFillBottomOp = parseFloat(cssVar('--radar-match-fill-bottom-opacity') || '0.18')
+  const envelopeStrokeOp = parseFloat(cssVar('--radar-envelope-stroke-opacity') || '0.45')
+  const radarTickTextShadow =
+    cssVar('--radar-tick-text-shadow') || '0 0 12px rgba(102,233,221,0.4)'
   const textMain = cssVar('--color-text') || '#dbe7ff'
   const textSubtle = `${textMain}99`
   const borderSoft = cssVar('--color-border') || 'rgba(120, 154, 197, 0.24)'
@@ -304,7 +326,11 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             textAnchor="middle"
             dy={-2}
             fill={primary}
-            style={{ fontSize: 24, fontWeight: 700 }}
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              textShadow: radarTickTextShadow
+            }}
           >
             {row.rawPct}%
           </text>
@@ -312,14 +338,19 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
             textAnchor="middle"
             dy={12}
             fill={textSubtle}
-            style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em' }}
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textShadow: radarTickTextShadow
+            }}
           >
             {title}
           </text>
         </g>
       )
     },
-    [data, language, primary, textSubtle]
+    [data, language, primary, textSubtle, radarTickTextShadow]
   )
 
   const tooltipFormatter = useCallback(
@@ -393,37 +424,74 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
                 const g = parseRadarGeom(p)
                 if (!g) return null
                 const { cx, cy, r } = g
-                const half = RADAR_DOT_TILE / 2
                 const rr = Math.max(0, r - 0.5)
+                const ringRadii = Array.from({ length: radarRingCount }, (_, i) => {
+                  const t = (i + 1) / radarRingCount
+                  return rr * t
+                })
                 return (
                   <g>
                     <defs>
-                      <pattern
-                        id={radarDotPatternId}
-                        patternUnits="userSpaceOnUse"
-                        width={RADAR_DOT_TILE}
-                        height={RADAR_DOT_TILE}
-                      >
-                        <circle
-                          cx={half}
-                          cy={half}
-                          r={RADAR_DOT_RADIUS}
-                          fill="var(--color-primary)"
-                          fillOpacity={0.58}
-                        />
-                      </pattern>
                       <linearGradient id={radarEnvelopeFillId} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={primaryDeep} stopOpacity={0.24} />
                         <stop offset="65%" stopColor={primaryDeep} stopOpacity={0.12} />
                         <stop offset="100%" stopColor={primaryDeep} stopOpacity={0.03} />
                       </linearGradient>
-                      <radialGradient id={radarCenterGlowId} cx="50%" cy="53%" r="36%">
-                        <stop offset="0%" stopColor={primary} stopOpacity={0.2} />
-                        <stop offset="100%" stopColor={primary} stopOpacity={0} />
+                      <linearGradient id={radarMatchFillId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={primary} stopOpacity={matchFillTopOp} />
+                        <stop offset="100%" stopColor={primaryDeep} stopOpacity={matchFillBottomOp} />
+                      </linearGradient>
+                      <filter
+                        id={radarMatchGlowFilterId}
+                        x="-45%"
+                        y="-45%"
+                        width="190%"
+                        height="190%"
+                      >
+                        <feGaussianBlur
+                          in="SourceAlpha"
+                          stdDeviation={matchGlowBlur}
+                          result="blur"
+                        />
+                        <feFlood
+                          floodColor={primary}
+                          floodOpacity={Number.isFinite(matchGlowFloodOp) ? matchGlowFloodOp : 0.45}
+                          result="glowColor"
+                        />
+                        <feComposite in="glowColor" in2="blur" operator="in" result="softGlow" />
+                        <feMerge>
+                          <feMergeNode in="softGlow" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                      <radialGradient
+                        id={radarCenterGlowId}
+                        cx="50%"
+                        cy="53%"
+                        r={radarGlowRadius}
+                      >
+                        <stop offset="0%" stopColor={radarGlowColor} stopOpacity={radarGlowCenterOp} />
+                        <stop
+                          offset={radarGlowMidOffset}
+                          stopColor={radarGlowColor}
+                          stopOpacity={radarGlowMidOp}
+                        />
+                        <stop offset="100%" stopColor={radarGlowColor} stopOpacity={radarGlowEdgeOp} />
                       </radialGradient>
                     </defs>
-                    <circle cx={cx} cy={cy} r={rr} fill={`url(#${radarDotPatternId})`} />
-                    <circle cx={cx} cy={cy} r={rr * 0.75} fill={`url(#${radarCenterGlowId})`} />
+                    <circle cx={cx} cy={cy} r={rr} fill={`url(#${radarCenterGlowId})`} />
+                    {ringRadii.map((rk) => (
+                      <circle
+                        key={rk}
+                        cx={cx}
+                        cy={cy}
+                        r={rk}
+                        fill="none"
+                        stroke={radarRingColor}
+                        strokeOpacity={radarRingOpacity}
+                        strokeWidth={radarRingWidth}
+                      />
+                    ))}
                   </g>
                 )
               }}
@@ -454,10 +522,10 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               name={envelopeName}
               dataKey="envelope"
               stroke={primaryDeep}
-              strokeOpacity={0.3}
+              strokeOpacity={envelopeStrokeOp}
               fill={`url(#${radarEnvelopeFillId})`}
               fillOpacity={1}
-              strokeWidth={2.2}
+              strokeWidth={2.35}
               dot={false}
               isAnimationActive={false}
             />
@@ -465,31 +533,11 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               name={labels.matchDegree}
               dataKey="value"
               stroke={primary}
-              strokeWidth={2.4}
-              fill={primary}
-              fillOpacity={0.46}
+              strokeWidth={2.5}
+              fill={`url(#${radarMatchFillId})`}
+              fillOpacity={1}
+              filter={`url(#${radarMatchGlowFilterId})`}
               isAnimationActive={false}
-            />
-            <Customized
-              component={(p: Record<string, unknown>) => {
-                const g = parseRadarGeom(p)
-                if (!g) return null
-                const { cx, cy, r } = g
-                return (
-                  <g>
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={r}
-                      fill="none"
-                      stroke={primary}
-                      strokeOpacity={0.28}
-                      strokeWidth={0.5}
-                    />
-                    <circle cx={cx} cy={cy} r={1.5} fill={primary} />
-                  </g>
-                )
-              }}
             />
           </RadarChart>
         </ResponsiveContainer>
@@ -497,10 +545,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
       <div className="mt-2 w-full flex flex-col gap-3 text-xs text-text/90">
         {onBaseWeightsChange && (
           <div className="mt-3 flex w-full justify-center px-1">
-            <div
-              className="flex w-full max-w-[360px] flex-col gap-3 rounded-lg bg-gradient-to-br from-surface/90 to-surface2/70 p-4 shadow-panel backdrop-blur-md"
-              style={{ border: '1px solid rgba(219, 231, 255, 0.16)' }}
-            >
+            <div className="glass-card flex w-full max-w-[360px] flex-col gap-3 rounded-[10px] p-4">
               <div className="text-sm font-semibold tracking-wide text-text/85">{labels.weightAdjust}</div>
               <div className="flex flex-col gap-4">
                 {WEIGHT_KEYS.map(({ key, label }) => (

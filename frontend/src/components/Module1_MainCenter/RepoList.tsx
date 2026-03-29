@@ -273,10 +273,8 @@ const RepoList: React.FC<RepoListProps> = ({
               e.stopPropagation()
               setDeleteTargetId(repo.repo_id)
             }}
-            className={`mb-3 cursor-pointer rounded-md border-2 bg-gradient-to-br from-surface/92 to-surface2/72 p-4 backdrop-blur-md transition hover:border-text/20 hover:bg-gradient-to-br hover:from-surface/95 hover:to-surface2/80 hover:shadow-sm ${
-              isActiveCard
-                ? 'border-text/25 shadow-sm ring-2 ring-black/[0.07] dark:border-white/22 dark:ring-white/[0.12]'
-                : 'border-border'
+            className={`glass-card glass-card--interactive mb-3 cursor-pointer border-2 p-4 transition ${
+              isActiveCard ? 'glass-card--active' : 'border-border'
             }`}
           >
             <div className="mb-2 flex items-center justify-between gap-2">

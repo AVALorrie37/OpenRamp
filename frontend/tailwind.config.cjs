@@ -8,6 +8,8 @@ module.exports = {
         primary: 'var(--color-primary)',
         primaryDark: 'var(--color-primaryDark)',
         primaryLight: 'var(--color-primaryLight)',
+        radarRing: 'var(--color-radarRing)',
+        radarGlow: 'var(--color-radarGlow)',
         accent: 'var(--color-accent)',
         tertiary: 'var(--color-tertiary)',
         background: 'var(--color-background)',
