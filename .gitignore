@@ -21,6 +21,7 @@ top_300_metrics/
 **/opendigger_cache/
 **/profile_cache/
 **/github_cache/
+**/runtime_cache/
 
 # 设计方案
 design_text/
