@@ -22,16 +22,10 @@
     border-radius: inherit;
     pointer-events: none;
     z-index: 1;
-    background: linear-gradient(
-      var(--glass-glint-angle),
-      var(--glass-glint-edge) 0%,
-      var(--glass-glint-edge) 36%,
-      var(--glass-glint-mid) 50%,
-      var(--glass-glint-edge) 64%,
-      var(--glass-glint-edge) 100%
-    );
-    opacity: var(--glass-glint-opacity);
-    mix-blend-mode: soft-light;
+    background-image: var(--glass-vignette-gradient), var(--glass-glint-gradient);
+    background-repeat: no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%;
+    opacity: var(--glass-glint-layer-opacity);
   }
 
   .glass-card > * {
@@ -94,10 +88,23 @@
   --color-grid: rgba(15, 23, 42, 0.08);
   --shadow-panel: rgba(15, 23, 42, 0.08);
   --shadow-modal: rgba(15, 23, 42, 0.22);
-  --glass-glint-angle: 60deg;
-  --glass-glint-mid: rgba(255, 255, 255, 0.42);
-  --glass-glint-edge: rgba(255, 255, 255, 0);
-  --glass-glint-opacity: 0.22;
+  --glass-glint-line: to bottom right;
+  --glass-glint-layer-opacity: 0.12;
+  --glass-vignette-gradient: radial-gradient(
+    ellipse 100% 92% at 100% 100%,
+    rgba(15, 23, 42, 0.52) 0%,
+    rgba(15, 23, 42, 0.14) 48%,
+    transparent 72%
+  );
+  --glass-glint-gradient: linear-gradient(
+    var(--glass-glint-line),
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.78) 22%,
+    rgba(255, 255, 255, 0.35) 45%,
+    rgba(255, 255, 255, 0.19) 62%,
+    rgba(85, 93, 113, 0.16) 85%,
+    rgba(60, 71, 96, 0.26) 100%
+  );
   --glass-surface-gradient: linear-gradient(
     180deg,
     var(--color-surface) 0%,
@@ -147,10 +154,23 @@
   --color-grid: rgba(120, 154, 197, 0.14);
   --shadow-panel: rgba(2, 8, 24, 0.46);
   --shadow-modal: rgba(0, 0, 0, 0.62);
-  --glass-glint-angle: 60deg;
-  --glass-glint-mid: rgba(180, 230, 255, 0.2);
-  --glass-glint-edge: rgba(255, 255, 255, 0);
-  --glass-glint-opacity: 0.38;
+  --glass-glint-line: to bottom right;
+  --glass-glint-layer-opacity: 0.12;
+  --glass-vignette-gradient: radial-gradient(
+    ellipse 100% 92% at 100% 100%,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(2, 8, 24, 0.28) 46%,
+    transparent 72%
+  );
+  --glass-glint-gradient: linear-gradient(
+    var(--glass-glint-line),
+    rgba(245, 255, 255, 0.873) 0%,
+    rgba(200, 227, 248, 0.68) 24%,
+    rgba(130, 181, 215, 0.32) 48%,
+    rgba(50, 98, 120, 0.22) 68%,
+    rgba(6, 22, 42, 0.58) 90%,
+    rgba(2, 17, 22, 0.78) 100%
+  );
   --glass-surface-gradient: linear-gradient(
     180deg,
     var(--color-surface) 0%,
