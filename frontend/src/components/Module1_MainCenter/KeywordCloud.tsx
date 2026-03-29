@@ -52,19 +52,19 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
     : (language === 'english' ? 'All Repos' : '所有仓库')
 
   const getFontSize = (count: number, maxCount: number) => {
-    const minSize = 12
-    const maxSize = 24
+    const minSize = 11
+    const maxSize = 17
     return minSize + ((count / maxCount) * (maxSize - minSize))
   }
 
   const maxCount = keywordData[0]?.count || 1
 
   return (
-    <div className="flex h-full flex-col px-3 pb-4 pt-2">
+    <div className="glass-content-shadow flex h-full flex-col px-3 pb-4 pt-2">
       <div className="mb-2 flex justify-end">
         <span
-          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-primaryLight bg-surface px-2.5 py-1 text-xs text-text ${
-            isSingleRepo && selectedRepo ? 'cursor-pointer hover:bg-primaryLight/40' : ''
+          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-t-md border border-primary bg-primary px-3 py-1.5 text-xs text-white transition ${
+            isSingleRepo && selectedRepo ? 'cursor-pointer hover:bg-primaryDark' : ''
           }`}
           role={isSingleRepo && selectedRepo ? 'link' : undefined}
           tabIndex={isSingleRepo && selectedRepo ? 0 : undefined}
@@ -89,20 +89,19 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
           const isActive = activeKeywords.includes(word)
           const sizeClass = (() => {
             const s = getFontSize(count, maxCount)
-            if (s >= 21) return 'text-xl'
-            if (s >= 18) return 'text-lg'
-            if (s >= 15) return 'text-base'
-            if (s >= 13) return 'text-sm'
+            if (s >= 16) return 'text-lg'
+            if (s >= 14) return 'text-base'
+            if (s >= 12) return 'text-sm'
             return 'text-xs'
           })()
-          const weightClass = count > maxCount * 0.5 ? 'font-semibold' : 'font-normal'
+          const weightClass = count > maxCount * 0.5 ? 'font-semibold' : 'font-medium'
           return (
             <span
               key={word}
-              className={`cursor-pointer rounded px-2 py-1 transition ${sizeClass} ${weightClass} ${
+              className={`cursor-pointer rounded-md px-2.5 py-1 transition [transition-property:transform,box-shadow,border-color,background-color] ${sizeClass} ${weightClass} ${
                 isActive
-                  ? 'bg-gradient-to-br from-primary/88 to-primaryDeep/82 text-white backdrop-blur-sm'
-                  : 'bg-gradient-to-br from-surface/92 to-surface2/72 text-primary backdrop-blur-sm hover:from-primaryLight/55 hover:to-surface2/78'
+                  ? 'relative z-0 border [border-color:var(--glass-frame-outer)] bg-primary/30 text-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.55),0_8px_22px_-8px_rgba(0,0,0,0.45),0_0_16px_-4px_var(--glass-frame-outer),inset_0_0_0_1px_var(--glass-frame-inner)] backdrop-blur-sm [text-shadow:0_0_10px_color-mix(in_srgb,var(--glass-frame-inner)_50%,transparent)] hover:-translate-y-px hover:[border-color:color-mix(in_srgb,var(--color-text)_20%,var(--glass-border))] hover:shadow-[0_3px_10px_-2px_rgba(0,0,0,0.5),0_12px_28px_-10px_rgba(0,0,0,0.38),0_0_20px_-4px_var(--glass-frame-outer),inset_0_0_0_1px_var(--glass-frame-inner)] before:pointer-events-none before:absolute before:inset-[-8px] before:-z-10 before:rounded-md before:bg-[radial-gradient(ellipse_at_center,var(--glass-frame-inner)_0%,transparent_72%)] before:blur-md before:content-[""]'
+                  : 'border [border-color:var(--glass-frame-outer)] bg-surface/58 text-primary shadow-[0_2px_5px_-1px_rgba(0,0,0,0.42),0_7px_18px_-8px_rgba(0,0,0,0.32),0_0_14px_-4px_var(--glass-frame-outer),inset_0_0_0_1px_var(--glass-frame-inner)] backdrop-blur-sm [text-shadow:0_0_8px_color-mix(in_srgb,var(--glass-frame-inner)_40%,transparent)] hover:-translate-y-px hover:[border-color:color-mix(in_srgb,var(--color-text)_20%,var(--glass-border))] hover:bg-surface/64 hover:shadow-[0_3px_8px_-2px_rgba(0,0,0,0.4),0_10px_24px_-10px_rgba(0,0,0,0.28),0_0_16px_-4px_var(--glass-frame-outer),inset_0_0_0_1px_var(--glass-frame-inner)] hover:[text-shadow:0_0_10px_color-mix(in_srgb,var(--glass-frame-inner)_50%,transparent)]'
               }`}
               onClick={(e) => {
                 e.stopPropagation()

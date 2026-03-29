@@ -193,7 +193,7 @@ const RepoList: React.FC<RepoListProps> = ({
           {canUseMatch && (
             <button
               onClick={() => setSortType('match')}
-              className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+              className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
                 sortType === 'match' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
               }`}
             >
@@ -202,7 +202,7 @@ const RepoList: React.FC<RepoListProps> = ({
           )}
           <button
             onClick={() => setSortType('skill')}
-            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
               sortType === 'skill' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
@@ -210,7 +210,7 @@ const RepoList: React.FC<RepoListProps> = ({
           </button>
           <button
             onClick={() => setSortType('activity')}
-            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
               sortType === 'activity' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >
@@ -218,7 +218,7 @@ const RepoList: React.FC<RepoListProps> = ({
           </button>
           <button
             onClick={() => setSortType('demand')}
-            className={`rounded-md border border-primary px-3 py-1.5 text-xs transition ${
+            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
               sortType === 'demand' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
             }`}
           >

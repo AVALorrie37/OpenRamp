@@ -807,7 +807,7 @@ const App: React.FC = () => {
           const showResizable = isXl && !!homeColSizes
 
           const leftPanel = (
-            <div className="glass-card glass-card--large flex h-full flex-col overflow-hidden">
+            <div className="glass-card glass-card--large glass-card--outer-depth flex h-full flex-col overflow-hidden">
               <RepoList
                 repos={repos}
                 onRepoClick={handleRepoClick}
@@ -853,7 +853,7 @@ const App: React.FC = () => {
           const middlePanel = (
             <div ref={middleColumnRef} className="flex h-full flex-col">
               <div
-                className="glass-card glass-card--large relative min-h-[200px] overflow-hidden"
+                className="glass-card glass-card--large relative min-h-[200px] overflow-visible"
                 style={middleStyles.top}
               >
                 <RepoActivityTabs
@@ -924,7 +924,7 @@ const App: React.FC = () => {
                 <div className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 transition group-hover:bg-primary/70" />
               </div>
               <div
-                className="glass-card glass-card--large relative min-h-[200px] overflow-hidden"
+                className="glass-card glass-card--large relative min-h-[200px] overflow-visible"
                 style={middleStyles.bottom}
                 onClick={handleKeywordAreaClick}
               >
@@ -942,9 +942,9 @@ const App: React.FC = () => {
           )
 
           const rightPanel = (
-            <div className="glass-card glass-card--large relative flex h-full items-center justify-center">
+            <div className="glass-card glass-card--large glass-card--outer-depth relative flex h-full items-center justify-center">
               <RadarPlaceholder
-                isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0} 
+                isActive={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
                 matchData={matchData}
                 baseWeights={weights}
                 onBaseWeightsChange={handleWeightsChange}
@@ -960,7 +960,7 @@ const App: React.FC = () => {
                 <div style={alignToThirdColStyle} className="h-full overflow-hidden">
                   {leftPanel}
                 </div>
-                <div style={alignToThirdColStyle} className="h-full overflow-hidden">
+                <div style={alignToThirdColStyle} className="h-full overflow-visible">
                   {middlePanel}
                 </div>
                 <div style={alignToThirdColStyle} className="h-full">

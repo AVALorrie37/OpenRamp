@@ -442,11 +442,11 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
   const refreshHint = language === 'english' ? 'Refresh' : '刷新'
 
   return (
-    <div className="flex h-full w-full flex-col p-3">
-      <div className="mb-3 flex border-b border-border">
+    <div className="glass-content-shadow flex h-full w-full flex-col p-3">
+      <div className="mb-3 flex items-center gap-2">
         <button
-          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
-            activeTab === 'commits' ? 'border-primary text-primary' : 'border-transparent text-text'
+          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
+            activeTab === 'commits' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
           }`}
           onClick={() => {
             setTab('commits')
@@ -456,8 +456,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
           Commit
         </button>
         <button
-          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
-            activeTab === 'issues' ? 'border-primary text-primary' : 'border-transparent text-text'
+          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
+            activeTab === 'issues' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
           }`}
           onClick={() => {
             setTab('issues')
@@ -467,8 +467,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
           Issues
         </button>
         <button
-          className={`border-b-2 bg-transparent px-3 py-1.5 text-xs ${
-            activeTab === 'openrank' ? 'border-primary text-primary' : 'border-transparent text-text'
+          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
+            activeTab === 'openrank' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
           }`}
           onClick={() => {
             setTab('openrank')
