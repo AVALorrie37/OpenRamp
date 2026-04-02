@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from './hooks/useUser'
 import { useRepos } from './hooks/useRepos'
@@ -90,6 +90,7 @@ const App: React.FC = () => {
   const middleColumnRef = useRef<HTMLDivElement | null>(null)
   const dragStateRef = useRef<{ dragging: boolean; startY: number; startTopHeight: number; total: number } | null>(null)
   const [middleTopHeight, setMiddleTopHeight] = useState<number | null>(null)
+  const [middleSplitMode, setMiddleSplitMode] = useState<'auto' | 'manual'>('auto')
   const [colorMode, setColorMode] = useState<'light' | 'dark'>(() => {
     try {
       const v = window.localStorage.getItem('openramp_color_mode')
@@ -205,18 +206,38 @@ const App: React.FC = () => {
       const total = rect.height
       if (!Number.isFinite(total) || total <= 0) return
       setMiddleTopHeight((prev) => {
-        if (typeof prev !== 'number' || !Number.isFinite(prev)) {
-          return Math.max(200, Math.round(total * 0.4))
-        }
         const minTop = 200
         const minBottom = 200
         const maxTop = Math.max(minTop, total - minBottom)
+        if (middleSplitMode === 'auto') {
+          const desired = Math.round(total * 0.4)
+          return Math.min(Math.max(desired, minTop), maxTop)
+        }
+        if (typeof prev !== 'number' || !Number.isFinite(prev)) {
+          const desired = Math.round(total * 0.4)
+          return Math.min(Math.max(desired, minTop), maxTop)
+        }
         return Math.min(Math.max(prev, minTop), maxTop)
       })
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [middleSplitMode])
+
+  useLayoutEffect(() => {
+    if (middleSplitMode !== 'auto') return
+    if (typeof middleTopHeight === 'number' && Number.isFinite(middleTopHeight)) return
+    const el = middleColumnRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const total = rect.height
+    if (!Number.isFinite(total) || total <= 0) return
+    const minTop = 200
+    const minBottom = 200
+    const maxTop = Math.max(minTop, total - minBottom)
+    const desired = Math.round(total * 0.4)
+    setMiddleTopHeight(Math.min(Math.max(desired, minTop), maxTop))
+  }, [middleSplitMode, middleTopHeight])
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -914,6 +935,7 @@ const App: React.FC = () => {
                   const total = rect.height
                   const currentTop = typeof middleTopHeight === 'number' ? middleTopHeight : Math.max(200, Math.round(total * 0.4))
                   dragStateRef.current = { dragging: true, startY: e.clientY, startTopHeight: currentTop, total }
+                  setMiddleSplitMode('manual')
                   ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
                 }}
                 aria-label="Resize middle panels"

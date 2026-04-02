@@ -45,17 +45,23 @@
 
   .glass-card--active {
     border-width: 2px;
-    border-color: rgba(15, 23, 42, 0.25);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(0, 0, 0, 0.07);
+    border-color: var(--glass-frame-outer);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 3px rgba(105, 210, 217, 0.47),
+      0 0 22px 8px color-mix(in srgb, var(--glass-frame-inner) 36%, transparent);
   }
 
   .dark .glass-card--active {
-    border-color: rgba(255, 255, 255, 0.22);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.12);
+    border-width: 2px;
+    border-color: var(--glass-frame-outer);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 3px rgba(105, 210, 217, 0.47),
+      0 0 22px 8px color-mix(in srgb, var(--glass-frame-inner) 36%, transparent);
   }
 
   .glass-card--interactive:not(.glass-card--active):hover {
-    border-color: color-mix(in srgb, var(--color-text) 20%, var(--glass-border));
+    border-width: 2px;
+    border-color: var(--glass-frame-outer);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 3px rgba(105, 210, 217, 0.47),
+      0 0 22px 8px color-mix(in srgb, var(--glass-frame-inner) 36%, transparent);
   }
 
   .glass-content-shadow {
@@ -96,7 +102,7 @@
   --color-surface: #ffffff;
   --color-surface2: #eef3f8;
   --color-grid: rgba(15, 23, 42, 0.08);
-  --shadow-panel: rgba(15, 23, 42, 0.08);
+  --shadow-panel: rgba(212, 252, 252, 0.786);
   --shadow-modal: rgba(15, 23, 42, 0.22);
   --glass-glint-line: to bottom right;
   --glass-glint-layer-opacity: 0.12;
@@ -120,10 +126,10 @@
     var(--color-surface) 0%,
     color-mix(in srgb, var(--color-surface2) 80%, transparent) 100%
   );
-  --glass-border: var(--color-border);
-  --glass-frame-outer: rgba(15, 23, 42, 0.16);
-  --glass-frame-inner: rgba(27, 179, 173, 0.28);
-  --glass-stack-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.42), 0 7px 18px -8px rgba(0, 0, 0, 0.32),
+  --glass-border:  rgba(102, 165, 168, 0.633);
+  --glass-frame-outer: rgba(71, 146, 149, 0.358);
+  --glass-frame-inner: rgb(231, 255, 255);
+  --glass-stack-shadow: 0 2px 5px -1px rgba(179, 205, 212, 0.42), 0 7px 18px -8px rgba(114, 125, 124, 0.958),
     0 0 14px -4px var(--glass-frame-outer);
   --glass-large-shadow: 0 4px 6px -1px var(--shadow-panel);
   --weight-track-groove-bg: color-mix(in srgb, var(--color-surface2) 88%, #000 12%);
@@ -174,7 +180,7 @@
   --radar-envelope-stroke-opacity: 0.48;
   --radar-tick-text-shadow: 0 0 14px rgba(102, 233, 221, 0.45),
     0 1px 2px rgba(0, 0, 0, 0.55);
-  --color-accent: #8336f7;
+  --color-accent: #6574f6;
   --color-tertiary: #213a5f;
   --color-background: #06122a;
   --color-text: #dbe7ff;
