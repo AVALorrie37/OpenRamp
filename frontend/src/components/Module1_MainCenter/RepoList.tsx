@@ -188,7 +188,7 @@ const RepoList: React.FC<RepoListProps> = ({
           </button>,
           document.body
         )}
-      <div className="flex min-w-[340px] items-center justify-between border-b border-border p-3">
+      <div className="flex min-w-[340px] items-center justify-between border-b-2 border-transparent px-3 pt-3 pb-0">
         <div className="flex gap-2">
           {canUseMatch && (
             <button
@@ -236,7 +236,7 @@ const RepoList: React.FC<RepoListProps> = ({
         {onOpenManualSearch && (
           <button
             onClick={onOpenManualSearch}
-            className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-surface px-2.5 py-1.5 text-xs text-primary transition hover:bg-primary/10"
+            className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-transparent px-2.5 py-1.5 text-xs text-primary transition"
             aria-label={manualSearchHint}
             title={manualSearchHint}
           >

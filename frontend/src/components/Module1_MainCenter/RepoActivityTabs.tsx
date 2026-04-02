@@ -329,10 +329,10 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
       )
     }
 
-    const primary = cssVar('--color-primary') || '#829c83'
-    const text = cssVar('--color-text') || '#1c1f1e'
-    const bg = cssVar('--color-background') || '#f8f9f8'
-    const grid = cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+    const primary = cssVar('--color-primary') || '#1bb3ad'
+    const text = cssVar('--color-text') || '#0f172a'
+    const bg = cssVar('--color-background') || '#f6f8fb'
+    const grid = cssVar('--color-grid') || 'rgba(15, 23, 42, 0.08)'
     const points =
       activeTab === 'commits' && (state.data == null || state.data.length === 0)
         ? buildCommitFallbackPoints(12)
@@ -484,7 +484,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
           openRank
         </button>
         <button
-          className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-surface px-2.5 py-1.5 text-xs text-primary transition hover:bg-primary/10"
+          className="ml-auto flex items-center gap-1 rounded-full border border-primary bg-transparent px-2.5 py-1.5 text-xs text-primary transition"
           onClick={() => {
             if (!repoId) return
             if (activeTab === 'commits') {

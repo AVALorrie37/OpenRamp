@@ -424,7 +424,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
               <button
                 onClick={() => void handleSearch()}
                 disabled={loading || autoLoading}
-                className="rounded-md bg-primary px-4 py-2 text-base text-white transition disabled:cursor-default disabled:opacity-70"
+                className="rounded-md border border-[var(--tab-selected-border)] bg-[var(--tab-selected-bg)] px-4 py-2 text-base font-medium text-[var(--tab-selected-text)] transition hover:brightness-[0.99] disabled:cursor-default disabled:opacity-70"
               >
                 {loading ? '搜索中...' : '搜索'}
               </button>
@@ -461,9 +461,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                   }
                 }}
                 disabled={loading || autoLoading}
-                className={`rounded-md px-4 py-2 text-base text-white transition disabled:cursor-default disabled:opacity-70 ${
-                  autoLoading ? 'bg-primaryLight' : 'bg-primary'
-                }`}
+                className="rounded-md border border-[var(--tab-selected-border)] bg-[var(--tab-selected-bg)] px-4 py-2 text-base font-medium text-[var(--tab-selected-text)] transition hover:brightness-[0.99] disabled:cursor-default disabled:opacity-70"
               >
                 {autoLoading ? '多轮搜索中...' : '一键多轮搜索'}
               </button>
@@ -477,7 +475,7 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                     key={k}
                     onClick={() => handleKeywordClick(k)}
                     className={`rounded-full border px-2.5 py-1 text-xs ${
-                      active ? 'border-primary bg-primary text-white' : 'border-[#9AA6A0] bg-[#EEF2EF]/40 text-text'
+                      active ? 'border-primary bg-primary text-white' : 'border-[color:var(--color-keyword-chip-border)] bg-[var(--color-keyword-chip-bg)] text-text'
                     }`}
                   >
                     {k}

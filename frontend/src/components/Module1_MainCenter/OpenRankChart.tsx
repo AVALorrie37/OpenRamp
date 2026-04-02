@@ -69,7 +69,7 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
       }
     })
 
-    const primary = cssVar('--color-primary') || '#829c83'
+    const primary = cssVar('--color-primary') || '#1bb3ad'
     return {
       labels,
       datasets: [
@@ -157,11 +157,11 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                   display: false
                 },
                 tooltip: {
-                  backgroundColor: cssVar('--color-background') || '#f8f9f8',
-                  borderColor: cssVar('--color-primary') || '#829c83',
+                  backgroundColor: cssVar('--color-background') || '#f6f8fb',
+                  borderColor: cssVar('--color-primary') || '#1bb3ad',
                   borderWidth: 1,
-                  titleColor: cssVar('--color-text') || '#1c1f1e',
-                  bodyColor: cssVar('--color-text') || '#1c1f1e',
+                  titleColor: cssVar('--color-text') || '#0f172a',
+                  bodyColor: cssVar('--color-text') || '#0f172a',
                   padding: 12,
                   callbacks: {
                     title: (items: any[]) => {
@@ -174,10 +174,10 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
               scales: {
                 x: {
                   grid: {
-                    color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+                    color: cssVar('--color-grid') || 'rgba(15, 23, 42, 0.08)'
                   },
                   ticks: {
-                    color: cssVar('--color-text') || '#1c1f1e',
+                    color: cssVar('--color-text') || '#0f172a',
                     maxRotation: 0,
                     minRotation: 0,
                     autoSkip: false,
@@ -208,10 +208,10 @@ const OpenRankChart: React.FC<OpenRankChartProps> = ({ repo, themeVersion = 0 })
                 y: {
                   beginAtZero: true,
                   grid: {
-                    color: cssVar('--color-grid') || 'rgba(209, 217, 211, 0.55)'
+                    color: cssVar('--color-grid') || 'rgba(15, 23, 42, 0.08)'
                   },
                   ticks: {
-                    color: cssVar('--color-text') || '#1c1f1e'
+                    color: cssVar('--color-text') || '#0f172a'
                   }
                 }
               }

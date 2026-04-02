@@ -40,8 +40,7 @@
 
   .glass-card--large.glass-card--outer-depth {
     box-shadow: var(--glass-large-shadow), inset 0 0 0 1px var(--glass-frame-inner),
-      0 2px 5px -1px rgba(0, 0, 0, 0.42), 0 7px 18px -8px rgba(0, 0, 0, 0.32),
-      0 0 14px -4px var(--glass-frame-outer);
+      var(--glass-stack-shadow);
   }
 
   .glass-card--active {
@@ -61,8 +60,7 @@
 
   .glass-content-shadow {
     border-radius: 8px;
-    box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.42), 0 7px 18px -8px rgba(0, 0, 0, 0.32),
-      0 0 14px -4px var(--glass-frame-outer);
+    box-shadow: var(--glass-stack-shadow);
   }
 }
 
@@ -72,7 +70,7 @@
   --color-primaryDark: #128b86;
   --color-primaryLight: rgba(27, 179, 173, 0.14);
   --color-radarRing: rgba(15, 107, 102, 0.55);
-  --color-radarGlow: #1bb3ad;
+  --color-radarGlow: var(--color-primary);
   --radar-glow-center-opacity: 0.24;
   --radar-glow-edge-opacity: 0;
   --radar-glow-radius: 36%;
@@ -125,20 +123,26 @@
   --glass-border: var(--color-border);
   --glass-frame-outer: rgba(15, 23, 42, 0.16);
   --glass-frame-inner: rgba(27, 179, 173, 0.28);
+  --glass-stack-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.42), 0 7px 18px -8px rgba(0, 0, 0, 0.32),
+    0 0 14px -4px var(--glass-frame-outer);
   --glass-large-shadow: 0 4px 6px -1px var(--shadow-panel);
   --weight-track-groove-bg: color-mix(in srgb, var(--color-surface2) 88%, #000 12%);
   --weight-track-inset: inset 0 2px 4px rgba(0, 0, 0, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  --emphasis-fill-bg: var(--color-primaryDeep);
+  --emphasis-fill-text: #ffffff;
   --tab-selected-bg: var(--color-primaryDeep);
-  --tab-selected-border:  #ffffff;
+  --tab-selected-border: var(--emphasis-fill-text);
   --tab-selected-text: #fffdfd;
   --tab-unselected-bg: rgba(90, 111, 109, 0.11);
   --tab-unselected-text: color-mix(in srgb, var(--color-text) 90%, transparent);
   --tab-unselected-hover-bg: color-mix(in srgb, var(--color-primary) 10%, transparent);
   --icon-star-favorited: rgba(95, 216, 212, 0.68);
   --icon-star-idle: var(--color-border);
-  --emphasis-fill-bg: var(--color-primaryDeep);
-  --emphasis-fill-text: #ffffff;
+  --color-specular-white: var(--emphasis-fill-text);
+  --color-keyword-chip-border: #9aa6a0;
+  --color-keyword-chip-bg: rgba(238, 242, 239, 0.4);
+  --color-text-on-primary-deep: #06222e;
   --chat-input-bg: var(--color-surface);
   --chat-input-border: var(--color-border);
   --chat-input-border-active: var(--color-primary);
@@ -205,6 +209,8 @@
   --glass-border: var(--color-border);
   --glass-frame-outer: rgba(164, 187, 222, 0.32);
   --glass-frame-inner: rgba(102, 233, 221, 0.24);
+  --glass-stack-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.42), 0 7px 18px -8px rgba(0, 0, 0, 0.32),
+    0 0 14px -4px var(--glass-frame-outer);
   --glass-large-shadow: 0 4px 6px -1px var(--shadow-panel);
   --weight-track-groove-bg: color-mix(in srgb, var(--color-background) 65%, #000 35%);
   --weight-track-inset: inset 0 3px 6px rgba(0, 0, 0, 0.55),
@@ -218,7 +224,11 @@
   --icon-star-favorited: rgba(200, 227, 248, 0.68);
   --icon-star-idle: var(--color-border);
   --emphasis-fill-bg: var(--color-primaryDeep);
-  --emphasis-fill-text:  rgba(43, 47, 54, 0.92);
+  --emphasis-fill-text: rgba(43, 47, 54, 0.92);
+  --color-specular-white: #ffffff;
+  --color-keyword-chip-border: rgba(164, 187, 222, 0.38);
+  --color-keyword-chip-bg: rgba(35, 46, 72, 0.5);
+  --color-text-on-primary-deep: #061018;
   --chat-input-bg: var(--color-surface);
   --chat-input-border: var(--color-border);
   --chat-input-border-active: var(--color-primary);

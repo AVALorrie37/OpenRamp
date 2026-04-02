@@ -139,7 +139,7 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
             </div>
             <div className="mb-1 flex flex-wrap gap-1">
               {repo.match_score != null && (
-                <div className="inline-block rounded-full bg-primary px-2 py-0.5 text-xs text-white">
+                <div className="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium text-[var(--emphasis-fill-text)] bg-[var(--emphasis-fill-bg)]">
                   {language === 'chinese' ? '匹配' : 'Match'} {pct(repo.match_score)}
                 </div>
               )}

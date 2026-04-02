@@ -201,16 +201,20 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
         <div>
           <button
             onClick={() => onUpdate({ language: 'chinese' as any })}
-            className={`mr-2 rounded-full border px-2 py-1 text-xs ${
-              profile?.language === 'chinese' ? 'border-primary bg-primary text-white' : 'border-border bg-background text-text'
+            className={`mr-2 rounded-full border px-2 py-1 text-xs font-medium ${
+              profile?.language === 'chinese'
+                ? 'border-[var(--emphasis-fill-bg)] bg-[var(--emphasis-fill-bg)] text-[var(--emphasis-fill-text)]'
+                : 'border-border bg-background text-text'
             }`}
           >
             中文
           </button>
           <button
             onClick={() => onUpdate({ language: 'english' as any })}
-            className={`rounded-full border px-2 py-1 text-xs ${
-              profile?.language === 'english' ? 'border-primary bg-primary text-white' : 'border-border bg-background text-text'
+            className={`rounded-full border px-2 py-1 text-xs font-medium ${
+              profile?.language === 'english'
+                ? 'border-[var(--emphasis-fill-bg)] bg-[var(--emphasis-fill-bg)] text-[var(--emphasis-fill-text)]'
+                : 'border-border bg-background text-text'
             }`}
           >
             EN
@@ -227,7 +231,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           {(profile?.skills || []).map((skill, index) => (
             <div
               key={index}
-              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm text-white"
+              className="flex items-center gap-1 rounded-full bg-[var(--emphasis-fill-bg)] px-3 py-1.5 text-sm font-medium text-[var(--emphasis-fill-text)]"
             >
               {editingIndex === index ? (
                 <>
@@ -258,13 +262,13 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                 <>
                   <span
                     onDoubleClick={() => handleEdit(index, skill)}
-                    className="cursor-pointer text-white"
+                    className="cursor-pointer text-[var(--emphasis-fill-text)]"
                   >
                     {cleanTag(skill)}
                   </span>
                   <button
                     onClick={() => handleDelete(index)}
-                    className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
+                    className="bg-transparent px-1 text-base leading-none text-[var(--emphasis-fill-text)]/90 hover:text-[var(--emphasis-fill-text)]"
                     aria-label="Remove"
                   >
                     <X size={16} />
@@ -330,12 +334,12 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
           {selectedPreferences.map((preference, index) => (
             <div
               key={index}
-              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm text-white"
+              className="flex items-center gap-1 rounded-full bg-[var(--emphasis-fill-bg)] px-3 py-1.5 text-sm font-medium text-[var(--emphasis-fill-text)]"
             >
               <span>{preferenceTypes[preference as keyof typeof preferenceTypes]?.label || preference}</span>
               <button
                 onClick={() => handleDeletePreference(preference)}
-                className="bg-transparent px-1 text-base leading-none text-white/90 hover:text-white"
+                className="bg-transparent px-1 text-base leading-none text-[var(--emphasis-fill-text)]/90 hover:text-[var(--emphasis-fill-text)]"
                 aria-label="Remove"
               >
                 <X size={16} />
@@ -355,8 +359,8 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
                     selectedPreferences.includes(key) ? 'border-2 border-primary bg-primary/10' : 'border border-border'
                   }`}
                 >
-                  <div className="mb-1 font-bold">{pref.label}</div>
-                  <div className="text-xs text-accent">{pref.description}</div>
+                  <div className="mb-1 font-bold text-[var(--emphasis-fill-bg)]">{pref.label}</div>
+                  <div className="text-xs text-text/70">{pref.description}</div>
                 </div>
               ))}
             </div>

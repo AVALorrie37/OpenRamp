@@ -153,9 +153,9 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const radarMatchFillId = useId().replace(/:/g, '')
   const radarMatchGlowFilterId = useId().replace(/:/g, '')
 
-  const primary = cssVar('--color-primary') || '#829c83'
-  const primaryDeep = cssVar('--color-primaryDeep') || '#3daecd'
-  const radarRingColor = cssVar('--color-radarRing') || 'rgba(62, 140, 132, 0.72)'
+  const primary = cssVar('--color-primary') || '#1bb3ad'
+  const primaryDeep = cssVar('--color-primaryDeep') || '#1bb3aea9'
+  const radarRingColor = cssVar('--color-radarRing') || 'rgba(15, 107, 102, 0.55)'
   const radarGlowRadius = cssVar('--radar-glow-radius') || '36%'
   const radarGlowColor = cssVar('--color-radarGlow') || primary
   const radarGlowCenterOp = parseFloat(cssVar('--radar-glow-center-opacity') || '0.24')
@@ -175,11 +175,11 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
   const matchFillBottomOp = parseFloat(cssVar('--radar-match-fill-bottom-opacity') || '0.18')
   const envelopeStrokeOp = parseFloat(cssVar('--radar-envelope-stroke-opacity') || '0.45')
   const radarTickTextShadow =
-    cssVar('--radar-tick-text-shadow') || '0 0 12px rgba(102,233,221,0.4)'
-  const textMain = cssVar('--color-text') || '#dbe7ff'
+    cssVar('--radar-tick-text-shadow') || '0 0 10px rgba(27, 179, 173, 0.35)'
+  const textMain = cssVar('--color-text') || '#0f172a'
   const textSubtle = `${textMain}99`
-  const borderSoft = cssVar('--color-border') || 'rgba(120, 154, 197, 0.24)'
-  const surface = cssVar('--color-surface') || '#0b1b36'
+  const borderSoft = cssVar('--color-border') || 'rgba(15, 23, 42, 0.12)'
+  const surface = cssVar('--color-surface') || '#ffffff'
 
   useEffect(() => {
     setLocalWeights(baseWeights || defaultBase)
@@ -605,7 +605,7 @@ const MatchRadarChart: FC<MatchRadarChartProps> = ({
               <button
                 type="button"
                 onClick={handleApplyToAll}
-                className="mt-1 w-full rounded-xl py-2.5 text-base font-medium text-[#06222e] transition hover:brightness-95"
+                className="mt-1 w-full rounded-xl py-2.5 text-base font-medium text-[color:var(--color-text-on-primary-deep)] transition hover:brightness-95"
                 style={{ backgroundColor: primaryDeep }}
               >
                 {labels.applyAll}
