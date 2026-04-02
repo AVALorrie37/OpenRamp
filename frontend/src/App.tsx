@@ -20,9 +20,6 @@ import LoadingSpinner from './components/shared/LoadingSpinner'
 
 import type { RepoResponse, MatchResult, UserProfile } from './types'
 
-const keywordsFingerprint = (kws: string[] | undefined): string =>
-  (kws ?? []).map((k) => k.toLowerCase()).sort().join('\u0001')
-
 type HomeColSizes = { left: number; middle: number; right: number }
 const HOME_COLS_STORAGE_KEY = 'openramp_home_cols_v1'
 const THIRD_COL_MIN_HEIGHT_PX = 600
@@ -694,62 +691,6 @@ const App: React.FC = () => {
     } as React.CSSProperties
   }, [isXl])
 
-  const handleKeywordCloudRepoLabelClick = async (repo: RepoResponse) => {
-    const prevFp = keywordsFingerprint(repo.keywords)
-    try {
-      await manualSearchAPI.bulkEnrich([{ repo_id: repo.repo_id, full_name: repo.repo_id }])
-      const merged = await fetchRepos({ repo_ids: [repo.repo_id], limit: 1 })
-      const next = merged?.find((r) => r.repo_id === repo.repo_id)
-      if (!next) return
-      const nextFp = keywordsFingerprint(next.keywords)
-      const kwsChanged = prevFp !== nextFp
-      if (
-        kwsChanged &&
-        username &&
-        isLoggedIn &&
-        profile?.skills &&
-        profile.skills.length > 0
-      ) {
-        try {
-          const match = await matchAPI.calculate(username, repo.repo_id, weights)
-          if (typeof match.match_score === 'number') {
-            updateRepoMatchData(repo.repo_id, {
-              match_score: match.match_score,
-              breakdown: match.breakdown,
-              dynamic_weights: match.dynamic_weights
-            })
-          }
-          setSelectedRepo((sel) => {
-            if (sel?.repo_id !== repo.repo_id) return sel
-            return {
-              ...next,
-              match_score: match.match_score,
-              breakdown: match.breakdown,
-              dynamic_weights: match.dynamic_weights
-            }
-          })
-          setMatchData((md) => {
-            if (!md || md.repo_full_name !== repo.repo_id) return md
-            return {
-              match_score: match.match_score,
-              breakdown: match.breakdown,
-              repo_name: next.name,
-              repo_full_name: repo.repo_id,
-              dynamic_weights: match.dynamic_weights
-            }
-          })
-        } catch (err) {
-          console.error('Match recalc after keywords sync failed:', err)
-          setSelectedRepo((sel) => (sel?.repo_id === repo.repo_id ? next : sel))
-        }
-      } else {
-        setSelectedRepo((sel) => (sel?.repo_id === repo.repo_id ? next : sel))
-      }
-    } catch (e) {
-      console.error('Repo topics sync failed:', e)
-    }
-  }
-
   const handleRepoBackgroundClick = () => {
     setSelectedRepo(null)
     setHighlightedRepoIds([])
@@ -963,7 +904,6 @@ const App: React.FC = () => {
                   onKeywordClick={handleKeywordClick}
                   activeKeywords={activeKeywords}
                   skipDescriptionKeywordFallback={skipDescriptionKeywordFallback}
-                  onSingleRepoLabelClick={handleKeywordCloudRepoLabelClick}
                 />
               </div>
             </div>

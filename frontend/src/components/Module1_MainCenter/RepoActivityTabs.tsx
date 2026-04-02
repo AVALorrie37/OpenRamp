@@ -130,6 +130,8 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
   const [pendingCommitFallback, setPendingCommitFallback] = useState<PendingFallbackState | null>(null)
   const [pendingIssueFallback, setPendingIssueFallback] = useState<PendingFallbackState | null>(null)
 
+  const repoLabel = repo ? (repo.name || repo.repo_id) : ''
+
   const trendCacheRef = useRef<{
     commits: Record<string, TrendPoint[]>
     issues: Record<string, TrendPoint[]>
@@ -261,7 +263,12 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
 
     if (activeTab === 'openrank') {
       return (
-        <OpenRankChart key={themeVersion} repo={repo} themeVersion={themeVersion} />
+        <div className="relative flex h-full w-full flex-col">
+          <div className="absolute right-2 top-2 z-10 max-w-[70%] overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-border bg-surface/70 px-2 py-1 text-[11px] text-text/80 backdrop-blur-sm">
+            {repoLabel}
+          </div>
+          <OpenRankChart key={themeVersion} repo={repo} themeVersion={themeVersion} />
+        </div>
       )
     }
 
@@ -360,6 +367,9 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
 
     return (
       <div className="relative flex h-full w-full flex-col px-2 pb-2">
+        <div className="absolute right-2 top-2 z-10 max-w-[70%] overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-border bg-surface/70 px-2 py-1 text-[11px] text-text/80 backdrop-blur-sm">
+          {repoLabel}
+        </div>
         <div className="min-h-0 flex-1 overflow-hidden">
         <Line
           key={themeVersion}

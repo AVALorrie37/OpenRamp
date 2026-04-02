@@ -9,7 +9,6 @@ interface KeywordCloudProps {
   onKeywordClick: (keyword: string) => void
   activeKeywords: string[]
   skipDescriptionKeywordFallback?: boolean
-  onSingleRepoLabelClick?: (repo: RepoResponse) => void
   language?: 'chinese' | 'english'
 }
 
@@ -89,9 +88,14 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
   onKeywordClick,
   activeKeywords,
   skipDescriptionKeywordFallback = false,
-  onSingleRepoLabelClick,
   language = 'chinese'
 }) => {
+  const [viewMode, setViewMode] = useState<'all' | 'single'>(selectedRepo ? 'single' : 'all')
+
+  useEffect(() => {
+    setViewMode(selectedRepo ? 'single' : 'all')
+  }, [selectedRepo?.repo_id])
+
   const globalKeywordCounts = useMemo(() => {
     const allKeywords: string[] = []
     repos.forEach(repo => {
@@ -113,7 +117,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
 
   const keywordData = useMemo(() => {
     const localKeywords: string[] = []
-    const sourceRepos = selectedRepo ? [selectedRepo] : repos
+    const sourceRepos = viewMode === 'single' && selectedRepo ? [selectedRepo] : repos
     sourceRepos.forEach(repo => {
       const fromBackend = repo.keywords && repo.keywords.length > 0 ? repo.keywords : []
       if (fromBackend.length > 0) {
@@ -126,7 +130,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
     })
 
     const localUnique = Array.from(new Set(localKeywords))
-    const counts = selectedRepo
+    const counts = viewMode === 'single' && selectedRepo
       ? Object.fromEntries(localUnique.map(w => [w, globalKeywordCounts[w] || 1]))
       : globalKeywordCounts
 
@@ -134,12 +138,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30)
       .map(([word, count]) => ({ word, count }))
-  }, [repos, selectedRepo, skipDescriptionKeywordFallback, globalKeywordCounts])
-
-  const isSingleRepo = !!selectedRepo
-  const modeLabel = isSingleRepo
-    ? (selectedRepo?.name || (language === 'english' ? 'Single Repo' : '单个仓库'))
-    : (language === 'english' ? 'All Repos' : '所有仓库')
+  }, [repos, selectedRepo, skipDescriptionKeywordFallback, globalKeywordCounts, viewMode])
 
   const maxCount = keywordData[0]?.count || 1
   const { ref: cloudRef, width: cloudWidth, height: cloudHeight } = useElementSize()
@@ -158,8 +157,8 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
       size: fontSizeFromValue(count, maxCount)
     }))
 
-    const seedBasis = selectedRepo
-      ? `repo:${selectedRepo.repo_id ?? selectedRepo.name ?? ''}`
+    const seedBasis = viewMode === 'single' && selectedRepo
+      ? `repo:${viewMode}:${selectedRepo.repo_id ?? selectedRepo.name ?? ''}`
       : `all:${keywordData.map(k => `${k.word}:${k.count}`).join('|')}`
     const rng = mulberry32(hashStringToUint32(seedBasis))
 
@@ -180,32 +179,41 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
     return () => {
       layout.stop()
     }
-  }, [cloudWidth, cloudHeight, keywordData, maxCount, selectedRepo])
+  }, [cloudWidth, cloudHeight, keywordData, maxCount, selectedRepo, viewMode])
 
   return (
     <div className="glass-content-shadow flex h-full flex-col px-3 pb-4 pt-2">
-      <div className="mb-2 flex justify-end">
-        <span
-          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-t-md border border-[var(--tab-selected-border)] bg-[var(--tab-selected-bg)] px-3 py-1.5 text-xs font-medium text-[var(--tab-selected-text)] transition ${
-            isSingleRepo && selectedRepo ? 'cursor-pointer hover:brightness-[0.99]' : ''
+      <div className="mb-2 flex justify-end gap-2">
+        {selectedRepo && (
+          <button
+            type="button"
+            className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+              viewMode === 'single'
+                ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+                : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation()
+              setViewMode('single')
+            }}
+          >
+            {selectedRepo.name || selectedRepo.repo_id}
+          </button>
+        )}
+        <button
+          type="button"
+          className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+            viewMode === 'all'
+              ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+              : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
           }`}
-          role={isSingleRepo && selectedRepo ? 'link' : undefined}
-          tabIndex={isSingleRepo && selectedRepo ? 0 : undefined}
           onClick={(e) => {
-            if (!isSingleRepo || !selectedRepo || !onSingleRepoLabelClick) return
             e.stopPropagation()
-            onSingleRepoLabelClick(selectedRepo)
-          }}
-          onKeyDown={(e) => {
-            if (!isSingleRepo || !selectedRepo || !onSingleRepoLabelClick) return
-            if (e.key !== 'Enter' && e.key !== ' ') return
-            e.preventDefault()
-            e.stopPropagation()
-            onSingleRepoLabelClick(selectedRepo)
+            setViewMode('all')
           }}
         >
-          {modeLabel}
-        </span>
+          {language === 'english' ? 'All Repos' : '所有仓库'}
+        </button>
       </div>
       <div
         ref={cloudRef}
