@@ -438,6 +438,14 @@ const App: React.FC = () => {
   }
 
   const handleRepoClick = async (repo: RepoResponse) => {
+    if (selectedRepo?.repo_id && selectedRepo.repo_id === repo.repo_id) {
+      setSelectedRepo(null)
+      setMatchData(null)
+      setHighlightedRepoIds([])
+      setActiveKeywords([])
+      return
+    }
+
     setSelectedRepo(repo)
     setHighlightedRepoIds([])
     setActiveKeywords([])
@@ -878,7 +886,7 @@ const App: React.FC = () => {
                 style={middleStyles.top}
               >
                 <RepoActivityTabs
-                  repo={selectedRepo || repos[0]}
+                  repo={selectedRepo}
                   themeVersion={themeVersion}
                   language={uiLanguage}
                   onOpenRankRefresh={async (repoId) => {

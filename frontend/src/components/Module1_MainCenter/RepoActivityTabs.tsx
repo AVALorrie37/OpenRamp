@@ -254,7 +254,7 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
     if (!repo) {
       return (
         <div className="flex h-[200px] items-center justify-center text-text/50">
-          请选择仓库
+          {language === 'english' ? 'Click a repository' : '请选择仓库'}
         </div>
       )
     }
