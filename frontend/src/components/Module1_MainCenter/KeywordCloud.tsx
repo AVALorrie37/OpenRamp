@@ -144,6 +144,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
   const maxCount = keywordData[0]?.count || 1
   const { ref: cloudRef, width: cloudWidth, height: cloudHeight } = useElementSize()
   const [placedWords, setPlacedWords] = useState<PlacedWord[]>([])
+  const [hoveredWord, setHoveredWord] = useState<string | null>(null)
 
   useEffect(() => {
     if (!cloudWidth || !cloudHeight || keywordData.length === 0) {
@@ -214,7 +215,8 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
           <g transform={`translate(${cloudWidth / 2}, ${cloudHeight / 2})`}>
             {placedWords.map(w => {
               const isActive = activeKeywords.includes(w.text)
-              const fill = isActive ? 'var(--color-surface)' : fillFromValue(w.value, maxCount)
+              const isHovered = hoveredWord === w.text
+              const fill = fillFromValue(w.value, maxCount)
               const stroke = isActive
                 ? 'var(--glass-frame-outer)'
                 : 'color-mix(in srgb, var(--glass-frame-inner) 55%, transparent)'
@@ -222,7 +224,7 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
                 <text
                   key={w.text}
                   textAnchor="middle"
-                  transform={`translate(${w.x}, ${w.y}) rotate(${w.rotate})`}
+                  transform={`translate(${w.x}, ${w.y}) rotate(${w.rotate}) scale(${isHovered ? 1.06 : 1})`}
                   style={{
                     fontFamily: 'system-ui',
                     fontSize: w.size,
@@ -232,8 +234,14 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
                     stroke,
                     strokeWidth: isActive ? 2 : 1,
                     strokeLinejoin: 'round',
-                    paintOrder: 'stroke'
+                    paintOrder: 'stroke',
+                    transition: 'transform 120ms ease-out',
+                    filter: isActive
+                      ? 'drop-shadow(0 0 0.5px rgba(146, 244, 251, 0.91)) drop-shadow(0 0 10px color-mix(in srgb, var(--glass-frame-inner) 36%, transparent)) drop-shadow(0 0 18px color-mix(in srgb, var(--glass-frame-inner) 36%, transparent))'
+                      : undefined
                   }}
+                  onMouseEnter={() => setHoveredWord(w.text)}
+                  onMouseLeave={() => setHoveredWord(null)}
                   onClick={(e) => {
                     e.stopPropagation()
                     onKeywordClick(w.text)
