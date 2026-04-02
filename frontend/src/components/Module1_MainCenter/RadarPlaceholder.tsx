@@ -47,8 +47,8 @@ const RadarPlaceholder: React.FC<RadarPlaceholderProps> = ({ isActive, matchData
   } else {
     // 已登录但无数据
     return (
-      <div className="p-10 text-center text-base text-text/40">
-        {language === 'english' ? 'Click a repository to view match details' : '点击仓库查看匹配详情'}
+      <div className="p-10 text-center text-lg text-text/40">
+        {language === 'english' ? 'Click a repository to show match details' : '点击仓库，查看匹配详情'}
       </div>
     )
   }

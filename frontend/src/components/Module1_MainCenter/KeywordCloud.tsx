@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import cloud from 'd3-cloud'
 import { extractKeywords, KEYWORD_CLOUD_STOP_WORDS } from '../../utils/formatters'
 import type { RepoResponse } from '../../types'
 
@@ -11,6 +12,76 @@ interface KeywordCloudProps {
   onSingleRepoLabelClick?: (repo: RepoResponse) => void
   language?: 'chinese' | 'english'
 }
+
+type PlacedWord = {
+  text: string
+  value: number
+  size: number
+  x: number
+  y: number
+  rotate: number
+}
+
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+
+const hashStringToUint32 = (s: string) => {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+const mulberry32 = (seed: number) => {
+  let a = seed >>> 0
+  return () => {
+    a += 0x6D2B79F5
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const fontSizeFromValue = (value: number, maxValue: number) => {
+  const min = 12
+  const max = 30
+  const t = maxValue <= 0 ? 0 : Math.sqrt(clamp(value / maxValue, 0, 1))
+  return min + t * (max - min)
+}
+
+const fillFromValue = (value: number, maxValue: number) => {
+  const t = maxValue <= 0 ? 0 : clamp(value / maxValue, 0, 1)
+  const accent = 18 + Math.round(t * 52)
+  return `color-mix(in srgb, var(--color-text) ${100 - accent}%, var(--color-primaryDeep) ${accent}%)`
+}
+
+const useElementSize = () => {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setSize({
+        width: Math.max(0, Math.floor(rect.width)),
+        height: Math.max(0, Math.floor(rect.height))
+      })
+    }
+
+    update()
+    const ro = new ResizeObserver(() => update())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return { ref, ...size }
+}
+
 // frontend/src/components/Module1_MainCenter/KeywordCloud.tsx
 const KeywordCloud: React.FC<KeywordCloudProps> = ({
   repos,
@@ -21,10 +92,9 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
   onSingleRepoLabelClick,
   language = 'chinese'
 }) => {
-  const keywordData = useMemo(() => {
+  const globalKeywordCounts = useMemo(() => {
     const allKeywords: string[] = []
-    const sourceRepos = selectedRepo ? [selectedRepo] : repos
-    sourceRepos.forEach(repo => {
+    repos.forEach(repo => {
       const fromBackend = repo.keywords && repo.keywords.length > 0 ? repo.keywords : []
       if (fromBackend.length > 0) {
         allKeywords.push(
@@ -35,29 +105,81 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
       }
     })
 
-    const keywordCounts = allKeywords.reduce((acc, keyword) => {
+    return allKeywords.reduce((acc, keyword) => {
       acc[keyword] = (acc[keyword] || 0) + 1
       return acc
     }, {} as Record<string, number>)
+  }, [repos, skipDescriptionKeywordFallback])
 
-    return Object.entries(keywordCounts)
+  const keywordData = useMemo(() => {
+    const localKeywords: string[] = []
+    const sourceRepos = selectedRepo ? [selectedRepo] : repos
+    sourceRepos.forEach(repo => {
+      const fromBackend = repo.keywords && repo.keywords.length > 0 ? repo.keywords : []
+      if (fromBackend.length > 0) {
+        localKeywords.push(
+          ...fromBackend.filter(k => !KEYWORD_CLOUD_STOP_WORDS.has(k.toLowerCase()))
+        )
+      } else if (repo.description && !skipDescriptionKeywordFallback) {
+        localKeywords.push(...extractKeywords(repo.description))
+      }
+    })
+
+    const localUnique = Array.from(new Set(localKeywords))
+    const counts = selectedRepo
+      ? Object.fromEntries(localUnique.map(w => [w, globalKeywordCounts[w] || 1]))
+      : globalKeywordCounts
+
+    return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30)
       .map(([word, count]) => ({ word, count }))
-  }, [repos, selectedRepo, skipDescriptionKeywordFallback])
+  }, [repos, selectedRepo, skipDescriptionKeywordFallback, globalKeywordCounts])
 
   const isSingleRepo = !!selectedRepo
   const modeLabel = isSingleRepo
     ? (selectedRepo?.name || (language === 'english' ? 'Single Repo' : '单个仓库'))
     : (language === 'english' ? 'All Repos' : '所有仓库')
 
-  const getFontSize = (count: number, maxCount: number) => {
-    const minSize = 11
-    const maxSize = 17
-    return minSize + ((count / maxCount) * (maxSize - minSize))
-  }
-
   const maxCount = keywordData[0]?.count || 1
+  const { ref: cloudRef, width: cloudWidth, height: cloudHeight } = useElementSize()
+  const [placedWords, setPlacedWords] = useState<PlacedWord[]>([])
+
+  useEffect(() => {
+    if (!cloudWidth || !cloudHeight || keywordData.length === 0) {
+      setPlacedWords([])
+      return
+    }
+
+    const words = keywordData.map(({ word, count }) => ({
+      text: word,
+      value: count,
+      size: fontSizeFromValue(count, maxCount)
+    }))
+
+    const seedBasis = selectedRepo
+      ? `repo:${selectedRepo.repo_id ?? selectedRepo.name ?? ''}`
+      : `all:${keywordData.map(k => `${k.word}:${k.count}`).join('|')}`
+    const rng = mulberry32(hashStringToUint32(seedBasis))
+
+    const layout = cloud<typeof words[number]>()
+      .size([cloudWidth, cloudHeight])
+      .words(words)
+      .padding(4)
+      .rotate(() => 0)
+      .font('system-ui')
+      .fontSize(d => d.size)
+      .spiral('archimedean')
+      .random(() => rng())
+      .on('end', (result: Array<typeof words[number] & { x: number; y: number; rotate: number }>) => {
+        setPlacedWords(result as unknown as PlacedWord[])
+      })
+
+    layout.start()
+    return () => {
+      layout.stop()
+    }
+  }, [cloudWidth, cloudHeight, keywordData, maxCount, selectedRepo])
 
   return (
     <div className="glass-content-shadow flex h-full flex-col px-3 pb-4 pt-2">
@@ -85,35 +207,44 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
         </span>
       </div>
       <div
-        className={`flex min-h-0 flex-1 flex-wrap items-start overflow-y-auto ${isSingleRepo ? 'justify-start gap-1.5' : 'justify-center gap-2.5'}`}
+        ref={cloudRef}
+        className="min-h-0 flex-1 overflow-hidden"
       >
-        {keywordData.map(({ word, count }) => {
-          const isActive = activeKeywords.includes(word)
-          const sizeClass = (() => {
-            const s = getFontSize(count, maxCount)
-            if (s >= 16) return 'text-lg'
-            if (s >= 14) return 'text-base'
-            if (s >= 12) return 'text-sm'
-            return 'text-xs'
-          })()
-          const weightClass = count > maxCount * 0.5 ? 'font-semibold' : 'font-medium'
-          return (
-            <span
-              key={word}
-              className={`cursor-pointer rounded-md px-2.5 py-1 transition [transition-property:transform,box-shadow,border-color,background-color] ${sizeClass} ${weightClass} ${
-                isActive
-                  ? 'relative z-0 border [border-color:var(--glass-frame-outer)] bg-primary text-[var(--color-surface)] shadow-[0_2px_6px_-1px_rgba(0,0,0,0.55),0_8px_22px_-8px_rgba(0,0,0,0.45),0_0_16px_-4px_var(--glass-frame-outer)] backdrop-blur-sm [text-shadow:0_0_10px_color-mix(in_srgb,var(--glass-frame-inner)_50%,transparent)] hover:-translate-y-px hover:[border-color:color-mix(in_srgb,var(--color-text)_20%,var(--glass-border))] hover:shadow-[0_3px_10px_-2px_rgba(0,0,0,0.5),0_12px_28px_-10px_rgba(0,0,0,0.38),0_0_20px_-4px_var(--glass-frame-outer)]'
-                  : 'border [border-color:var(--glass-frame-outer)] bg-surface/58 text-primary shadow-[var(--glass-stack-shadow),inset_0_0_0_1px_var(--glass-frame-inner)] backdrop-blur-sm [text-shadow:0_0_8px_color-mix(in_srgb,var(--glass-frame-inner)_40%,transparent)] hover:-translate-y-px hover:[border-color:color-mix(in_srgb,var(--color-text)_20%,var(--glass-border))] hover:bg-surface/64 hover:shadow-[0_3px_8px_-2px_rgba(0,0,0,0.4),0_10px_24px_-10px_rgba(0,0,0,0.28),0_0_16px_-4px_var(--glass-frame-outer),inset_0_0_0_1px_var(--glass-frame-inner)] hover:[text-shadow:0_0_10px_color-mix(in_srgb,var(--glass-frame-inner)_50%,transparent)]'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onKeywordClick(word)
-              }}
-            >
-              {word}
-            </span>
-          )
-        })}
+        <svg width="100%" height="100%" viewBox={`0 0 ${Math.max(1, cloudWidth)} ${Math.max(1, cloudHeight)}`}>
+          <g transform={`translate(${cloudWidth / 2}, ${cloudHeight / 2})`}>
+            {placedWords.map(w => {
+              const isActive = activeKeywords.includes(w.text)
+              const fill = isActive ? 'var(--color-surface)' : fillFromValue(w.value, maxCount)
+              const stroke = isActive
+                ? 'var(--glass-frame-outer)'
+                : 'color-mix(in srgb, var(--glass-frame-inner) 55%, transparent)'
+              return (
+                <text
+                  key={w.text}
+                  textAnchor="middle"
+                  transform={`translate(${w.x}, ${w.y}) rotate(${w.rotate})`}
+                  style={{
+                    fontFamily: 'system-ui',
+                    fontSize: w.size,
+                    fontWeight: w.value >= maxCount * 0.5 ? 600 : 500,
+                    cursor: 'pointer',
+                    fill,
+                    stroke,
+                    strokeWidth: isActive ? 2 : 1,
+                    strokeLinejoin: 'round',
+                    paintOrder: 'stroke'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onKeywordClick(w.text)
+                  }}
+                >
+                  {w.text}
+                </text>
+              )
+            })}
+          </g>
+        </svg>
       </div>
     </div>
   )

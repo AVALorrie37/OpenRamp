@@ -655,7 +655,6 @@ const App: React.FC = () => {
   }
 
   const handleKeywordClick = (keyword: string) => {
-    setSelectedRepo(null)
     setActiveKeywords(prev => {
       const exists = prev.includes(keyword)
       const next = exists ? prev.filter(k => k !== keyword) : [...prev, keyword]
@@ -677,7 +676,6 @@ const App: React.FC = () => {
   }
 
   const handleKeywordAreaClick = () => {
-    setSelectedRepo(null)
     setHighlightedRepoIds([])
     setActiveKeywords([])
   }
