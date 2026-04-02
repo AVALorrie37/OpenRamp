@@ -704,7 +704,7 @@ const App: React.FC = () => {
           OpenRamp
         </h1>
         <div className="flex items-center gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-base text-text">
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-full border border-border bg-surface2 px-4 py-1.5 text-base text-text shadow-[inset_0_2px_4px_rgba(0,0,0,0.12),inset_0_-1px_0_rgba(255,255,255,0.6)] transition-[transform,box-shadow,background-color] duration-150 ease-out hover:bg-surface2/80 active:translate-y-[1px] active:scale-[0.98] active:shadow-[inset_0_3px_6px_rgba(0,0,0,0.18),inset_0_-1px_0_rgba(255,255,255,0.55)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] dark:active:shadow-[0_1px_5px_rgba(0,0,0,0.55),0_1px_0_rgba(255,255,255,0.05),inset_0_2px_4px_rgba(0,0,0,0.28),inset_0_-1px_0_rgba(255,255,255,0.06)]">
             <input
               type="checkbox"
               checked={colorMode === 'dark'}
@@ -726,39 +726,40 @@ const App: React.FC = () => {
               className="peer sr-only"
             />
             <span
-              className={`inline-flex h-4 w-4 items-center justify-center transition-colors duration-200 ease-out peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 ${
-                colorMode === 'dark' ? 'text-primary' : 'text-primary'
-              }`}
+              className="inline-flex h-5 w-5 items-center justify-center text-text transition-colors duration-200 ease-out peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50"
             >
               {colorMode === 'dark' ? (
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
+                <svg className="h-5 w-5 translate-y-[2px]" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path
+                    d="M21 13.2A8.2 8.2 0 0 1 10.8 3a7.2 7.2 0 1 0 10.2 10.2Z"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
-                    d="M2,2 L22,2 L22,22 L2,22 L2,2 Z M5,13 L10,17 L19,6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 </svg>
               ) : (
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 32 32"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
                   <path
-                    fill="currentColor"
-                    d="M4,4h2v2H4V4z M8,6h4V4H8V6z M14,6h4V4h-4V6z M20,6h4V4h-4V6z M26,4v2h2V4H26z M8,28h4v-2H8V28z M14,28h4v-2h-4V28z M20,28h4v-2h-4V28z M26,12h2V8h-2V12z M26,18h2v-4h-2V18z M26,24h2v-4h-2V24z M26,28h2v-2h-2V28z M4,12h2V8H4V12z M4,18h2v-4H4V18z M4,24h2v-4H4V24z M4,28h2v-2H4V28z"
+                    d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                   />
                 </svg>
               )}
             </span>
-            {uiLanguage === 'english' ? 'Dark mode' : '深色模式'}
+            {uiLanguage === 'english' ? (colorMode === 'dark' ? 'Dark mode' : 'Light mode') : (colorMode === 'dark' ? '深色模式' : '浅色模式')}
           </label>
           <UserDropdown
             username={username}
