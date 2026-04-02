@@ -18,11 +18,7 @@ function clampPos(left: number, top: number) {
 }
 
 function defaultPosition() {
-  const w = window.innerWidth
-  const h = window.innerHeight
-  const marginRight = w >= 640 ? 30 : 16
-  const marginBottom = 60
-  return clampPos(w - BTN_SIZE - marginRight, h - BTN_SIZE - marginBottom)
+  return clampPos(1043, 435)
 }
 
 const AIButton: React.FC<AIButtonProps> = ({ onClick, language = 'chinese' }) => {

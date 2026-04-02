@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, X } from 'lucide-react'
+import { ArrowDown, Copy, Send, Square, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
@@ -40,6 +40,67 @@ function stageLabel(stage: string | null | undefined, language: 'chinese' | 'eng
   return language === 'chinese' ? pair.chinese : pair.english
 }
 
+type Rect = { left: number; top: number; width: number; height: number }
+
+const MIN_W = 360
+const MIN_H = 360
+const EDGE_HANDLE = 8
+const CORNER_HANDLE = 14
+const STORAGE_KEY = 'openramp.aiChatWindow.rect.v1'
+
+function clampRect(r: Rect, vw: number, vh: number): Rect {
+  const width = Math.min(Math.max(MIN_W, r.width), Math.max(MIN_W, vw))
+  const height = Math.min(Math.max(MIN_H, r.height), Math.max(MIN_H, vh))
+  const left = Math.min(Math.max(0, r.left), Math.max(0, vw - width))
+  const top = Math.min(Math.max(0, r.top), Math.max(0, vh - height))
+  return { left, top, width, height }
+}
+
+function defaultRect(): Rect {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const leftPct = 459 / 1167
+  const topPct = 20 / 788
+  const widthPct = 648 / 1167
+  const heightPct = 0.9
+
+  const w = Math.min(vw - 32, Math.round(vw * widthPct))
+  const h = Math.min(vh - 32, Math.round(vh * heightPct))
+  return clampRect(
+    {
+      left: Math.round(vw * leftPct),
+      top: Math.round(vh * topPct),
+      width: w,
+      height: h,
+    },
+    vw,
+    vh
+  )
+}
+
+function readStoredRect(): Rect | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<Rect> | null
+    if (!parsed) return null
+    const left = Number(parsed.left)
+    const top = Number(parsed.top)
+    const width = Number(parsed.width)
+    const height = Number(parsed.height)
+    if (![left, top, width, height].every(Number.isFinite)) return null
+    return { left, top, width, height }
+  } catch {
+    return null
+  }
+}
+
+function writeStoredRect(r: Rect) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(r))
+  } catch {}
+}
+
 const AIChatWindow: React.FC<AIChatWindowProps> = ({
   isOpen,
   onClose,
@@ -61,6 +122,39 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   const [askAiBubble, setAskAiBubble] = useState<{ text: string; top: number; left: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [footerHeight, setFooterHeight] = useState(0)
+  const [rect, setRect] = useState<Rect>(() => {
+    if (typeof window === 'undefined') return { left: 0, top: 0, width: 500, height: 600 }
+    const stored = readStoredRect()
+    return clampRect(stored ?? defaultRect(), window.innerWidth, window.innerHeight)
+  })
+  const [isMaximized, setIsMaximized] = useState(false)
+  const dragMoveRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    origLeft: number
+    origTop: number
+  } | null>(null)
+  const dragResizeRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    orig: Rect
+    handle:
+      | 'n'
+      | 's'
+      | 'e'
+      | 'w'
+      | 'ne'
+      | 'nw'
+      | 'se'
+      | 'sw'
+    ratio: number
+  } | null>(null)
 
   const syncSelectionBubble = useCallback(() => {
     if (!isOpen || !onAskAIAboutText) {
@@ -105,6 +199,46 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
     }
   }, [isOpen])
 
+  useLayoutEffect(() => {
+    if (!isOpen || typeof window === 'undefined') return
+    setRect((r) => clampRect(r, window.innerWidth, window.innerHeight))
+  }, [isOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onResize = () => {
+      setRect((r) => clampRect(r, window.innerWidth, window.innerHeight))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    return
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    setIsMaximized(
+      rect.left === 0 &&
+        rect.top === 0 &&
+        rect.width === vw &&
+        rect.height === vh
+    )
+  }, [rect])
+
+  useEffect(() => {
+    const el = footerRef.current
+    if (!el) return
+    const update = () => setFooterHeight(el.getBoundingClientRect().height)
+    update()
+    const ro = new ResizeObserver(() => update())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   useEffect(() => {
     if (!isOpen || !onAskAIAboutText) return
     let t: number
@@ -131,6 +265,153 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setShowJumpToLatest(false)
+    requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (!el) return
+      el.scrollTop = el.scrollHeight
+    })
+  }, [isOpen])
+
+  const syncJumpToLatest = useCallback(() => {
+    const el = scrollRef.current
+    const end = messagesEndRef.current
+    if (!el || !end) return
+    const elRect = el.getBoundingClientRect()
+    const endRect = end.getBoundingClientRect()
+    const below = endRect.bottom - elRect.bottom
+    setShowJumpToLatest(below > elRect.height / 2)
+  }, [])
+
+  const onMessagesScroll = useCallback(() => {
+    requestAnimationFrame(syncJumpToLatest)
+  }, [syncJumpToLatest])
+
+  const jumpToLatest = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    requestAnimationFrame(syncJumpToLatest)
+  }, [isOpen, messages, loading, syncJumpToLatest])
+
+  const beginMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement | null
+    if (target?.closest('button,input,textarea,select,a,[role="button"]')) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragMoveRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origLeft: rect.left,
+      origTop: rect.top,
+    }
+  }, [rect.left, rect.top])
+
+  const movePointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragMoveRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+    setRect((r) => clampRect({ ...r, left: d.origLeft + dx, top: d.origTop + dy }, window.innerWidth, window.innerHeight))
+  }, [])
+
+  const endMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragMoveRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+    dragMoveRef.current = null
+  }, [])
+
+  const beginResize = useCallback((handle: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') => {
+    return (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      dragResizeRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        orig: rect,
+        handle,
+        ratio: rect.width / Math.max(1, rect.height),
+      }
+    }
+  }, [rect])
+
+  const resizePointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragResizeRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+
+    const apply = (next: Rect) => setRect(clampRect(next, vw, vh))
+
+    const o = d.orig
+    const isCorner = d.handle.length === 2
+    if (!isCorner) {
+      switch (d.handle) {
+        case 'e': {
+          apply({ ...o, width: o.width + dx })
+          return
+        }
+        case 'w': {
+          apply({ left: o.left + dx, top: o.top, width: o.width - dx, height: o.height })
+          return
+        }
+        case 's': {
+          apply({ ...o, height: o.height + dy })
+          return
+        }
+        case 'n': {
+          apply({ left: o.left, top: o.top + dy, width: o.width, height: o.height - dy })
+          return
+        }
+      }
+    }
+
+    const ratio = d.ratio
+    const absDx = Math.abs(dx)
+    const absDy = Math.abs(dy)
+    const byWidth = absDx >= absDy * ratio
+
+    let w = o.width
+    let h = o.height
+
+    if (byWidth) {
+      w = o.width + (d.handle.includes('w') ? -dx : dx)
+      h = w / Math.max(0.01, ratio)
+    } else {
+      h = o.height + (d.handle.includes('n') ? -dy : dy)
+      w = h * ratio
+    }
+
+    let left = o.left
+    let top = o.top
+    if (d.handle.includes('w')) left = o.left + (o.width - w)
+    if (d.handle.includes('n')) top = o.top + (o.height - h)
+
+    apply({ left, top, width: w, height: h })
+  }, [])
+
+  const endResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragResizeRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+    dragResizeRef.current = null
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -164,6 +445,37 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
     await onSendMessage(suggestion)
   }
 
+  const windowStyle = useMemo(() => {
+    if (typeof window === 'undefined') return undefined
+    return {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    } as React.CSSProperties
+  }, [rect.height, rect.left, rect.top, rect.width])
+
+  const toggleMaximize = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    setRect((r) => {
+      const alreadyMax =
+        r.left === 0 && r.top === 0 && r.width === vw && r.height === vh
+      if (alreadyMax) {
+        const next = clampRect(defaultRect(), vw, vh)
+        return next
+      }
+      const next = clampRect({ left: 0, top: 0, width: vw, height: vh }, vw, vh)
+      return next
+    })
+  }, [])
+
+  const handleClose = useCallback(() => {
+    if (typeof window !== 'undefined') writeStoredRect(rect)
+    onClose()
+  }, [onClose, rect])
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -195,34 +507,64 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               document.body
             )}
           <motion.div
-            className="fixed inset-0 z-[1000] bg-black/30"
-            onClick={onClose}
+            className="fixed inset-0 z-[1000] bg-black/20"
+            onClick={handleClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           />
           <motion.div
-            className="fixed bottom-[100px] right-4 z-[1001] flex h-[70vh] w-[calc(100%-2rem)] max-w-[500px] flex-col rounded-lg bg-surface shadow-modal sm:right-[30px] sm:h-[600px]"
+            className="fixed z-[1001] flex flex-col rounded-lg bg-surface shadow-modal"
+            style={windowStyle}
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.18 }}
           >
-            <div className="flex items-center justify-between border-b border-border p-5">
+            <div
+              className="flex items-center justify-between border-b border-border p-5"
+              onPointerDown={beginMove}
+              onPointerMove={movePointer}
+              onPointerUp={endMove}
+              onPointerCancel={endMove}
+            >
               <h3 className="m-0 text-lg font-semibold text-text">
                 {language === 'english' ? 'Open Source Contribution Assistant' : '开源贡献智能向导'}
               </h3>
-              <button
-                onClick={onClose}
-                className="inline-flex items-center justify-center px-2 text-text"
-                aria-label={language === 'english' ? 'Close' : '关闭'}
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleMaximize()
+                  }}
+                  className="inline-flex items-center justify-center px-2 text-text"
+                  aria-label={
+                    language === 'english'
+                      ? (isMaximized ? 'Restore' : 'Maximize')
+                      : (isMaximized ? '还原' : '最大化')
+                  }
+                >
+                  {isMaximized ? <Copy size={18} /> : <Square size={18} />}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleClose()
+                  }}
+                  className="inline-flex items-center justify-center px-2 text-text"
+                  aria-label={language === 'english' ? 'Close' : '关闭'}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-background p-5">
+            <div
+              ref={scrollRef}
+              className="relative flex-1 overflow-y-auto bg-background p-5"
+              onScroll={onMessagesScroll}
+            >
               {messages.length === 0 && (
                 <div className="mt-10 text-center text-text/60">
                   {language === 'english' ? 'Start chatting!' : '开始对话吧！'}
@@ -260,7 +602,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="border-t border-border bg-surface p-4">
+            <div ref={footerRef} className="border-t border-border bg-surface p-4">
               <form onSubmit={handleSubmit} className="relative">
                 <div className="relative mb-3">
                   <input
@@ -291,6 +633,88 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
               </form>
             </div>
+
+            {showJumpToLatest && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  jumpToLatest()
+                }}
+                className="pointer-events-auto absolute right-4 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text shadow-md transition hover:brightness-[0.98]"
+                style={{ bottom: footerHeight + 3 }}
+              >
+                <ArrowDown size={16} />
+                {language === 'english' ? 'Latest' : '最新'}
+              </button>
+            )}
+
+            <div
+              className="absolute left-0 top-0 h-full z-[2]"
+              style={{ width: EDGE_HANDLE, cursor: 'ew-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('w')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute top-0 h-full z-[1]"
+              style={{ right: -EDGE_HANDLE, width: EDGE_HANDLE, cursor: 'ew-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('e')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute left-0 top-0 w-full z-[2]"
+              style={{ height: EDGE_HANDLE, cursor: 'ns-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('n')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute bottom-0 left-0 w-full z-[2]"
+              style={{ height: EDGE_HANDLE, cursor: 'ns-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('s')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+
+            <div
+              className="absolute left-0 top-0 z-[3]"
+              style={{ width: CORNER_HANDLE, height: CORNER_HANDLE, cursor: 'nwse-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('nw')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute right-0 top-0 z-[3]"
+              style={{ width: CORNER_HANDLE, height: CORNER_HANDLE, cursor: 'nesw-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('ne')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute left-0 bottom-0 z-[3]"
+              style={{ width: CORNER_HANDLE, height: CORNER_HANDLE, cursor: 'nesw-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('sw')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
+            <div
+              className="absolute right-0 bottom-0 z-[3]"
+              style={{ width: CORNER_HANDLE, height: CORNER_HANDLE, cursor: 'nwse-resize', pointerEvents: 'auto' }}
+              onPointerDown={beginResize('se')}
+              onPointerMove={resizePointer}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+            />
           </motion.div>
         </>
       )}
