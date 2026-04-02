@@ -137,6 +137,9 @@
   --tab-unselected-bg: rgba(90, 111, 109, 0.11);
   --tab-unselected-text: color-mix(in srgb, var(--color-text) 90%, transparent);
   --tab-unselected-hover-bg: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --scrollbar-track-bg: rgba(234, 239, 240, 0.58);
+  --scrollbar-thumb-bg: rgba(212, 221, 223, 0.70);
+  --scrollbar-thumb-hover-bg: rgba(194, 206, 208, 0.78);
   --icon-star-favorited: rgba(95, 216, 212, 0.68);
   --icon-star-idle: var(--color-border);
   --color-specular-white: var(--emphasis-fill-text);
@@ -221,6 +224,9 @@
   --tab-unselected-bg: rgba(75, 83, 122, 0.542);
   --tab-unselected-text: color-mix(in srgb, var(--color-text) 90%, transparent);
   --tab-unselected-hover-bg: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --scrollbar-track-bg:  rgba(64, 67, 86, 0.468);
+  --scrollbar-thumb-bg:  rgba(188, 210, 241, 0.429);
+  --scrollbar-thumb-hover-bg:  rgba(119, 131, 150, 0.745);
   --icon-star-favorited: rgba(200, 227, 248, 0.68);
   --icon-star-idle: var(--color-border);
   --emphasis-fill-bg: var(--color-primaryDeep);
@@ -275,34 +281,17 @@ input, textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-background);
+  background: var(--scrollbar-track-bg);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-primary);
+  background: var(--scrollbar-thumb-bg);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primaryDark);
-}
-
-.repo-list-scrollbar {
-  scrollbar-color: var(--tab-unselected-bg) var(--color-background);
-  scrollbar-width: thin;
-}
-
-.repo-list-scrollbar::-webkit-scrollbar-track {
-  background: var(--color-background);
-}
-
-.repo-list-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--tab-unselected-bg);
-  border-radius: 4px;
-}
-
-.repo-list-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--tab-unselected-hover-bg);
+  background: var(--scrollbar-thumb-hover-bg);
 }
 
 .katex,

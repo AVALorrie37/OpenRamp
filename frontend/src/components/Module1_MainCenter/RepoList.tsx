@@ -254,7 +254,7 @@ const RepoList: React.FC<RepoListProps> = ({
         )}
       </div>
       <div
-        className="repo-list-scrollbar flex-1 overflow-y-auto p-3 pb-8"
+        className="flex-1 overflow-y-auto p-3 pb-8"
         onClick={onBackgroundClick}
       >
         {sortedRepos.map((repo: RepoResponse) => {
