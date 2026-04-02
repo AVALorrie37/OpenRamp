@@ -270,7 +270,11 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
                     disabled={loading}
-                    className={`w-full rounded-md border bg-surface px-3 py-2 pr-11 text-base outline-none ${loading ? 'border-primary animate-pulse' : 'border-border'}`}
+                    className={`w-full rounded-md border bg-[var(--chat-input-bg)] px-3 py-2 pr-11 text-base text-[var(--chat-input-text)] outline-none ${
+                      loading
+                        ? 'border-[var(--chat-input-border-active)] animate-pulse'
+                        : 'border-[var(--chat-input-border)]'
+                    }`}
                   />
                   <button
                     type="submit"

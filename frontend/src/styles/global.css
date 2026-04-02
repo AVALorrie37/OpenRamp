@@ -87,7 +87,7 @@
   --radar-match-fill-bottom-opacity: 0.16;
   --radar-envelope-stroke-opacity: 0.42;
   --radar-tick-text-shadow: 0 0 10px rgba(27, 179, 173, 0.35);
-  --color-accent: #2b7cff;
+  --color-accent: #2bf8ff;
   --color-tertiary: #6b7280;
   --color-background: #f6f8fb;
   --color-text: #0f172a;
@@ -129,6 +129,20 @@
   --weight-track-groove-bg: color-mix(in srgb, var(--color-surface2) 88%, #000 12%);
   --weight-track-inset: inset 0 2px 4px rgba(0, 0, 0, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  --tab-selected-bg: var(--color-primaryDeep);
+  --tab-selected-border:  #ffffff;
+  --tab-selected-text: #fffdfd;
+  --tab-unselected-bg: rgba(90, 111, 109, 0.11);
+  --tab-unselected-text: color-mix(in srgb, var(--color-text) 90%, transparent);
+  --tab-unselected-hover-bg: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --icon-star-favorited: rgba(95, 216, 212, 0.68);
+  --icon-star-idle: var(--color-border);
+  --emphasis-fill-bg: var(--color-primaryDeep);
+  --emphasis-fill-text: #ffffff;
+  --chat-input-bg: var(--color-surface);
+  --chat-input-border: var(--color-border);
+  --chat-input-border-active: var(--color-primary);
+  --chat-input-text: var(--color-text);
 }
 
 .dark {
@@ -153,7 +167,7 @@
   --radar-envelope-stroke-opacity: 0.48;
   --radar-tick-text-shadow: 0 0 14px rgba(102, 233, 221, 0.45),
     0 1px 2px rgba(0, 0, 0, 0.55);
-  --color-accent: #a7d9ff;
+  --color-accent: #8336f7;
   --color-tertiary: #213a5f;
   --color-background: #06122a;
   --color-text: #dbe7ff;
@@ -195,6 +209,20 @@
   --weight-track-groove-bg: color-mix(in srgb, var(--color-background) 65%, #000 35%);
   --weight-track-inset: inset 0 3px 6px rgba(0, 0, 0, 0.55),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  --tab-selected-bg: var(--color-primaryDeep);
+  --tab-selected-border: var(--color-primaryDeep);
+  --tab-selected-text: rgba(43, 47, 54, 0.92);
+  --tab-unselected-bg: rgba(75, 83, 122, 0.542);
+  --tab-unselected-text: color-mix(in srgb, var(--color-text) 90%, transparent);
+  --tab-unselected-hover-bg: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --icon-star-favorited: rgba(200, 227, 248, 0.68);
+  --icon-star-idle: var(--color-border);
+  --emphasis-fill-bg: var(--color-primaryDeep);
+  --emphasis-fill-text:  rgba(43, 47, 54, 0.92);
+  --chat-input-bg: var(--color-surface);
+  --chat-input-border: var(--color-border);
+  --chat-input-border-active: var(--color-primary);
+  --chat-input-text: var(--color-text);
 }
 
 * {
@@ -247,6 +275,24 @@ input, textarea {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primaryDark);
+}
+
+.repo-list-scrollbar {
+  scrollbar-color: var(--tab-unselected-bg) var(--color-background);
+  scrollbar-width: thin;
+}
+
+.repo-list-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+.repo-list-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--tab-unselected-bg);
+  border-radius: 4px;
+}
+
+.repo-list-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--tab-unselected-hover-bg);
 }
 
 .katex,

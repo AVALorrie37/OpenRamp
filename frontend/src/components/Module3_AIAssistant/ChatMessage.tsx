@@ -22,7 +22,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language = 'chinese'
           isNotice ? 'text-xs text-text/70' : 'text-base'
         } ${
           hasResults ? 'max-w-[85%]' : 'max-w-[70%]'
-        } ${isUser ? 'bg-primary text-white' : 'bg-primaryLight text-text'}`}
+        } ${
+          isUser
+            ? 'bg-[var(--emphasis-fill-bg)] text-[var(--emphasis-fill-text)]'
+            : 'bg-primaryLight text-text'
+        }`}
       >
         <div data-chat-selectable>
           {message.content}

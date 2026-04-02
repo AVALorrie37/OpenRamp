@@ -24,7 +24,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ username, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-lg font-semibold text-white transition hover:scale-110 hover:bg-primaryDark"
+      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[var(--color-primaryDeep)] text-lg font-semibold text-[#06222e] transition hover:brightness-95"
     >
       {initial}
     </button>

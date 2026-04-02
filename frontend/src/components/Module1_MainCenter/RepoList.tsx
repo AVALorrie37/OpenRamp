@@ -143,10 +143,10 @@ const RepoList: React.FC<RepoListProps> = ({
   const labels = language === 'english'
     ? {
         matchTotal: 'Composite',
-        skill: 'Skill',
-        activity: 'Activity',
-        demand: 'Demand',
-        match: 'Match',
+        skill: 'Skill ',
+        activity: 'Activity ',
+        demand: 'Demand ',
+        match: 'Match ',
         favorite: 'Favorite',
         unfavorite: 'Unfavorite'
       }
@@ -193,8 +193,10 @@ const RepoList: React.FC<RepoListProps> = ({
           {canUseMatch && (
             <button
               onClick={() => setSortType('match')}
-              className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-                sortType === 'match' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+              className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+                sortType === 'match'
+                  ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+                  : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
               }`}
             >
               {labels.matchTotal}
@@ -202,24 +204,30 @@ const RepoList: React.FC<RepoListProps> = ({
           )}
           <button
             onClick={() => setSortType('skill')}
-            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-              sortType === 'skill' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+              sortType === 'skill'
+                ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+                : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
             }`}
           >
             {labels.skill}
           </button>
           <button
             onClick={() => setSortType('activity')}
-            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-              sortType === 'activity' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+              sortType === 'activity'
+                ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+                : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
             }`}
           >
             {labels.activity}
           </button>
           <button
             onClick={() => setSortType('demand')}
-            className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-              sortType === 'demand' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+            className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+              sortType === 'demand'
+                ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+                : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
             }`}
           >
             {labels.demand}
@@ -246,7 +254,7 @@ const RepoList: React.FC<RepoListProps> = ({
         )}
       </div>
       <div
-        className="flex-1 overflow-y-auto p-3 pb-8"
+        className="repo-list-scrollbar flex-1 overflow-y-auto p-3 pb-8"
         onClick={onBackgroundClick}
       >
         {sortedRepos.map((repo: RepoResponse) => {
@@ -309,7 +317,7 @@ const RepoList: React.FC<RepoListProps> = ({
               </h3>
               <div className="ml-2 flex max-w-[65%] shrink-0 flex-wrap items-center justify-end gap-2">
                 {canUseMatchSort && typeof repo.match_score === 'number' && (
-                  <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-white bg-primary">
+                  <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[var(--emphasis-fill-text)] bg-[var(--emphasis-fill-bg)]">
                     {labels.match}{Math.round(repo.match_score * 100)}%
                   </span>
                 )}
@@ -320,7 +328,11 @@ const RepoList: React.FC<RepoListProps> = ({
                       e.stopPropagation()
                       onToggleFavorite(repo)
                     }}
-                    className="inline-flex items-center justify-center rounded-full bg-transparent p-1 text-base text-border transition hover:text-accent"
+                    className={`inline-flex items-center justify-center rounded-full bg-transparent p-1 text-base transition ${
+                      repo.is_favorited
+                        ? 'text-[var(--icon-star-favorited)]'
+                        : 'text-[var(--icon-star-idle)] hover:text-[var(--icon-star-favorited)]'
+                    }`}
                     aria-label={repo.is_favorited ? labels.unfavorite : labels.favorite}
                   >
                     <Star size={16} fill={repo.is_favorited ? 'currentColor' : 'none'} />

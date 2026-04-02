@@ -63,8 +63,8 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
     <div className="glass-content-shadow flex h-full flex-col px-3 pb-4 pt-2">
       <div className="mb-2 flex justify-end">
         <span
-          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-t-md border border-primary bg-primary px-3 py-1.5 text-xs text-white transition ${
-            isSingleRepo && selectedRepo ? 'cursor-pointer hover:bg-primaryDark' : ''
+          className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-t-md border border-[var(--tab-selected-border)] bg-[var(--tab-selected-bg)] px-3 py-1.5 text-xs font-medium text-[var(--tab-selected-text)] transition ${
+            isSingleRepo && selectedRepo ? 'cursor-pointer hover:brightness-[0.99]' : ''
           }`}
           role={isSingleRepo && selectedRepo ? 'link' : undefined}
           tabIndex={isSingleRepo && selectedRepo ? 0 : undefined}

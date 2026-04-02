@@ -127,7 +127,12 @@ const SearchResultCards: React.FC<SearchResultCardsProps> = ({
                 title={language === 'chinese' ? (isFav ? '取消收藏' : '收藏') : (isFav ? 'Unfavorite' : 'Favorite')}
                 disabled={!username}
               >
-                <span className={isFav ? 'text-accent' : 'text-border'} aria-hidden="true">
+                <span
+                  className={
+                    isFav ? 'text-[var(--icon-star-favorited)]' : 'text-[var(--icon-star-idle)]'
+                  }
+                  aria-hidden="true"
+                >
                   <Star size={16} fill={isFav ? 'currentColor' : 'none'} />
                 </span>
               </button>

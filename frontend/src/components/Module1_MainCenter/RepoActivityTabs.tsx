@@ -445,19 +445,23 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
     <div className="glass-content-shadow flex h-full w-full flex-col p-3">
       <div className="mb-3 flex items-center gap-2">
         <button
-          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-            activeTab === 'commits' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+          className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+            activeTab === 'commits'
+              ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+              : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
           }`}
           onClick={() => {
             setTab('commits')
             if (repoId) void loadTrend('commits', repoId)
           }}
         >
-          Commit
+          Commits
         </button>
         <button
-          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-            activeTab === 'issues' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+          className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+            activeTab === 'issues'
+              ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+              : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
           }`}
           onClick={() => {
             setTab('issues')
@@ -467,8 +471,10 @@ const RepoActivityTabs: React.FC<RepoActivityTabsProps> = ({ repo, themeVersion 
           Issues
         </button>
         <button
-          className={`rounded-t-md border border-primary px-3 py-1.5 text-xs transition ${
-            activeTab === 'openrank' ? 'bg-primary text-white' : 'bg-background text-text hover:bg-primary/10'
+          className={`rounded-t-md border border-[var(--tab-selected-border)] px-3 py-1.5 text-xs transition ${
+            activeTab === 'openrank'
+              ? 'bg-[var(--tab-selected-bg)] font-medium text-[var(--tab-selected-text)] hover:brightness-[0.99]'
+              : 'bg-[var(--tab-unselected-bg)] font-medium text-[var(--tab-unselected-text)] hover:bg-[var(--tab-unselected-hover-bg)]'
           }`}
           onClick={() => {
             setTab('openrank')
