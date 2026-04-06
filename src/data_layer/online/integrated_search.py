@@ -34,6 +34,14 @@ try:
     from .GithubAPI.schemas import SearchResult, RepoMetadata
     from .OpenDiggerAPI.client import OpenDiggerClient
     from ..offline.loader import OfflineRepoLoader
+    from .score_calibration_store import (
+        CHANNEL_GITHUB_ACTIVITY,
+        CHANNEL_GITHUB_DEMAND,
+        CHANNEL_OPENDIGGER_ACTIVITY,
+        CHANNEL_OPENDIGGER_DEMAND,
+        ScoreCalibrationStore,
+        get_calibration_store,
+    )
 finally:
     # Clean up temporary paths
     paths_to_remove = [
@@ -73,6 +81,12 @@ class IntegratedRepoResult:
     demand_score: float = 0.0
     composite_score: float = 0.0          # 0.5*active + 0.3*influence + 0.2*demand
     languages: List[str] = field(default_factory=list)  # From github_keywords or []
+    issues_new_last_30: int = 0
+    active_days_last_30: int = 0
+    github_a_raw: Optional[float] = None
+    github_d_raw: Optional[float] = None
+    od_active_raw: Optional[float] = None
+    od_demand_raw: Optional[float] = None
 
 
 @dataclass
@@ -109,7 +123,8 @@ class IntegratedRepoSearch:
         github_client: GitHubClient = None,
         opendigger_client: OpenDiggerClient = None,
         use_cache: bool = True,
-        profile_cache_dir: Optional[str] = None
+        profile_cache_dir: Optional[str] = None,
+        calibration_store: Optional[ScoreCalibrationStore] = None,
     ):
         """
         Initialize the integrated search.
@@ -119,16 +134,14 @@ class IntegratedRepoSearch:
             opendigger_client: Optional pre-configured OpenDiggerClient instance
             use_cache: Whether to use local cache for OpenDigger data (default: True)
             profile_cache_dir: Directory for user profile cache (default: data_layer/data/profile_cache)
+            calibration_store: Optional persistent score calibration (default: process-wide singleton)
         """
         self._github = github_client or GitHubClient()
         self._opendigger = opendigger_client or OpenDiggerClient(use_cache=use_cache)
         self._scorer = MatchScorer()
+        self._calibration = calibration_store if calibration_store is not None else get_calibration_store()
+        self._offline_loader = OfflineRepoLoader()
 
-        # Online-learning stats for GitHub-only activity normalization (A_raw -> [0,1])
-        self._activity_a_raw_samples: List[float] = []
-        self._activity_p1: float = 1
-        self._activity_p99: float = 3000.0
-        
         # Setup profile cache directory
         if profile_cache_dir:
             self._profile_cache_dir = Path(profile_cache_dir)
@@ -207,88 +220,10 @@ class IntegratedRepoSearch:
             print(f"Warning: Failed to fetch OpenDigger data for {repo_id}: {e}")
             return None
     
-    def _compute_unified_scores(
-        self,
-        opendigger_metrics: Dict[str, Any],
-        github_keywords: List[str]
-    ) -> Dict[str, Any]:
-        active_data = opendigger_metrics.get("active_dates_and_times") or {}
-        openrank_data = opendigger_metrics.get("openrank") or {}
-        issues_data = opendigger_metrics.get("issues_new") or {}
-        loader = OfflineRepoLoader()
-        active_score = loader._calculate_active_score(active_data if isinstance(active_data, dict) else {})
-        influence_score = loader._calculate_influence_score(openrank_data if isinstance(openrank_data, dict) else {})
-        demand_score = loader._calculate_demand_score(issues_data if isinstance(issues_data, dict) else {})
-        composite_score = 0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score
-        return {
-            "active_score": round(active_score, 4),
-            "influence_score": round(influence_score, 4),
-            "demand_score": round(demand_score, 4),
-            "composite_score": round(composite_score, 4),
-            "languages": list(github_keywords) if github_keywords else [],
-        }
-
-    @staticmethod
-    def _robust_min_max(value: float, v_min: float, v_max: float) -> float:
-        if value <= v_min:
-            return 0.0
-        if value >= v_max:
-            return 1.0
-        return (value - v_min) / (v_max - v_min)
-
-    def _update_activity_quantiles(self, a_raw: float) -> None:
-        """
-        Update running estimates of p1/p99 for activity A_raw using a sliding window.
-        """
-        self._activity_a_raw_samples.append(a_raw)
-        # Keep a sliding window to bound memory and adapt to new data
-        max_window = 1000
-        if len(self._activity_a_raw_samples) > max_window:
-            self._activity_a_raw_samples = self._activity_a_raw_samples[-max_window:]
-
-        # Need enough samples for stable quantiles
-        if len(self._activity_a_raw_samples) < 50:
-            return
-
-        sorted_vals = sorted(self._activity_a_raw_samples)
-        n = len(sorted_vals)
-        idx1 = max(0, int(0.01 * n) - 1)
-        idx99 = min(n - 1, int(0.99 * n) - 1)
-        p1 = sorted_vals[idx1]
-        p99 = sorted_vals[idx99]
-
-        # Guard against degenerate ranges
-        if p99 <= p1:
-            return
-
-        self._activity_p1 = p1
-        self._activity_p99 = p99
-
-    def _normalize_activity_a_raw(self, a_raw: float) -> float:
-        """
-        Normalize A_raw to [0,1] using robust Min-Max with online-learned p1/p99.
-        """
-        # Update quantile estimates before using them
-        self._update_activity_quantiles(a_raw)
-        v_min = self._activity_p1
-        v_max = self._activity_p99
-
-        # Fallback if estimates are still default or too close
-        if v_max <= v_min + 1e-6:
-            v_min, v_max = 0.5, 500.0
-
-        return self._robust_min_max(a_raw, v_min=v_min, v_max=v_max)
-
-    def _compute_github_only_scores(self, metadata: RepoMetadata, github_keywords: List[str]) -> Dict[str, Any]:
-        """
-        当没有 OpenDigger 数据时，仅基于 GitHub 原生指标估算各子分。
-        参考 design_text/match_algorithm.md 中的 GitHub 校准公式。
-        """
+    def _github_raw_pair(self, metadata: RepoMetadata) -> Tuple[float, float]:
         stars = max(0, int(getattr(metadata, "stars", 0)))
         forks = max(0, int(getattr(metadata, "forks", 0)))
         open_issues = max(0, int(getattr(metadata, "open_issues", 0)))
-
-        # 估算近30天提交活跃度：根据最近更新时间粗略映射
         recent_commits_30d = 0
         try:
             if metadata.last_updated:
@@ -298,38 +233,127 @@ class IntegratedRepoSearch:
                     recent_commits_30d = 30 - days
         except Exception:
             recent_commits_30d = 0
-
-        # 活跃度原始指标 A_raw
         a_raw = (
             math.log2(1.0 + stars)
             + 2.0 * math.log2(1.0 + recent_commits_30d)
             + 0.5 * math.log2(1.0 + forks)
         )
-        # 使用分位数在线学习得到的 p1/p99 做鲁棒 Min-Max 归一化
-        s_activity = self._normalize_activity_a_raw(a_raw)
-
-        # 需求分：open_issues 和 open_issues / recent_commits_30d
-        issues_norm = self._robust_min_max(
-            math.log2(1.0 + open_issues), v_min=0.0, v_max=8.0
-        )
         ratio = open_issues / max(1.0, float(recent_commits_30d)) if open_issues > 0 else 0.0
-        ratio_norm = self._robust_min_max(
-            math.log2(1.0 + ratio), v_min=0.0, v_max=4.0
+        d_raw = 0.6 * math.log2(1.0 + open_issues) + 0.4 * math.log2(1.0 + ratio)
+        return a_raw, d_raw
+
+    def _build_scores_opendigger(
+        self,
+        opendigger_metrics: Dict[str, Any],
+        github_keywords: List[str],
+    ) -> Dict[str, Any]:
+        active_data = opendigger_metrics.get("active_dates_and_times") or {}
+        openrank_data = opendigger_metrics.get("openrank") or {}
+        issues_data = opendigger_metrics.get("issues_new") or {}
+        loader = self._offline_loader
+        ad = active_data if isinstance(active_data, dict) else {}
+        od = issues_data if isinstance(issues_data, dict) else {}
+        orank = openrank_data if isinstance(openrank_data, dict) else {}
+        ar = loader.compute_opendigger_active_raw(ad)
+        dr = loader.compute_opendigger_demand_raw(od)
+        influence_score = loader._calculate_influence_score(orank)
+        active_score = round(self._calibration.normalize_single(CHANNEL_OPENDIGGER_ACTIVITY, ar), 4)
+        demand_score = round(self._calibration.normalize_single(CHANNEL_OPENDIGGER_DEMAND, dr), 4)
+        composite_score = round(
+            0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score, 4
         )
-        s_demand = 0.6 * issues_norm + 0.4 * ratio_norm
-
-        active_score = round(s_activity, 4)
-        demand_score = round(s_demand, 4)
-        influence_score = 0.0
-        composite_score = 0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score
-
+        ad30 = int(opendigger_metrics.get("active_days_last_30") or 0)
+        iss30 = int(opendigger_metrics.get("issues_new_last_30") or 0)
         return {
-            "active_score": round(active_score, 4),
+            "active_score": active_score,
             "influence_score": round(influence_score, 4),
-            "demand_score": round(demand_score, 4),
-            "composite_score": round(composite_score, 4),
+            "demand_score": demand_score,
+            "composite_score": composite_score,
             "languages": list(github_keywords) if github_keywords else [],
+            "od_active_raw": ar,
+            "od_demand_raw": dr,
+            "active_days_last_30": ad30,
+            "issues_new_last_30": iss30,
         }
+
+    def _build_scores_github_only(
+        self, metadata: RepoMetadata, github_keywords: List[str]
+    ) -> Dict[str, Any]:
+        a_raw, d_raw = self._github_raw_pair(metadata)
+        open_issues = max(0, int(getattr(metadata, "open_issues", 0)))
+        active_score = round(self._calibration.normalize_single(CHANNEL_GITHUB_ACTIVITY, a_raw), 4)
+        demand_score = round(self._calibration.normalize_single(CHANNEL_GITHUB_DEMAND, d_raw), 4)
+        influence_score = 0.0
+        composite_score = round(0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score, 4)
+        return {
+            "active_score": active_score,
+            "influence_score": influence_score,
+            "demand_score": demand_score,
+            "composite_score": composite_score,
+            "languages": list(github_keywords) if github_keywords else [],
+            "github_a_raw": a_raw,
+            "github_d_raw": d_raw,
+            "active_days_last_30": 0,
+            "issues_new_last_30": open_issues,
+        }
+
+    def _finalize_repository_scores(self, repos: List["IntegratedRepoResult"]) -> None:
+        """
+        用「持久化池 + 当次搜索结果」批量重算 activity/demand，并 commit 本批 raw。
+        搜索循环内为仅持久化池的 provisional；此处覆盖为最终分。
+        """
+        if not repos:
+            return
+        gh_idx = [
+            i
+            for i, r in enumerate(repos)
+            if r.github_a_raw is not None
+            and r.github_d_raw is not None
+            and not r.opendigger_metrics
+        ]
+        od_idx = [
+            i
+            for i, r in enumerate(repos)
+            if r.od_active_raw is not None
+            and r.od_demand_raw is not None
+            and bool(r.opendigger_metrics)
+        ]
+        commit: Dict[str, List[float]] = {
+            CHANNEL_GITHUB_ACTIVITY: [],
+            CHANNEL_GITHUB_DEMAND: [],
+            CHANNEL_OPENDIGGER_ACTIVITY: [],
+            CHANNEL_OPENDIGGER_DEMAND: [],
+        }
+        if gh_idx:
+            a_raws = [repos[i].github_a_raw for i in gh_idx]
+            d_raws = [repos[i].github_d_raw for i in gh_idx]
+            na = self._calibration.normalize_batch(CHANNEL_GITHUB_ACTIVITY, a_raws)
+            nd = self._calibration.normalize_batch(CHANNEL_GITHUB_DEMAND, d_raws)
+            for j, idx in enumerate(gh_idx):
+                r = repos[idx]
+                r.active_score = round(na[j], 4)
+                r.demand_score = round(nd[j], 4)
+                r.composite_score = round(
+                    0.5 * r.active_score + 0.3 * r.influence_score + 0.2 * r.demand_score, 4
+                )
+            commit[CHANNEL_GITHUB_ACTIVITY].extend(a_raws)
+            commit[CHANNEL_GITHUB_DEMAND].extend(d_raws)
+        if od_idx:
+            a_raws = [repos[i].od_active_raw for i in od_idx]
+            d_raws = [repos[i].od_demand_raw for i in od_idx]
+            na = self._calibration.normalize_batch(CHANNEL_OPENDIGGER_ACTIVITY, a_raws)
+            nd = self._calibration.normalize_batch(CHANNEL_OPENDIGGER_DEMAND, d_raws)
+            for j, idx in enumerate(od_idx):
+                r = repos[idx]
+                r.active_score = round(na[j], 4)
+                r.demand_score = round(nd[j], 4)
+                r.composite_score = round(
+                    0.5 * r.active_score + 0.3 * r.influence_score + 0.2 * r.demand_score, 4
+                )
+            commit[CHANNEL_OPENDIGGER_ACTIVITY].extend(a_raws)
+            commit[CHANNEL_OPENDIGGER_DEMAND].extend(d_raws)
+        if any(commit.values()):
+            self._calibration.commit_session(commit)
     
     def _calculate_match_score(
         self,
@@ -484,8 +508,7 @@ class IntegratedRepoSearch:
                 metrics = self._fetch_opendigger_metrics(result.repo_id)
                 
                 if metrics is not None:
-                    # 有 OpenDigger 数据：使用 OpenDigger + GitHub 统一指标
-                    unified = self._compute_unified_scores(metrics, result.keywords)
+                    unified = self._build_scores_opendigger(metrics, result.keywords)
                     integrated_result = IntegratedRepoResult(
                         repo_id=result.repo_id,
                         github_keywords=result.keywords,
@@ -497,12 +520,15 @@ class IntegratedRepoSearch:
                         demand_score=unified["demand_score"],
                         composite_score=unified["composite_score"],
                         languages=unified["languages"],
+                        issues_new_last_30=unified["issues_new_last_30"],
+                        active_days_last_30=unified["active_days_last_30"],
+                        od_active_raw=unified["od_active_raw"],
+                        od_demand_raw=unified["od_demand_raw"],
                     )
                     qualified_repos.append(integrated_result)
                     print(f"✓ Valid with OpenDigger ({len(qualified_repos)}/{target_count})")
                 else:
-                    # 无 OpenDigger 数据：退化为基于 GitHub 指标的估算，但仍参与后续匹配计算
-                    unified = self._compute_github_only_scores(result.metadata, result.keywords)
+                    unified = self._build_scores_github_only(result.metadata, result.keywords)
                     integrated_result = IntegratedRepoResult(
                         repo_id=result.repo_id,
                         github_keywords=result.keywords,
@@ -514,11 +540,17 @@ class IntegratedRepoSearch:
                         demand_score=unified["demand_score"],
                         composite_score=unified["composite_score"],
                         languages=unified["languages"],
+                        issues_new_last_30=unified["issues_new_last_30"],
+                        active_days_last_30=unified["active_days_last_30"],
+                        github_a_raw=unified["github_a_raw"],
+                        github_d_raw=unified["github_d_raw"],
                     )
                     qualified_repos.append(integrated_result)
                     skipped_count += 1
                     print(f"✓ No OpenDigger data, used GitHub-only metrics ({len(qualified_repos)}/{target_count})")
-        
+
+        self._finalize_repository_scores(qualified_repos)
+
         # Determine if search was sufficient
         is_sufficient = len(qualified_repos) >= target_count
         
@@ -572,7 +604,7 @@ class IntegratedRepoSearch:
             print(f"Info: Repository {repo_id} does not have OpenDigger metrics")
             return None
         
-        unified = self._compute_unified_scores(metrics, [])
+        unified = self._build_scores_opendigger(metrics, [])
         return IntegratedRepoResult(
             repo_id=repo_id,
             github_keywords=[],
@@ -584,6 +616,10 @@ class IntegratedRepoSearch:
             demand_score=unified["demand_score"],
             composite_score=unified["composite_score"],
             languages=unified["languages"],
+            issues_new_last_30=unified["issues_new_last_30"],
+            active_days_last_30=unified["active_days_last_30"],
+            od_active_raw=unified["od_active_raw"],
+            od_demand_raw=unified["od_demand_raw"],
         )
     
     def clear_opendigger_cache(self, repo_id: Optional[str] = None) -> int:
@@ -697,6 +733,8 @@ class IntegratedRepoSearch:
                 "breakdown": repo.match_breakdown,
                 "source": "github_opendigger_online",
                 "keywords": repo.github_keywords,
+                "issues_new_last_30": repo.issues_new_last_30,
+                "active_days_last_30": repo.active_days_last_30,
             }
         
         # Step 2: Generate keyword combinations
@@ -891,7 +929,7 @@ def build_unified_from_github_metadata(
 ) -> Dict[str, Any]:
     """
     OpenDigger 无数据时，用 GitHub REST 元数据构建与离线/在线统一结构对齐的字典。
-    活跃度/需求子分使用 IntegratedRepoSearch._compute_github_only_scores（与设计文档 GitHub 校准一致）。
+    活跃度/需求子分使用 IntegratedRepoSearch._build_scores_github_only（与设计文档 GitHub 校准一致）。
     """
     from .GithubAPI.schemas import RepoMetadata
 
@@ -903,7 +941,7 @@ def build_unified_from_github_metadata(
     )
     kws = [str(t).strip().lower() for t in (topics or []) if str(t).strip()]
     searcher = IntegratedRepoSearch()
-    scores = searcher._compute_github_only_scores(metadata, kws)
+    scores = searcher._build_scores_github_only(metadata, kws)
     parts = repo_id.split("/")
     repo_name = parts[1] if len(parts) == 2 else repo_id
     langs = scores.get("languages") or kws or ["unknown"]
@@ -919,6 +957,8 @@ def build_unified_from_github_metadata(
         "raw_metrics": None,
         "keywords": kws,
         "source": "github_only",
+        "issues_new_last_30": scores["issues_new_last_30"],
+        "active_days_last_30": scores["active_days_last_30"],
     }
 
 

@@ -1,7 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { chatAPI, profileAPI, searchAPI } from '../services/api'
 import { storage } from '../utils/storage'
-import type { ChatMessage, ChatResponse, UserProfile } from '../types'
+import type { ChatMessage, ChatResponse, UserProfile, ProfileGapKind } from '../types'
+
+function parseProfileGap(g: unknown): ProfileGapKind | undefined {
+  if (g === 'skills' || g === 'contribution_styles' || g === 'both') return g
+  return undefined
+}
 
 function searchStageToText(stage: string, data: Record<string, unknown>, lang: string): string {
   const kw = (data.keywords as string[])?.join(', ') ?? ''
@@ -72,7 +77,8 @@ export const useAIChat = (
   isProfileModified?: () => boolean,
   resetProfileModified?: () => void,
   onSearchComplete?: (repos: any[]) => void,
-  uiLanguage: UiLang = 'english'
+  uiLanguage: UiLang = 'english',
+  updateProfile?: (partial: Partial<UserProfile>) => void
 ) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -348,6 +354,7 @@ export const useAIChat = (
         uiLanguage,
         (stage, data) => {
           if (stage === 'intent_recognizing') setLoadingStage('intent_recognizing')
+          else if (stage === 'search_intent_mining') setLoadingStage('search_intent_mining')
           else if (stage === 'intent_done') {
             const next = (data.next as string) || 'generating_reply'
             setLoadingStage(next === 'generating_reply' && opts?.skipIntent ? 'concept_explaining' : next)
@@ -368,6 +375,19 @@ export const useAIChat = (
         content: response.reply,
         timestamp: Date.now(),
         action: response.action
+      }
+      if (response.action === 'COLLECT_PROFILE_FOR_SEARCH') {
+        const gap = parseProfileGap(response.profile_gap)
+        if (gap) {
+          assistantMessage.profileGap = gap
+          assistantMessage.suggestedKeywords = Array.isArray(response.suggested_keywords)
+            ? response.suggested_keywords.map((k) => String(k))
+            : []
+          assistantMessage.profileDraftBaseline = {
+            skills: [...(response.skills || [])],
+            preferences: [...(response.preferences || [])]
+          }
+        }
       }
       setMessages(prev => {
         const updatedMessages = [...prev, assistantMessage]
@@ -398,6 +418,51 @@ export const useAIChat = (
       setLoadingStage(null)
     }
   }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch, uiLanguage])
+
+  const confirmCollectProfileDraft = useCallback(
+    async (messageIndex: number, draft: { skills: string[]; preferences: string[] }) => {
+      if (!user_id) return
+      try {
+        await profileAPI.sync(user_id, draft.skills, draft.preferences, uiLanguage)
+        updateProfile?.({ skills: draft.skills, preferences: draft.preferences })
+        resetProfileModified?.()
+        setMessages((prev) => {
+          const next = prev.map((m, i) =>
+            i === messageIndex
+              ? {
+                  ...m,
+                  collectResolved: true,
+                  profileDraftBaseline: { skills: [...draft.skills], preferences: [...draft.preferences] }
+                }
+              : m
+          )
+          storage.saveChatMessages(user_id, next)
+          return next
+        })
+        const sufficient = draft.skills.length > 0 && draft.preferences.length > 0
+        if (sufficient) {
+          await handleAutoSearch(user_id)
+        } else {
+          const insufficientMsg: ChatMessage = {
+            role: 'assistant',
+            content:
+              uiLanguage === 'english'
+                ? 'Your profile has been saved, but there is not enough information to search yet. Please add skills and contribution preferences, or keep chatting with the assistant.'
+                : '已保存你的修改，但信息仍不足，暂时无法搜索。请继续补充技能与贡献方式，或与 AI 聊聊完善画像。',
+            timestamp: Date.now()
+          }
+          setMessages((prev) => {
+            const next = [...prev, insufficientMsg]
+            storage.saveChatMessages(user_id, next)
+            return next
+          })
+        }
+      } catch (error) {
+        console.error('confirmCollectProfileDraft failed:', error)
+      }
+    },
+    [user_id, uiLanguage, updateProfile, resetProfileModified, handleAutoSearch]
+  )
 
   const triggerLocalQueryIntent = useCallback(() => {
     if (!user_id) return
@@ -474,6 +539,7 @@ export const useAIChat = (
     sendMessage,
     triggerLocalQueryIntent,
     clearMessages,
-    cancelSearch
+    cancelSearch,
+    confirmCollectProfileDraft
   }
 }

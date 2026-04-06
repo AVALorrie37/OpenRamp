@@ -32,6 +32,11 @@ from src.core.ai.conversation_handler import ConversationHandler
 from src.core.match import MatchScorer, UserProfile, RepoData
 from src.core.match.config import MatchConfig, MatchWeights, DEFAULT_CONFIG
 from src.data_layer.online.integrated_search import IntegratedRepoSearch, build_unified_from_github_metadata
+from src.data_layer.online.score_calibration_store import (
+    CHANNEL_OPENDIGGER_ACTIVITY,
+    CHANNEL_OPENDIGGER_DEMAND,
+    get_calibration_store,
+)
 import re
 import httpx
 
@@ -165,24 +170,22 @@ def load_offline_repos() -> List[dict]:
 def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
     """
     将在线数据转换为统一格式。
-    注意：在线模式不返回 raw_metrics。
+    注意：在线模式不返回 raw_metrics。activity/demand 子分使用持久化分位校准（不写入样本池）。
     """
-    # 计算指标（使用与离线模式相同的逻辑）
     active_data = online_data.get("active_dates_and_times", {})
     openrank_data = online_data.get("openrank", {})
     issues_data = online_data.get("issues_new", {})
 
-    # 使用离线加载器的计算方法（临时创建实例）
     loader = OfflineRepoLoader()
-    active_score = loader._calculate_active_score(
-        active_data if isinstance(active_data, dict) else {}
-    )
-    influence_score = loader._calculate_influence_score(
-        openrank_data if isinstance(openrank_data, dict) else {}
-    )
-    demand_score = loader._calculate_demand_score(
-        issues_data if isinstance(issues_data, dict) else {}
-    )
+    ad = active_data if isinstance(active_data, dict) else {}
+    od = issues_data if isinstance(issues_data, dict) else {}
+    orank = openrank_data if isinstance(openrank_data, dict) else {}
+    ar = loader.compute_opendigger_active_raw(ad)
+    dr = loader.compute_opendigger_demand_raw(od)
+    store = get_calibration_store()
+    active_score = round(store.normalize_single(CHANNEL_OPENDIGGER_ACTIVITY, ar), 4)
+    demand_score = round(store.normalize_single(CHANNEL_OPENDIGGER_DEMAND, dr), 4)
+    influence_score = loader._calculate_influence_score(orank)
     composite_score = 0.5 * active_score + 0.3 * influence_score + 0.2 * demand_score
 
     parts = repo_id.split("/")
@@ -192,6 +195,9 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
     if isinstance(openrank_data, dict) and openrank_data:
         sorted_entries = sorted(openrank_data.items())[-30:]
         openrank_str = ",".join(f"{k}:{v}" for k, v in sorted_entries)
+
+    ad30 = int(online_data.get("active_days_last_30") or 0)
+    iss30 = int(online_data.get("issues_new_last_30") or 0)
 
     base = {
         "repo_id": repo_id,
@@ -205,6 +211,8 @@ def convert_online_to_unified(online_data: dict, repo_id: str) -> dict:
         "raw_metrics": {"openrank": openrank_str} if openrank_str else None,
         "keywords": [],
         "source": "opendigger_online",
+        "active_days_last_30": ad30,
+        "issues_new_last_30": iss30,
     }
 
     try:
@@ -691,7 +699,9 @@ async def chat(request: ChatRequest = Body(...)):
         preferences = data.get("contribution_styles", [])
         auto_search = data.get("auto_search", False)
         intent = data.get("intent", "")
-        return {
+        profile_gap = data.get("profile_gap")
+        suggested_keywords = data.get("suggested_keywords")
+        out = {
             "reply": result.get("reply", ""),
             "status": "collecting" if not confirmed else "confirmed",
             "skills": skills,
@@ -710,6 +720,11 @@ async def chat(request: ChatRequest = Body(...)):
                 "experience_level": _get_experience_level(data)
             } if (confirmed or profile_updated) else None
         }
+        if profile_gap is not None:
+            out["profile_gap"] = profile_gap
+        if suggested_keywords is not None:
+            out["suggested_keywords"] = suggested_keywords
+        return out
     except Exception as e:
         logger.error(f"CHAT_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"CHAT_ERROR: {str(e)}")
@@ -729,7 +744,9 @@ def _chat_result_to_response(result: Dict[str, Any], session_id: str, agent_type
     preferences = data.get("contribution_styles", [])
     auto_search = data.get("auto_search", False)
     intent = data.get("intent", "")
-    return {
+    profile_gap = data.get("profile_gap")
+    suggested_keywords = data.get("suggested_keywords")
+    out = {
         "reply": result.get("reply", ""),
         "status": "collecting" if not confirmed else "confirmed",
         "skills": skills,
@@ -746,6 +763,11 @@ def _chat_result_to_response(result: Dict[str, Any], session_id: str, agent_type
             "experience_level": _get_experience_level(data)
         } if (confirmed or profile_updated) else None
     }
+    if profile_gap is not None:
+        out["profile_gap"] = profile_gap
+    if suggested_keywords is not None:
+        out["suggested_keywords"] = suggested_keywords
+    return out
 
 
 _stream_executor = ThreadPoolExecutor(max_workers=4)
@@ -987,8 +1009,8 @@ async def calculate_match(request: MatchRequest = Body(...)):
 
         repo_data = RepoData(
             keywords=repo_keywords,
-            active_days_last_30=30,
-            issues_new_last_30=int(repo_data_dict.get("demand_score", 0) * 50),
+            active_days_last_30=int(repo_data_dict.get("active_days_last_30") or 0),
+            issues_new_last_30=int(repo_data_dict.get("issues_new_last_30") or 0),
             openrank=repo_data_dict.get("influence_score", 0) * 50,
             name=repo_data_dict.get("name"),
             full_name=repo_data_dict.get("repo_id"),
@@ -1060,8 +1082,8 @@ async def search_repos(request: SearchRequest = Body(...)):
                                 repo_keywords = r.get("languages", []) + (r.get("description") or "").split()
                             repo_data = RepoData(
                                 keywords=repo_keywords,
-                                active_days_last_30=30,
-                                issues_new_last_30=int(r.get("demand_score", 0) * 50),
+                                active_days_last_30=int(r.get("active_days_last_30") or 0),
+                                issues_new_last_30=int(r.get("issues_new_last_30") or 0),
                                 openrank=r.get("influence_score", 0) * 50,
                                 name=r.get("name"),
                                 full_name=r.get("repo_id"),
@@ -1081,8 +1103,8 @@ async def search_repos(request: SearchRequest = Body(...)):
                                 repo_keywords = repo_copy.get("languages", []) + (repo_copy.get("description") or "").split()
                             repo_data_for_breakdown = RepoData(
                                 keywords=repo_keywords,
-                                active_days_last_30=30,
-                                issues_new_last_30=int(repo_copy.get("demand_score", 0) * 50),
+                                active_days_last_30=int(repo_copy.get("active_days_last_30") or 0),
+                                issues_new_last_30=int(repo_copy.get("issues_new_last_30") or 0),
                                 openrank=repo_copy.get("influence_score", 0) * 50,
                                 name=repo_copy.get("name"),
                                 full_name=repo_copy.get("repo_id"),
@@ -1131,6 +1153,8 @@ async def search_repos(request: SearchRequest = Body(...)):
                                 "breakdown": repo_result.match_breakdown,
                                 "source": "github_opendigger_online",
                                 "keywords": repo_result.github_keywords,
+                                "issues_new_last_30": repo_result.issues_new_last_30,
+                                "active_days_last_30": repo_result.active_days_last_30,
                             }
                         )
                     message = result.message
@@ -1233,8 +1257,8 @@ async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
                         repo_keywords = (r.description or "").split()
                     repo_data = RepoData(
                         keywords=repo_keywords,
-                        active_days_last_30=30,
-                        issues_new_last_30=int((r.demand_score or 0.0) * 50),
+                        active_days_last_30=int(r.active_days_last_30 or 0),
+                        issues_new_last_30=int(r.issues_new_last_30 or 0),
                         openrank=(r.influence_score or 0.0) * 50,
                         name=name,
                         full_name=r.repo_id,
@@ -1265,6 +1289,8 @@ async def search_repos_by_keywords(request: KeywordSearchRequest = Body(...)):
                 "html_url": html_url,
                 "stargazers_count": getattr(r.metadata, "stars", 0),
                 "updated_at": getattr(r.metadata, "last_updated", None),
+                "issues_new_last_30": r.issues_new_last_30,
+                "active_days_last_30": r.active_days_last_30,
                 "owner": {
                     "login": owner,
                 },

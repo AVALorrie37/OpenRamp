@@ -50,6 +50,8 @@ export interface UserProfile {
   language?: 'chinese' | 'english'
 }
 
+export type ProfileGapKind = 'skills' | 'contribution_styles' | 'both'
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -65,6 +67,10 @@ export interface ChatMessage {
     targetCount: number
     rounds: number
   }
+  profileGap?: ProfileGapKind
+  suggestedKeywords?: string[]
+  profileDraftBaseline?: { skills: string[]; preferences: string[] }
+  collectResolved?: boolean
 }
 
 export interface ChatResponse {
@@ -79,4 +85,6 @@ export interface ChatResponse {
   session_id?: string
   error?: string
   auto_search?: boolean
+  profile_gap?: ProfileGapKind
+  suggested_keywords?: string[]
 }

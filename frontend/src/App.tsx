@@ -345,8 +345,9 @@ const App: React.FC = () => {
     searchStage,
     sendMessage,
     triggerLocalQueryIntent,
-    cancelSearch
-  } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete, uiLanguage)
+    cancelSearch,
+    confirmCollectProfileDraft
+  } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete, uiLanguage, updateProfile)
 
   const handleLogin = (user: string) => {
     setSelectedRepo(null)
@@ -1063,6 +1064,9 @@ const App: React.FC = () => {
         onQueryCurrentProfile={triggerLocalQueryIntent}
         onCancelSearch={cancelSearch}
         onAskAIAboutText={handleAskAIAboutSelection}
+        onConfirmCollectProfile={(idx, draft) => {
+          void confirmCollectProfileDraft(idx, draft)
+        }}
         language={uiLanguage}
         username={username}
         onFavorite={handleChatFavorite}

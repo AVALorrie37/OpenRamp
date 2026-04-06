@@ -12,6 +12,7 @@ from .integrated_search import (
     IntegratedSearchResult,
     search_repos_with_opendigger,
 )
+from .score_calibration_store import get_calibration_store
 
 __all__ = [
     # GitHub API
@@ -25,4 +26,5 @@ __all__ = [
     "IntegratedRepoResult",
     "IntegratedSearchResult",
     "search_repos_with_opendigger",
+    "get_calibration_store",
 ]

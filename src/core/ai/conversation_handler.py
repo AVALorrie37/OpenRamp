@@ -4,7 +4,7 @@ import json
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, Callable
+from typing import Dict, Any, Tuple, Optional, Callable, List
 from .provider import OllamaProvider
 from .prompts import PromptManager
 from .utils import validate_and_parse, extract_json_from_response
@@ -252,7 +252,11 @@ class ConversationHandler:
 
         if intent == 'search_repo' or user_action == 'SEARCH':
             stage("intent_done", {"intent": intent, "next": "search_repo"})
-            result = self._handle_search(user_language)
+            gap = self._compute_profile_gap()
+            if gap == 'none':
+                result = self._handle_search(user_language)
+            else:
+                result = self._handle_collect_profile_for_search(user_language, gap, stage)
             self.conversation_history.append({'role': 'assistant', 'content': result['reply']})
             if self.user_id:
                 self._save_profile_to_cache()
@@ -758,7 +762,101 @@ class ConversationHandler:
         skills = profile.get('skills', [])
         styles = profile.get('contribution_styles', [])
         return len(skills) > 0 and len(styles) > 0
-    
+
+    def _compute_profile_gap(self) -> str:
+        skills = self.current_profile.get('skills') or []
+        styles = self.current_profile.get('contribution_styles') or []
+        no_s = len(skills) == 0
+        no_c = len(styles) == 0
+        if no_s and no_c:
+            return 'both'
+        if no_s:
+            return 'skills'
+        if no_c:
+            return 'contribution_styles'
+        return 'none'
+
+    def _run_search_intent_miner(
+        self, language: str, stage: Optional[Callable[[str, Dict[str, Any]], None]]
+    ) -> Tuple[str, List[str]]:
+        try:
+            if stage:
+                stage("search_intent_mining", {})
+            system_prompt, _ = self.prompt_manager.get_agent_prompt('search_intent_miner')
+            system_prompt = self._inject_language_instruction(system_prompt, language)
+            profile_text = self._format_profile_for_agent1(self.current_profile, language)
+            conv = self._build_conversation_context()
+            user_prompt = f"{conv}\n\nCurrent profile:\n{profile_text}\n\nRespond with JSON only as specified."
+            raw = self.provider.generate(
+                prompt_template=user_prompt,
+                variables={},
+                system_prompt=system_prompt,
+                temperature=0.3,
+                max_tokens=1024,
+            )
+            json_str = extract_json_from_response(raw or '')
+            if not json_str:
+                raise ValueError('no json in miner response')
+            data = json.loads(json_str)
+            reply = (data.get('reply') or '').strip()
+            kws = data.get('suggested_keywords') or []
+            if not isinstance(kws, list):
+                kws = []
+            cleaned: List[str] = []
+            for x in kws:
+                k = str(x).strip().lower().replace(' ', '_')[:20]
+                if k and re.match(r'^[a-zA-Z0-9_]+$', k):
+                    cleaned.append(k)
+            if not reply:
+                raise ValueError('empty miner reply')
+            return reply, cleaned[:12]
+        except Exception as e:
+            logger.warning("search_intent_miner failed: %s", e)
+            if language == 'chinese':
+                fb = (
+                    "你想找合适的开源项目，但还缺少技能标签。请在下方补充技能，可点击推荐关键词加入；"
+                    "若有贡献偏好也请一并选择，完成后点击「确认修改」。"
+                )
+            else:
+                fb = (
+                    "To search for projects, add at least one skill tag below (you can use the suggested keywords). "
+                    "Select contribution preferences if needed, then tap Confirm."
+                )
+            return fb, []
+
+    def _handle_collect_profile_for_search(
+        self,
+        language: str,
+        gap: str,
+        stage: Optional[Callable[[str, Dict[str, Any]], None]],
+    ) -> Dict[str, Any]:
+        suggested_keywords: List[str] = []
+        if gap == 'contribution_styles':
+            if language == 'chinese':
+                reply = "你的技能已记录。要完成搜索，请在下方选择贡献方式，再点击「确认修改」。"
+            else:
+                reply = "Your skills are saved. To search, select contribution preferences below, then tap Confirm."
+        else:
+            reply, suggested_keywords = self._run_search_intent_miner(language, stage)
+            if gap == 'both':
+                if language == 'chinese':
+                    reply = reply + "\n\n请同时在下方选择贡献方式，确认后再开始搜索。"
+                else:
+                    reply = reply + "\n\nAlso select contribution preferences below, then confirm to search."
+
+        return {
+            'reply': reply,
+            'action': 'COLLECT_PROFILE_FOR_SEARCH',
+            'data': {
+                'skills': self.current_profile['skills'],
+                'contribution_styles': self.current_profile['contribution_styles'],
+                'profile_updated': False,
+                'intent': 'search_repo',
+                'profile_gap': gap,
+                'suggested_keywords': suggested_keywords,
+            },
+        }
+
     def _handle_confirm(self, language: str) -> Dict[str, Any]:
         """处理确认动作"""
         # 保存到文件缓存

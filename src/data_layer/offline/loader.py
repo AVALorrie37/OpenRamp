@@ -39,41 +39,40 @@ class OfflineRepoLoader:
             logger.error(f"读取文件失败 {file_path}: {e}")
             return None
 
-    def _calculate_active_score(self, active_data: Dict[str, List[int]]) -> float:
-        """
-        计算活跃度分数：近3个月活跃天数 × 每日活跃峰值 / 100 (max=1.0)
-        """
+    def compute_opendigger_active_raw(self, active_data: Dict[str, List[int]]) -> float:
+        """在线分位校准用：active_days * peak（与 _calculate_active_score 分子一致，未除 100）。"""
         if not active_data:
             return 0.0
 
-        # 获取最近3个月的数据（简化处理）
         now = datetime.now()
         three_months_ago = (now - timedelta(days=90)).replace(day=1)
-        recent_data = []
+        recent_data: List[int] = []
 
         for month_key, daily_values in active_data.items():
             if not isinstance(daily_values, list):
                 continue
-            # 解析月份键（格式：YYYY-MM）
             try:
                 month_date = datetime.strptime(month_key, "%Y-%m")
                 if month_date >= three_months_ago:
-                    # 数组中的每个值代表一天的活跃度，取前30个（假设是最近30天）
                     recent_data.extend(daily_values[:30])
             except ValueError:
-                # 跳过无效的键（如 "2021-10-raw"）
                 continue
 
         if not recent_data:
             return 0.0
 
-        # 计算活跃天数（值 > 0 的天数）
         active_days = sum(1 for v in recent_data if v > 0)
-        # 计算峰值
         peak = max(recent_data) if recent_data else 0
+        return float(active_days * peak)
 
-        score = (active_days * peak) / 100.0
-        return min(score, 1.0)
+    def _calculate_active_score(self, active_data: Dict[str, List[int]]) -> float:
+        """
+        计算活跃度分数：近3个月活跃天数 × 每日活跃峰值 / 100 (max=1.0)
+        """
+        raw = self.compute_opendigger_active_raw(active_data)
+        if raw <= 0.0:
+            return 0.0
+        return min(raw / 100.0, 1.0)
 
     def _calculate_influence_score(self, openrank_data: Dict[str, float]) -> float:
         """
@@ -99,14 +98,11 @@ class OfflineRepoLoader:
         score = latest_value / 50.0
         return min(score, 1.0)
 
-    def _calculate_demand_score(self, issues_data: Dict[str, int]) -> float:
-        """
-        计算需求热度分数：近3个月新增 issue 总数 / 50 (max=1.0)
-        """
+    def compute_opendigger_demand_raw(self, issues_data: Dict[str, int]) -> float:
+        """在线分位校准用：近 3 个月新增 issue 总数（与 _calculate_demand_score 分子一致，未除 50）。"""
         if not issues_data:
             return 0.0
 
-        # 获取最近3个月的数据
         now = datetime.now()
         three_months_ago = (now - timedelta(days=90)).replace(day=1)
         total_issues = 0
@@ -115,12 +111,20 @@ class OfflineRepoLoader:
             try:
                 month_date = datetime.strptime(month_key, "%Y-%m")
                 if month_date >= three_months_ago:
-                    total_issues += count
-            except ValueError:
+                    total_issues += int(count)
+            except (ValueError, TypeError):
                 continue
 
-        score = total_issues / 50.0
-        return min(score, 1.0)
+        return float(total_issues)
+
+    def _calculate_demand_score(self, issues_data: Dict[str, int]) -> float:
+        """
+        计算需求热度分数：近3个月新增 issue 总数 / 50 (max=1.0)
+        """
+        raw = self.compute_opendigger_demand_raw(issues_data)
+        if raw <= 0.0:
+            return 0.0
+        return min(raw / 50.0, 1.0)
 
     def _format_raw_metrics(
         self,

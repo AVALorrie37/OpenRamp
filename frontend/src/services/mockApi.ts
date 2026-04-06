@@ -127,6 +127,20 @@ export const mockChatAPI = {
         session_id: session_id || `${user_id}_agent1_${Date.now()}`
       }
     }
+    if (lowerMessage.includes('__mock_collect__')) {
+      return {
+        reply: '（Mock）请在下方补充技能与贡献方式后确认。',
+        status: 'collecting',
+        skills: [],
+        preferences: [],
+        action: 'COLLECT_PROFILE_FOR_SEARCH',
+        confirmed: false,
+        profile_updated: false,
+        profile_gap: 'both',
+        suggested_keywords: ['python', 'typescript'],
+        session_id: session_id || `${user_id}_agent1_${Date.now()}`
+      }
+    }
     if (lowerMessage.includes('搜索') || lowerMessage.includes('搜索匹配项目')) {
       return {
         reply: '正在为你搜索匹配的项目...',

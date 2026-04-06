@@ -19,6 +19,7 @@ interface AIChatWindowProps {
   onQueryCurrentProfile?: () => void
   onCancelSearch?: () => void
   onAskAIAboutText?: (text: string) => void
+  onConfirmCollectProfile?: (messageIndex: number, draft: { skills: string[]; preferences: string[] }) => void
   language?: 'chinese' | 'english'
   username?: string | null
   onFavorite?: (repo: any) => void
@@ -34,6 +35,7 @@ function stageLabel(stage: string | null | undefined, language: 'chinese' | 'eng
     query_status: { chinese: '查询状态中...', english: 'Querying status...' },
     confirm: { chinese: '确认中...', english: 'Confirming...' },
     search_repo: { chinese: '准备搜索...', english: 'Preparing search...' },
+    search_intent_mining: { chinese: '分析搜索意图中...', english: 'Analyzing search intent...' },
     irrelevant: { chinese: '处理中...', english: 'Processing...' }
   }
   const pair = labels[stage] || { chinese: '处理中...', english: 'Processing...' }
@@ -113,6 +115,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   onQueryCurrentProfile,
   onCancelSearch,
   onAskAIAboutText,
+  onConfirmCollectProfile,
   language = 'chinese',
   username = null,
   onFavorite,
@@ -577,17 +580,30 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                       <SearchBubble onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
                       {(msg.searchResults && msg.searchResults.length >= 3) && (
                         <ChatMessage
+                          messageIndex={index}
                           message={{ ...msg, isSearching: false }}
                           language={language}
                           username={username}
                           onFavorite={onFavorite}
                           onUnfavorite={onUnfavorite}
+                          onConfirmCollectProfile={onConfirmCollectProfile}
                         />
                       )}
                     </div>
                   )
                 }
-                return <ChatMessage key={index} message={msg} language={language} username={username} onFavorite={onFavorite} onUnfavorite={onUnfavorite} />
+                return (
+                  <ChatMessage
+                    key={index}
+                    messageIndex={index}
+                    message={msg}
+                    language={language}
+                    username={username}
+                    onFavorite={onFavorite}
+                    onUnfavorite={onUnfavorite}
+                    onConfirmCollectProfile={onConfirmCollectProfile}
+                  />
+                )
               })}
               {loading && (
                 <div className="flex justify-start">
