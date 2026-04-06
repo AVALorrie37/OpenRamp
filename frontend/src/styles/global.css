@@ -263,6 +263,16 @@ body {
   color: var(--color-text);
 }
 
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 42%, transparent);
+  color: var(--color-text);
+}
+
+::-moz-selection {
+  background: color-mix(in srgb, var(--color-primary) 42%, transparent);
+  color: var(--color-text);
+}
+
 #root {
   width: 100%;
   height: 100vh;
