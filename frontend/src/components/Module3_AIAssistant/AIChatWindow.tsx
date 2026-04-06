@@ -128,7 +128,6 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
-  const [footerHeight, setFooterHeight] = useState(0)
   const [rect, setRect] = useState<Rect>(() => {
     if (typeof window === 'undefined') return { left: 0, top: 0, width: 500, height: 600 }
     const stored = readStoredRect()
@@ -231,16 +230,6 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
         rect.height === vh
     )
   }, [rect])
-
-  useEffect(() => {
-    const el = footerRef.current
-    if (!el) return
-    const update = () => setFooterHeight(el.getBoundingClientRect().height)
-    update()
-    const ro = new ResizeObserver(() => update())
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   useEffect(() => {
     if (!isOpen || !onAskAIAboutText) return
@@ -618,7 +607,21 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
               <div ref={messagesEndRef} />
             </div>
 
-            <div ref={footerRef} className="border-t border-border bg-surface p-4">
+            <div ref={footerRef} className="relative border-t border-border bg-surface p-4">
+              {showJumpToLatest && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    jumpToLatest()
+                  }}
+                  className="pointer-events-auto absolute right-4 top-0 inline-flex -translate-y-[calc(100%+8px)] items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text shadow-md transition hover:brightness-[0.98]"
+                >
+                  <ArrowDown size={16} />
+                  {language === 'english' ? 'Latest' : '最新'}
+                </button>
+              )}
               <form onSubmit={handleSubmit} className="relative">
                 <div className="relative mb-3">
                   <input
@@ -649,22 +652,6 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 <SuggestionButtons onSuggestionClick={handleSuggestion} language={language} />
               </form>
             </div>
-
-            {showJumpToLatest && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  jumpToLatest()
-                }}
-                className="pointer-events-auto absolute right-4 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text shadow-md transition hover:brightness-[0.98]"
-                style={{ bottom: footerHeight + 3 }}
-              >
-                <ArrowDown size={16} />
-                {language === 'english' ? 'Latest' : '最新'}
-              </button>
-            )}
 
             <div
               className="absolute left-0 top-0 h-full z-[2]"

@@ -4,16 +4,15 @@
 
 Smooth your ramp to open source. OpenRamp combines **AI conversational profiling with multi-dimensional scoring** so you can find open-source projects that fit you better among a huge pool of repositories.
 
+![](SnowShot_2026-04-06_en.png)
+![](SnowShot_2026-04-06_chat_en.png)
 
 
+## Why Try It?
 
-## Why try it?
-
-- **Conversational profiling**: describe your stack, preferences, and experience in natural language and get a developer profile you can match against
-- **Smart matching**: blends skill fit, project activity, and community signals into easy-to-read scores and short explanations
-- **Data-backed**: GitHub API and OpenDigger-style metrics, with local caching and online enrichment
-- **Visualization**: repo lists, time series, word clouds, and match radar charts
-- **Web UI**: React 18 + Vite + TypeScript—easy to use in the browser
+- **🗣️ Conversational Profiling**: Describe your stack and experience in natural language to generate a match-ready developer profile.
+- **🎯 Smarter Matching & Insights**: Multi-signal scoring with clear reasons, plus rich visualizations to help you decide faster.
+- **🔒 100% Local & Free**: Run LLMs locally with **zero token costs** and **full privacy**. No API keys, no subscriptions.
 
 ## What you can do
 
