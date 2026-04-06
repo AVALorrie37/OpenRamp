@@ -1,27 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
-import { reposAPI, matchAPI } from '../services/api'
-import { storage, DEFAULT_MATCH_WEIGHTS } from '../utils/storage'
+import { reposAPI, userReposAPI } from '../services/api'
+import { storage } from '../utils/storage'
 import type { RepoResponse } from '../types'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
-function stripMatchFields(repo: RepoResponse): RepoResponse {
-  const next = { ...repo }
-  delete next.match_score
-  delete next.breakdown
-  delete next.dynamic_weights
-  return next
-}
-
-function hasCompleteMatchData(repo: RepoResponse): boolean {
-  const bd = repo.breakdown
-  return (
-    typeof repo.match_score === 'number' &&
-    typeof bd?.skill === 'number' &&
-    typeof bd?.activity === 'number' &&
-    typeof bd?.demand === 'number'
-  )
-}
 
 export const useRepos = (username: string | null, sessionReady = true) => {
   const [repos, setRepos] = useState<RepoResponse[]>([])
@@ -50,86 +32,42 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     return { ...repo, name: repoName }
   }, [])
 
-  const mergeWithFavorites = useCallback((list: RepoResponse[], uname: string | null): RepoResponse[] => {
-    if (!uname) return list
-    const favorites = storage.getUserFavorites(uname) || []
-    if (!favorites || favorites.length === 0) return list
-    const map = new Map<string, RepoResponse>()
-    list.forEach((r) => {
-      map.set(r.repo_id, { ...r, is_favorited: r.is_favorited === true })
-    })
-    favorites.forEach((fav: any) => {
-      const repoId = fav.repo_id
-      if (!repoId) {
-        return
-      }
-      const existing = map.get(repoId)
-      const base: RepoResponse = existing || fav
-      map.set(repoId, { ...base, ...fav, is_favorited: true })
-    })
-    return Array.from(map.values()).map(normalizeRepoName)
-  }, [normalizeRepoName])
-
-  const applyMatchScores = useCallback(async (uname: string, list: RepoResponse[]): Promise<RepoResponse[]> => {
-    const stored = storage.getUserMatchWeights(uname)
-    const weights = stored ?? DEFAULT_MATCH_WEIGHTS
-    return Promise.all(
-      list.map(async (repo) => {
-        if (hasCompleteMatchData(repo)) {
-          return repo
-        }
-        const base = stripMatchFields(repo)
-        try {
-          const match = await matchAPI.calculate(uname, repo.repo_id, weights)
-          if (typeof match.match_score !== 'number') {
-            return base
-          }
-          return {
-            ...base,
-            match_score: match.match_score,
-            breakdown: match.breakdown,
-            dynamic_weights: match.dynamic_weights
-          }
-        } catch {
-          return base
-        }
-      })
-    )
-  }, [])
-
   const loadPreset = useCallback(async () => {
     const uname = username
     const requestId = beginRequest()
-    const favorites = uname ? (storage.getUserFavorites(uname) || []) : []
-    if (uname && favorites.length > 0) {
-      let favList = favorites.map((r: RepoResponse) => normalizeRepoName({ ...r, is_favorited: true }))
-      if (favList.length > 0) {
-        favList = await applyMatchScores(uname, favList.map((r) => ({ ...r })))
-      }
-      if (!isRequestCurrent(requestId, uname)) return
-      setRepos(favList)
-      setReposMeta({ mode: 'favorites', source: 'user_favorites' })
+
+    if (uname) {
+      setLoading(true)
       setError(null)
-      setLoading(false)
+      try {
+        const res = await userReposAPI.list(uname)
+        if (!isRequestCurrent(requestId, uname)) return
+        const list = (res.repos || []).map(normalizeRepoName)
+        setRepos(list)
+        setReposMeta({ mode: 'user_online', source: 'user_repo_store' })
+      } catch (err: any) {
+        if (!isRequestCurrent(requestId, uname)) return
+        setError(err.message || 'Failed to fetch user repos')
+        setRepos([])
+        setReposMeta({ mode: 'user_online', source: 'user_repo_store' })
+      } finally {
+        if (isRequestCurrent(requestId, uname)) setLoading(false)
+      }
       return
     }
+
     if (USE_MOCK) {
       const preset = storage.getPresetRepos()
       if (preset && preset.length > 0) {
-        let list = preset as RepoResponse[]
-        if (uname) {
-          list = await applyMatchScores(uname, preset.map((r: RepoResponse) => ({ ...r })))
-        }
-        if (!isRequestCurrent(requestId, uname)) return
-        const finalList = uname ? mergeWithFavorites(list, uname) : list
-        setRepos(finalList)
+        setRepos((preset as RepoResponse[]).map(normalizeRepoName))
+        setReposMeta({ mode: 'offline', source: 'offline_dataset' })
+        setError(null)
         setLoading(false)
         return
       }
     }
-    let ownedLoading = false
+
     setLoading(true)
-    ownedLoading = true
     setError(null)
     try {
       const response = await reposAPI.get({ limit: 10 })
@@ -137,15 +75,8 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       setReposMeta({ mode: response.mode, source: response.source })
       if (response.repos.length > 0) {
         storage.savePresetRepos(response.repos)
-        let list = response.repos
-        if (uname) {
-          list = await applyMatchScores(uname, response.repos.map((r) => ({ ...r })))
-        }
-        if (!isRequestCurrent(requestId, uname)) return
-        const finalList = uname ? mergeWithFavorites(list, uname) : list
-        setRepos(finalList)
+        setRepos((response.repos as RepoResponse[]).map(normalizeRepoName))
       } else {
-        if (!isRequestCurrent(requestId, uname)) return
         setRepos([])
       }
     } catch (err: any) {
@@ -153,71 +84,28 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       setError(err.message || 'Failed to fetch repos')
       const fallback = storage.getPresetRepos()
       const raw = fallback && fallback.length > 0 ? fallback : []
-      let list = raw as RepoResponse[]
-      if (uname && list.length > 0) {
-        list = await applyMatchScores(uname, raw.map((r: RepoResponse) => ({ ...r })))
-      }
-      if (!isRequestCurrent(requestId, uname)) return
-      const finalList = uname ? mergeWithFavorites(list, uname) : list
-      setRepos(finalList)
+      setRepos((raw as RepoResponse[]).map(normalizeRepoName))
+      setReposMeta({ mode: 'offline', source: 'offline_dataset' })
     } finally {
-      if (ownedLoading) {
-        setLoading(false)
-      }
+      if (isRequestCurrent(requestId, uname)) setLoading(false)
     }
-  }, [username, beginRequest, isRequestCurrent, normalizeRepoName, applyMatchScores, mergeWithFavorites])
+  }, [username, beginRequest, isRequestCurrent, normalizeRepoName])
 
   const refreshRepos = useCallback(async (): Promise<RepoResponse[] | undefined> => {
     const uname = username
-    if (USE_MOCK) {
-      if (uname) {
-        const userRepos = storage.getUserRepos(uname)
-        if (userRepos && userRepos.length > 0) {
-          const mergedBase = mergeWithFavorites(userRepos, uname)
-          const updated = await applyMatchScores(uname, mergedBase)
-          storage.saveUserRepos(uname, updated)
-          setRepos(updated)
-          return updated
-        }
-      }
-      await loadPreset()
-      return undefined
-    }
     if (uname) {
       setLoading(true)
       setError(null)
       try {
-        let baseList = storage.getUserRepos(uname)
-        const favorites = storage.getUserFavorites(uname) || []
-        if (favorites.length > 0) {
-          baseList = favorites
-        }
-        if (!baseList || baseList.length === 0) {
-          const preset = storage.getPresetRepos()
-          if (preset && preset.length > 0) {
-            baseList = preset
-          } else {
-            await loadPreset()
-            setLoading(false)
-            return undefined
-          }
-        }
-
-        const mergedBase = mergeWithFavorites(baseList, uname)
-        const updated = await applyMatchScores(uname, mergedBase)
-
-        storage.saveUserRepos(uname, updated)
-        setRepos(updated)
-        return updated
+        const res = await userReposAPI.list(uname)
+        const list = (res.repos || []).map(normalizeRepoName)
+        setRepos(list)
+        setReposMeta({ mode: 'user_online', source: 'user_repo_store' })
+        return list
       } catch (err: any) {
-        setError(err.message || 'Failed to fetch repos')
-        const userRepos = storage.getUserRepos(uname)
-        if (userRepos && userRepos.length > 0) {
-          const merged = mergeWithFavorites(userRepos, uname)
-          setRepos(merged)
-        } else {
-          await loadPreset()
-        }
+        setError(err.message || 'Failed to fetch user repos')
+        setRepos([])
+        setReposMeta({ mode: 'user_online', source: 'user_repo_store' })
         return undefined
       } finally {
         setLoading(false)
@@ -225,7 +113,7 @@ export const useRepos = (username: string | null, sessionReady = true) => {
     }
     await loadPreset()
     return undefined
-  }, [username, loadPreset, mergeWithFavorites, applyMatchScores])
+  }, [username, loadPreset, normalizeRepoName])
 
   useLayoutEffect(() => {
     requestIdRef.current += 1
@@ -260,29 +148,33 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       try {
         const response = await reposAPI.get(params || { limit: 10 })
         if (!isRequestCurrent(requestId, uname)) return undefined
+        const list = (response.repos || []).map(normalizeRepoName)
+        if (uname) {
+          // Logged-in: persist these as user online repos (not preset/offline).
+          await Promise.all(
+            list.map(async (r) => {
+              try {
+                await userReposAPI.upsert(uname, r)
+              } catch {}
+            })
+          )
+          const refreshed = await userReposAPI.list(uname)
+          const final = (refreshed.repos || []).map(normalizeRepoName)
+          if (!isRequestCurrent(requestId, uname)) return undefined
+          setReposMeta({ mode: 'user_online', source: 'user_repo_store' })
+          setRepos(final)
+          return final
+        }
+        // Not logged in: keep preset behavior.
         setReposMeta({ mode: response.mode, source: response.source })
-        const list = response.repos || []
-        let merged = mergeWithFavorites(list, uname)
-        const hasFavorites = !!uname && (storage.getUserFavorites(uname)?.length || 0) > 0
-        if (hasFavorites && !params?.repo_ids) {
-          const favoriteIds = new Set((storage.getUserFavorites(uname!) || []).map((r: any) => r.repo_id))
-          merged = merged.filter((r) => favoriteIds.has(r.repo_id))
-        }
-        if (uname && merged.length > 0) {
-          merged = await applyMatchScores(uname, merged.map((r) => ({ ...r })))
-        }
-        if (!isRequestCurrent(requestId, uname)) return undefined
-        if (params?.repo_ids && params.repo_ids.length > 0 && uname) {
-          storage.saveUserRepos(uname, merged)
-        }
         if (!params?.repo_ids && list.length > 0) {
           const preset = storage.getPresetRepos()
           if (!preset || preset.length === 0) {
             storage.savePresetRepos(list)
           }
         }
-        setRepos(merged)
-        return merged
+        setRepos(list)
+        return list
       } catch (err: any) {
         if (!isRequestCurrent(requestId, uname)) return undefined
         setError(err.message || 'Failed to fetch repos')
@@ -294,7 +186,7 @@ export const useRepos = (username: string | null, sessionReady = true) => {
         }
       }
     },
-    [username, beginRequest, isRequestCurrent, mergeWithFavorites, applyMatchScores]
+    [username, beginRequest, isRequestCurrent, normalizeRepoName]
   )
 
   const refreshToPreset = useCallback(() => {
@@ -306,13 +198,6 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       const next = prev.map((r) =>
         r.repo_id === repoId ? { ...r, match_score: score } : r
       )
-      if (username) {
-        const userRepos = storage.getUserRepos(username) || []
-        const nextUserRepos = userRepos.map((r: any) =>
-          r.repo_id === repoId ? { ...r, match_score: score } : r
-        )
-        storage.saveUserRepos(username, nextUserRepos)
-      }
       return next
     })
   }, [username])
@@ -332,20 +217,6 @@ export const useRepos = (username: string | null, sessionReady = true) => {
             }
           : r
       )
-      if (username) {
-        const userRepos = storage.getUserRepos(username) || []
-        const nextUserRepos = userRepos.map((r: any) =>
-          r.repo_id === repoId
-            ? {
-                ...r,
-                match_score: match.match_score,
-                breakdown: match.breakdown ?? r.breakdown,
-                dynamic_weights: match.dynamic_weights ?? r.dynamic_weights
-              }
-            : r
-        )
-        storage.saveUserRepos(username, nextUserRepos)
-      }
       return next
     })
   }, [username])
@@ -353,29 +224,24 @@ export const useRepos = (username: string | null, sessionReady = true) => {
   const addRepo = useCallback((repo: RepoResponse) => {
     setRepos((prev) => {
       if (prev.some((r) => r.repo_id === repo.repo_id)) {
-        return prev.map((r) => r.repo_id === repo.repo_id ? { ...r, ...repo, is_favorited: true } : r)
+        return prev.map((r) => r.repo_id === repo.repo_id ? { ...r, ...repo } : r)
       }
-      const next = [...prev, { ...repo, is_favorited: true }]
-      if (username) {
-        storage.saveUserRepos(username, next)
-      }
+      const next = [...prev, { ...repo }]
       return next
     })
+    if (username) {
+      void userReposAPI.upsert(username, repo).catch(() => {})
+    }
   }, [username])
 
   const deleteRepo = useCallback((repoId: string) => {
     setRepos((prev) => {
       const next = prev.filter((r) => r.repo_id !== repoId)
-      if (username) {
-        const userRepos = storage.getUserRepos(username) || []
-        const nextUserRepos = userRepos.filter((r: any) => r.repo_id !== repoId)
-        storage.saveUserRepos(username, nextUserRepos)
-        const favorites = storage.getUserFavorites(username) || []
-        const nextFavorites = favorites.filter((r: any) => r.repo_id !== repoId)
-        storage.saveUserFavorites(username, nextFavorites)
-      }
       return next
     })
+    if (username) {
+      void userReposAPI.delete(username, repoId).catch(() => {})
+    }
   }, [username])
 
   const toggleFavorite = useCallback((repoId: string) => {
@@ -383,26 +249,13 @@ export const useRepos = (username: string | null, sessionReady = true) => {
       return
     }
     setRepos((prev) => {
-      const next = prev.map((r) =>
-        r.repo_id === repoId ? { ...r, is_favorited: !r.is_favorited } : r
-      )
-      const favorites = storage.getUserFavorites(username) || []
-      const exists = favorites.some((f: any) => f.repo_id === repoId)
-      let nextFavorites: any[]
-      if (exists) {
-        nextFavorites = favorites.filter((f: any) => f.repo_id !== repoId)
-      } else {
-        const repo = next.find((r) => r.repo_id === repoId)
-        if (!repo) {
-          return next
-        }
-        nextFavorites = [...favorites, { ...repo, is_favorited: true }]
-      }
-      storage.saveUserFavorites(username, nextFavorites)
-      if (nextFavorites.length > 0) {
-        const favoriteIds = new Set(nextFavorites.map((f: any) => f.repo_id))
-        return next.filter((r) => favoriteIds.has(r.repo_id))
-      }
+      const next = prev.map((r) => {
+        if (r.repo_id !== repoId) return r
+        const is_favorited = !r.is_favorited
+        const updated = { ...r, is_favorited }
+        void userReposAPI.upsert(username, updated).catch(() => {})
+        return updated
+      })
       return next
     })
   }, [username])

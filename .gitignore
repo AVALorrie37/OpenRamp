@@ -31,4 +31,36 @@ docs/
 
 # 前端依赖
 node_modules/
+# frontend deps
+frontend/node_modules/
+
+# TypeScript incremental build info
+**/*.tsbuildinfo
+
+# build outputs (keep the ones you actually use)
 frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
+
+# tool caches
+frontend/node_modules/.vite/
+frontend/.cache/
+frontend/.parcel-cache/
+
+# coverage
+frontend/coverage/
+
+# logs
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# local env files (secrets)
+frontend/.env
+frontend/.env.*.local
+
+# misc
+frontend/.DS_Store

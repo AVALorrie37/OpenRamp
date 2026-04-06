@@ -37,6 +37,7 @@ from src.data_layer.online.score_calibration_store import (
     CHANNEL_OPENDIGGER_DEMAND,
     get_calibration_store,
 )
+from src.data_layer.online.user_repo_store import UserRepoStore
 import re
 import httpx
 
@@ -90,6 +91,14 @@ class RepoResponse(BaseModel):
     influence_score: float
     demand_score: float
     composite_score: float
+    match_score: Optional[float] = None
+    breakdown: Optional[Dict[str, float]] = None
+    dynamic_weights: Optional[Dict[str, float]] = None
+    is_favorited: Optional[bool] = None
+    score_frozen: Optional[bool] = None
+    score_version: Optional[str] = None
+    scored_at: Optional[int] = None
+    score_context: Optional[Dict[str, Any]] = None
     raw_metrics: Optional[dict] = None
     keywords: Optional[List[str]] = None
 
@@ -530,6 +539,7 @@ _conversation_handlers: Dict[str, ConversationHandler] = {}
 _session_to_handler: Dict[str, str] = {}
 _match_scorer: Optional[MatchScorer] = None
 _integrated_search: Optional[IntegratedRepoSearch] = None
+_user_repo_store: Optional[UserRepoStore] = None
 _http_client: Optional[httpx.AsyncClient] = None
 _github_activity_cache: Dict[str, Dict[str, Any]] = {}
 _running_searches: Dict[str, asyncio.Event] = {}
@@ -653,6 +663,31 @@ def get_integrated_search() -> IntegratedRepoSearch:
     if _integrated_search is None:
         _integrated_search = IntegratedRepoSearch()
     return _integrated_search
+
+
+def get_user_repo_store() -> UserRepoStore:
+    global _user_repo_store
+    if _user_repo_store is None:
+        _user_repo_store = UserRepoStore()
+    return _user_repo_store
+
+
+class UserReposUpsertRequest(BaseModel):
+    user_id: str
+    repo: Dict[str, Any]
+
+
+class UserReposDeleteRequest(BaseModel):
+    user_id: str
+    repo_id: str
+
+
+class UserReposApplyWeightsRequest(BaseModel):
+    user_id: str
+    weights: Dict[str, float]
+    budget: int = 5
+    ttl_hours: int = 24
+    force_repo_id: Optional[str] = None
 
 
 def get_http_client() -> httpx.AsyncClient:
@@ -1026,6 +1061,173 @@ async def calculate_match(request: MatchRequest = Body(...)):
     except Exception as e:
         logger.error(f"MATCH_CALCULATION_ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"MATCH_CALCULATION_ERROR: {str(e)}")
+
+
+@app.get("/api/user_repos")
+async def list_user_repos(user_id: str = Query(..., description="user id")):
+    _validate_user_id(user_id)
+    store = get_user_repo_store()
+    repos = store.list_user_repos(user_id)
+    repos.sort(key=lambda r: float(r.get("match_score") or -1), reverse=True)
+    return {"mode": "user_online", "source": "user_repo_store", "repos": repos}
+
+
+@app.post("/api/user_repos/upsert")
+async def upsert_user_repo(request: UserReposUpsertRequest = Body(...)):
+    _validate_user_id(request.user_id)
+    repo = dict(request.repo or {})
+    if not repo.get("repo_id"):
+        raise HTTPException(status_code=400, detail="USER_REPOS_UPSERT_MISSING_REPO_ID")
+    store = get_user_repo_store()
+    merged = store.upsert_user_repo(request.user_id, repo)
+    return {"status": "ok", "repo": merged}
+
+
+@app.post("/api/user_repos/delete")
+async def delete_user_repo(request: UserReposDeleteRequest = Body(...)):
+    _validate_user_id(request.user_id)
+    _validate_repo_id(request.repo_id)
+    store = get_user_repo_store()
+    store.delete_user_repo(request.user_id, request.repo_id)
+    return {"status": "ok"}
+
+
+def _normalize_weights_dict(weights: Dict[str, float]) -> MatchWeights:
+    base_config = DEFAULT_CONFIG
+    w_skill = float(weights.get("w_skill", base_config.weights.w_skill))
+    w_activity = float(weights.get("w_activity", base_config.weights.w_activity))
+    w_demand = float(weights.get("w_demand", base_config.weights.w_demand))
+    total = w_skill + w_activity + w_demand
+    if total <= 0:
+        w_skill, w_activity, w_demand = (
+            base_config.weights.w_skill,
+            base_config.weights.w_activity,
+            base_config.weights.w_demand,
+        )
+    else:
+        w_skill = round(w_skill / total, 4)
+        w_activity = round(w_activity / total, 4)
+        w_demand = round(w_demand / total, 4)
+    return MatchWeights(w_skill=w_skill, w_activity=w_activity, w_demand=w_demand)
+
+
+def _compute_match_from_repo_snapshot(
+    scorer: MatchScorer,
+    user_profile_obj: UserProfile,
+    repo_dict: Dict[str, Any],
+) -> Dict[str, Any]:
+    repo_keywords = repo_dict.get("keywords") or []
+    if not repo_keywords:
+        repo_keywords = repo_dict.get("languages", []) + (repo_dict.get("description", "") or "").split()
+    src = repo_dict.get("source")
+    if src in ("opendigger_online", "github_opendigger_online"):
+        data_source = "opendigger+github"
+    elif src == "github_only":
+        data_source = "github_only"
+    else:
+        data_source = "metadata_only"
+    repo_data = RepoData(
+        keywords=repo_keywords,
+        active_days_last_30=int(repo_dict.get("active_days_last_30") or 0),
+        issues_new_last_30=int(repo_dict.get("issues_new_last_30") or 0),
+        openrank=float(repo_dict.get("influence_score") or 0.0) * 50.0,
+        name=repo_dict.get("name"),
+        full_name=repo_dict.get("repo_id"),
+        precomputed_activity_score=repo_dict.get("active_score"),
+        precomputed_demand_score=repo_dict.get("demand_score"),
+        data_source=data_source,
+    )
+    m = scorer.calculate(user_profile_obj, repo_data)
+    return m.to_dict()
+
+
+@app.post("/api/user_repos/apply_weights")
+async def apply_weights_to_user_repos(request: UserReposApplyWeightsRequest = Body(...)):
+    _validate_user_id(request.user_id)
+    budget = int(request.budget or 0)
+    if budget < 0:
+        budget = 0
+    budget = min(budget, 50)
+    ttl_hours = int(request.ttl_hours or 0)
+    ttl_hours = max(0, min(ttl_hours, 24 * 30))
+
+    handler, _ = get_conversation_handler(request.user_id)
+    profile = handler.get_current_profile()
+    if not profile.get("skills") and not profile.get("contribution_styles"):
+        raise HTTPException(status_code=404, detail="MATCH_USER_PROFILE_NOT_FOUND: User profile not found")
+    user_profile_obj = UserProfile.from_dict(
+        {
+            "skills": profile.get("skills", []),
+            "contribution_style": profile.get("contribution_styles", [None])[0],
+            "experience_level": _get_experience_level(profile),
+        }
+    )
+
+    weights = _normalize_weights_dict(request.weights or {})
+    base_config = DEFAULT_CONFIG
+    config = MatchConfig(
+        weights=weights,
+        activity_weights=base_config.activity_weights,
+        activity_thresholds=base_config.activity_thresholds,
+        demand_config=base_config.demand_config,
+    )
+    scorer = MatchScorer(config)
+
+    store = get_user_repo_store()
+    repos = store.list_user_repos(request.user_id)
+    now_ms = int(time.time() * 1000)
+    ttl_ms = ttl_hours * 3600 * 1000
+
+    def needs_refresh(r: Dict[str, Any]) -> bool:
+        scored_at = r.get("scored_at")
+        if not isinstance(scored_at, int):
+            return True
+        if ttl_ms > 0 and now_ms - scored_at < ttl_ms:
+            return False
+        return True
+
+    force_repo_id = (request.force_repo_id or "").strip() or None
+    if force_repo_id:
+        _validate_repo_id(force_repo_id)
+
+    candidates = [r for r in repos if isinstance(r, dict) and r.get("repo_id") and needs_refresh(r)]
+    candidates.sort(key=lambda r: int(r.get("scored_at") or 0))
+    to_refresh: List[Dict[str, Any]] = candidates[:budget] if budget > 0 else []
+
+    if force_repo_id:
+        forced = next((r for r in repos if isinstance(r, dict) and str(r.get("repo_id")) == force_repo_id), None)
+        if forced is not None:
+            # Always refresh current repo, regardless of TTL/budget selection.
+            rest = [r for r in to_refresh if str(r.get("repo_id")) != force_repo_id]
+            to_refresh = [forced] + rest
+
+    updated_map: Dict[str, Dict[str, Any]] = {str(r.get("repo_id")): r for r in repos if isinstance(r, dict) and r.get("repo_id")}
+    for r in to_refresh:
+        rid = str(r.get("repo_id"))
+        try:
+            match_dict = _compute_match_from_repo_snapshot(scorer, user_profile_obj, r)
+            updated = dict(r)
+            updated["match_score"] = match_dict.get("match_score")
+            updated["breakdown"] = match_dict.get("breakdown")
+            updated["dynamic_weights"] = match_dict.get("dynamic_weights")
+            updated["score_frozen"] = True
+            updated["score_version"] = "v1"
+            updated["scored_at"] = now_ms
+            updated["score_context"] = {
+                "weights": {
+                    "w_skill": weights.w_skill,
+                    "w_activity": weights.w_activity,
+                    "w_demand": weights.w_demand,
+                }
+            }
+            store.upsert_user_repo(request.user_id, updated)
+            updated_map[rid] = updated
+        except Exception:
+            continue
+
+    final = list(updated_map.values())
+    final.sort(key=lambda x: float(x.get("match_score") or -1), reverse=True)
+    return {"mode": "user_online", "source": "user_repo_store", "repos": final, "refreshed": [r.get("repo_id") for r in to_refresh]}
 
 
 @app.post("/api/search")

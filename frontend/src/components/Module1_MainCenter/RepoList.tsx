@@ -10,6 +10,7 @@ interface RepoListProps {
   onOpenManualSearch?: () => void
   highlightedRepoIds?: string[]
   selectedRepoId?: string | null
+  updatingRepoIds?: string[]
   onBackgroundClick?: () => void
   canUseMatchSort?: boolean
   onDeleteRepo?: (repoId: string) => void
@@ -31,6 +32,7 @@ const RepoList: React.FC<RepoListProps> = ({
   onOpenManualSearch,
   highlightedRepoIds,
   selectedRepoId,
+  updatingRepoIds,
   onBackgroundClick,
   canUseMatchSort,
   onDeleteRepo,
@@ -257,7 +259,15 @@ const RepoList: React.FC<RepoListProps> = ({
         className="flex-1 overflow-y-auto p-3 pb-8"
         onClick={onBackgroundClick}
       >
+        {sortedRepos.length === 0 && (
+          <div className="mt-10 text-center text-base text-text/60">
+            {language === 'english'
+              ? 'No repositories yet. Run a search to add more.'
+              : '当前没有仓库。请先搜索以添加更多仓库。'}
+          </div>
+        )}
         {sortedRepos.map((repo: RepoResponse) => {
+          const isUpdating = !!updatingRepoIds?.includes(repo.repo_id)
           const isKeywordHighlight = !!highlightedRepoIds?.includes(repo.repo_id)
           const isSelected = selectedRepoId != null && selectedRepoId === repo.repo_id
           const isActiveCard = isSelected || isKeywordHighlight
@@ -317,8 +327,13 @@ const RepoList: React.FC<RepoListProps> = ({
               </h3>
               <div className="ml-2 flex max-w-[65%] shrink-0 flex-wrap items-center justify-end gap-2">
                 {canUseMatchSort && typeof repo.match_score === 'number' && (
-                  <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[var(--emphasis-fill-text)] bg-[var(--emphasis-fill-bg)]">
-                    {labels.match}{Math.round(repo.match_score * 100)}%
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-medium text-[var(--emphasis-fill-text)] bg-[var(--emphasis-fill-bg)] ${isUpdating ? 'opacity-70 blur-[0.6px]' : ''}`}
+                  >
+                    {labels.match}
+                    {isUpdating
+                      ? (language === 'english' ? '…' : '…')
+                      : `${Math.round(repo.match_score * 100)}%`}
                   </span>
                 )}
                 {onToggleFavorite && (
@@ -345,17 +360,17 @@ const RepoList: React.FC<RepoListProps> = ({
               typeof repo.breakdown?.demand === 'number') && (
               <div className="mb-1 flex flex-wrap items-center gap-1.5">
                 {typeof repo.breakdown?.skill === 'number' && (
-                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                  <span className={`rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text ${isUpdating ? 'opacity-70 blur-[0.6px]' : ''}`}>
                     {labels.skill}{Math.round(repo.breakdown.skill * 100)}%
                   </span>
                 )}
                 {typeof repo.breakdown?.activity === 'number' && (
-                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                  <span className={`rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text ${isUpdating ? 'opacity-70 blur-[0.6px]' : ''}`}>
                     {labels.activity}{Math.round(repo.breakdown.activity * 100)}%
                   </span>
                 )}
                 {typeof repo.breakdown?.demand === 'number' && (
-                  <span className="rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text">
+                  <span className={`rounded bg-primaryLight px-1.5 py-0.5 text-[11px] font-medium text-text ${isUpdating ? 'opacity-70 blur-[0.6px]' : ''}`}>
                     {labels.demand}{Math.round(repo.breakdown.demand * 100)}%
                   </span>
                 )}

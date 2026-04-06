@@ -48,6 +48,27 @@ export const reposAPI = USE_MOCK
       }
     }
 
+export const userReposAPI = {
+  list: async (user_id: string): Promise<ReposResponse> => {
+    return unwrap(api.get('/api/user_repos', { params: { user_id } }))
+  },
+  upsert: async (user_id: string, repo: any): Promise<{ status: string; repo: any }> => {
+    return unwrap(api.post('/api/user_repos/upsert', { user_id, repo }))
+  },
+  delete: async (user_id: string, repo_id: string): Promise<{ status: string }> => {
+    return unwrap(api.post('/api/user_repos/delete', { user_id, repo_id }))
+  },
+  applyWeights: async (
+    user_id: string,
+    weights: { w_skill: number; w_activity: number; w_demand: number },
+    budget: number = 5,
+    ttl_hours: number = 24,
+    force_repo_id?: string
+  ): Promise<any> => {
+    return unwrap(api.post('/api/user_repos/apply_weights', { user_id, weights, budget, ttl_hours, force_repo_id }))
+  }
+}
+
 export const manualSearchAPI = {
   searchGithub: async (query: string, per_page: number = 20, page: number = 1) => {
     return unwrap(

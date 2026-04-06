@@ -4,7 +4,7 @@ import { useUser } from './hooks/useUser'
 import { useUiLanguage } from './hooks/useUiLanguage'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
-import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
+import { searchAPI, manualSearchAPI, profileAPI, userReposAPI } from './services/api'
 import { storage, DEFAULT_MATCH_WEIGHTS } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
@@ -32,7 +32,7 @@ const HOME_RIGHT_MIN_WIDTH_PX = 350
 
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
-  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchData, toggleFavorite } = useRepos(username, sessionReady)
+  const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, toggleFavorite } = useRepos(username, sessionReady)
   const { uiLanguage, setUiLanguage } = useUiLanguage()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [selectedRepo, setSelectedRepo] = useState<RepoResponse | null>(null)
   const [matchData, setMatchData] = useState<MatchResult | null>(null)
   const [weights, setWeights] = useState(DEFAULT_MATCH_WEIGHTS)
+  const [updatingRepoIds, setUpdatingRepoIds] = useState<string[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const prevIsLoggedInRef = useRef<boolean>(isLoggedIn)
 
@@ -328,15 +329,38 @@ const App: React.FC = () => {
       bottom: { height: `calc(100% - ${Math.round(middleTopHeight)}px - 10px)` } as React.CSSProperties
     }
   }, [middleTopHeight])
+
+  const freezeRepoSnapshot = useCallback((repo: any) => {
+    const now = Date.now()
+    const w = weights
+    return {
+      ...repo,
+      score_frozen: true,
+      score_version: 'v1',
+      scored_at: now,
+      score_context: { weights: { w_skill: w.w_skill, w_activity: w.w_activity, w_demand: w.w_demand } }
+    }
+  }, [weights])
+
   const handleSearchComplete = useCallback((searchRepos: any[]) => {
     if (searchRepos && searchRepos.length > 0) {
-      fetchRepos({ repo_ids: searchRepos.map((r: { repo_id: string }) => r.repo_id), limit: 10 })
+      if (username) {
+        void Promise.all(
+          searchRepos.map(async (r: any) => {
+            try {
+              await userReposAPI.upsert(username, freezeRepoSnapshot(r))
+            } catch {}
+          })
+        ).then(() => refreshRepos())
+      } else {
+        fetchRepos({ repo_ids: searchRepos.map((r: { repo_id: string }) => r.repo_id), limit: 10 })
+      }
       if (username) {
         localStorage.setItem(`last_search_${username}`, Date.now().toString())
       }
       setToast(uiLanguage === 'english' ? 'Search completed, check the home page' : '搜索完成，请查看主页')
     }
-  }, [username, fetchRepos, uiLanguage])
+  }, [username, fetchRepos, uiLanguage, refreshRepos, freezeRepoSnapshot])
   const {
     messages,
     loading: chatLoading,
@@ -449,40 +473,48 @@ const App: React.FC = () => {
     setHighlightedRepoIds([])
     setActiveKeywords([])
 
-    if (isLoggedIn && profile?.skills && profile.skills.length > 0) {
+    if (isLoggedIn && username && profile?.skills && profile.skills.length > 0) {
       try {
-        if (isProfileModified && isProfileModified() && username && profile) {
-          try {
-            await profileAPI.sync(
-              username,
-              profile.skills || [],
-              profile.preferences || [],
-              uiLanguage
-            )
-            resetProfileModified()
-            await refreshRepos()
-          } catch (error) {
-            console.error('Profile sync before match failed:', error)
+        setUpdatingRepoIds((prev) => (prev.includes(repo.repo_id) ? prev : [...prev, repo.repo_id]))
+        const res = await userReposAPI.applyWeights(username, weights, 1, 0, repo.repo_id)
+        if (Array.isArray(res?.repos)) {
+          void refreshRepos()
+          const updated = (res.repos as any[]).find((r) => r.repo_id === repo.repo_id)
+          if (updated?.breakdown && typeof updated.match_score === 'number') {
+            addRepo(updated as any)
+            setMatchData({
+              match_score: updated.match_score,
+              breakdown: updated.breakdown,
+              repo_name: updated.name || repo.name,
+              repo_full_name: updated.repo_id,
+              dynamic_weights: updated.dynamic_weights
+            })
+            return
           }
         }
-        const match = await matchAPI.calculate(username!, repo.repo_id, weights)
-        setMatchData({
-          match_score: match.match_score,
-          breakdown: match.breakdown,
-          repo_name: repo.name,
-          repo_full_name: repo.repo_id,
-          dynamic_weights: match.dynamic_weights
-        })
-        if (typeof match.match_score === 'number') {
-          updateRepoMatchData(repo.repo_id, {
-            match_score: match.match_score,
-            breakdown: match.breakdown,
-            dynamic_weights: match.dynamic_weights
-          })
-        }
-      } catch (error) {
-        console.error('Match error:', error)
+      } catch {
+        // fall through
+      } finally {
+        setUpdatingRepoIds((prev) => prev.filter((id) => id !== repo.repo_id))
       }
+    }
+
+    const bd = (repo as any).breakdown
+    if (
+      typeof (repo as any).match_score === 'number' &&
+      typeof bd?.skill === 'number' &&
+      typeof bd?.activity === 'number' &&
+      typeof bd?.demand === 'number'
+    ) {
+      setMatchData({
+        match_score: (repo as any).match_score,
+        breakdown: bd,
+        repo_name: repo.name,
+        repo_full_name: repo.repo_id,
+        dynamic_weights: (repo as any).dynamic_weights
+      })
+    } else {
+      setMatchData(null)
     }
   }
 
@@ -492,17 +524,8 @@ const App: React.FC = () => {
       return
     }
     try {
-      if (username) {
-        const existingFavorites = storage.getUserFavorites(username) || []
-        const existingIds = new Set(existingFavorites.map((r: any) => r.repo_id))
-        const mergedFavorites = [
-          ...existingFavorites,
-          ...favorited.filter((r) => r.repo_id && !existingIds.has(r.repo_id))
-        ]
-        storage.saveUserFavorites(username, mergedFavorites)
-      }
       favorited.forEach((repo) => {
-        addRepo({
+        const snap = freezeRepoSnapshot({
           repo_id: repo.repo_id,
           name: repo.full_name || repo.repo_id,
           description: repo.description || '',
@@ -517,6 +540,10 @@ const App: React.FC = () => {
           keywords: repo.keywords || [],
           is_favorited: true
         } as any)
+        addRepo(snap as any)
+        if (username) {
+          void userReposAPI.upsert(username, snap).catch(() => {})
+        }
       })
       const enriched = await manualSearchAPI.bulkEnrich(
         favorited.map((r) => ({
@@ -527,7 +554,7 @@ const App: React.FC = () => {
       if (enriched && enriched.repos && enriched.repos.length > 0) {
         enriched.repos.forEach((e: any) => {
           const local = favorited.find((f) => f.repo_id === e.repo_id)
-          addRepo({
+          const snap = freezeRepoSnapshot({
             ...e,
             ...(local || {}),
             description: (local && local.description) || e.description,
@@ -536,6 +563,10 @@ const App: React.FC = () => {
             dynamic_weights: local?.dynamic_weights,
             is_favorited: true
           })
+          addRepo(snap as any)
+          if (username) {
+            void userReposAPI.upsert(username, snap).catch(() => {})
+          }
         })
         const hasZeroScores = enriched.repos.some((r: any) =>
           (r.active_score === 0 || r.active_score === 0.0) &&
@@ -558,21 +589,26 @@ const App: React.FC = () => {
 
   const handleChatFavorite = async (repo: any) => {
     if (!username) return
-    addRepo(repo)
+    const snap0 = freezeRepoSnapshot({ ...repo, is_favorited: true })
+    addRepo(snap0 as any)
+    void userReposAPI.upsert(username, snap0).catch(() => {})
     try {
       const enriched = await manualSearchAPI.bulkEnrich([
         { repo_id: repo.repo_id, full_name: repo.name }
       ])
       if (enriched && enriched.repos && enriched.repos.length > 0) {
         const e = enriched.repos[0]
-        addRepo({
+        const snap = freezeRepoSnapshot({
           ...e,
           ...repo,
           description: repo.description || e.description,
           match_score: repo.match_score,
           breakdown: repo.breakdown,
-          dynamic_weights: repo.dynamic_weights
+          dynamic_weights: repo.dynamic_weights,
+          is_favorited: true
         })
+        addRepo(snap as any)
+        void userReposAPI.upsert(username, snap).catch(() => {})
       }
     } catch (error) {
       console.error('chat favorite enrich error:', error)
@@ -642,7 +678,33 @@ const App: React.FC = () => {
       return
     }
     try {
-      const updated = await refreshRepos()
+      const repoIdsAtStart = repos.map((r) => r.repo_id)
+      setUpdatingRepoIds(repoIdsAtStart)
+      const MAX_BUDGET = 50
+      const maxIters = Math.max(1, Math.ceil(repoIdsAtStart.length / MAX_BUDGET) + 2)
+      let lastRes: any = null
+      for (let i = 0; i < maxIters; i += 1) {
+        const res = await userReposAPI.applyWeights(
+          username,
+          next,
+          MAX_BUDGET,
+          0,
+          selectedRepo?.repo_id ?? undefined
+        )
+        lastRes = res
+        const refreshed = Array.isArray(res?.refreshed) ? (res.refreshed as string[]) : []
+        if (Array.isArray(res?.repos)) {
+          for (const r of res.repos as RepoResponse[]) {
+            addRepo(r)
+          }
+        }
+        if (refreshed.length === 0) break
+        if (refreshed.length >= repoIdsAtStart.length) break
+      }
+
+      const updated = Array.isArray(lastRes?.repos) ? (lastRes.repos as RepoResponse[]) : await refreshRepos()
+      // Ensure left list reflects server-side resort.
+      void refreshRepos()
       const sel = selectedRepo
       if (updated && sel) {
         const r = updated.find((x) => x.repo_id === sel.repo_id)
@@ -658,6 +720,8 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error('Match error:', error)
+    } finally {
+      setUpdatingRepoIds([])
     }
   }
 
@@ -796,6 +860,7 @@ const App: React.FC = () => {
                 onBackgroundClick={handleRepoBackgroundClick}
                 highlightedRepoIds={highlightedRepoIds}
                 selectedRepoId={selectedRepo?.repo_id ?? null}
+                updatingRepoIds={updatingRepoIds}
                 canUseMatchSort={isLoggedIn && !!profile?.skills && profile.skills.length > 0}
                 openRepoHintTitle={
                   uiLanguage === 'english'
@@ -857,31 +922,11 @@ const App: React.FC = () => {
                       console.error('openrank refresh enrich failed:', e)
                     }
 
-                    if (isLoggedIn && username && profile?.skills && profile.skills.length > 0) {
-                      try {
-                        const match = await matchAPI.calculate(username, repoId, weights)
-                        updateRepoMatchData(repoId, {
-                          match_score: match.match_score,
-                          breakdown: match.breakdown,
-                          dynamic_weights: match.dynamic_weights
-                        })
-                        if (selectedRepo?.repo_id === repoId) {
-                          setMatchData((md) => {
-                            if (!md) {
-                              return {
-                                match_score: match.match_score,
-                                breakdown: match.breakdown,
-                                repo_name: selectedRepo?.name || repoId.split('/')[1] || 'repo',
-                                repo_full_name: repoId,
-                                dynamic_weights: match.dynamic_weights
-                              }
-                            }
-                            return { ...md, dynamic_weights: match.dynamic_weights }
-                          })
-                        }
-                      } catch (e) {
-                        console.error('openrank refresh match failed:', e)
-                      }
+                    if (selectedRepo?.repo_id === repoId) {
+                      setMatchData((md) => {
+                        if (!md) return md
+                        return { ...md }
+                      })
                     }
                   }}
                 />

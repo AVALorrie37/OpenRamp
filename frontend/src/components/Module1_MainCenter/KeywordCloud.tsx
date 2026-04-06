@@ -140,6 +140,11 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
       .map(([word, count]) => ({ word, count }))
   }, [repos, selectedRepo, skipDescriptionKeywordFallback, globalKeywordCounts, viewMode])
 
+  const emptyHint =
+    language === 'english'
+      ? 'No keywords yet. Run a search to add more repositories.'
+      : '当前没有关键词。请先搜索以添加更多仓库。'
+
   const maxCount = keywordData[0]?.count || 1
   const { ref: cloudRef, width: cloudWidth, height: cloudHeight } = useElementSize()
   const [placedWords, setPlacedWords] = useState<PlacedWord[]>([])
@@ -219,6 +224,11 @@ const KeywordCloud: React.FC<KeywordCloudProps> = ({
         ref={cloudRef}
         className="min-h-0 flex-1 overflow-hidden"
       >
+        {keywordData.length === 0 && (
+          <div className="flex h-full items-center justify-center text-center text-base text-text/60">
+            {emptyHint}
+          </div>
+        )}
         <svg width="100%" height="100%" viewBox={`0 0 ${Math.max(1, cloudWidth)} ${Math.max(1, cloudHeight)}`}>
           <g transform={`translate(${cloudWidth / 2}, ${cloudHeight / 2})`}>
             {placedWords.map(w => {

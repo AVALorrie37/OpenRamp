@@ -25,6 +25,13 @@ export interface RepoResponse {
   demand_score: number
   composite_score: number
   match_score?: number
+  score_frozen?: boolean
+  score_version?: string
+  scored_at?: number
+  score_context?: {
+    weights: { w_skill: number; w_activity: number; w_demand: number }
+    profile_fingerprint?: string
+  }
   raw_metrics?: {
     active_dates?: string
     openrank?: string
