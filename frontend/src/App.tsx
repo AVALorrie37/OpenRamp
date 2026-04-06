@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from './hooks/useUser'
+import { useUiLanguage } from './hooks/useUiLanguage'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { searchAPI, matchAPI, manualSearchAPI, profileAPI } from './services/api'
@@ -32,7 +33,7 @@ const HOME_RIGHT_MIN_WIDTH_PX = 350
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
   const { repos, reposMeta, loading: reposLoading, fetchRepos, refreshRepos, addRepo, deleteRepo, updateRepoMatchData, toggleFavorite } = useRepos(username, sessionReady)
-  const uiLanguage: 'chinese' | 'english' = profile?.language || 'chinese'
+  const { uiLanguage, setUiLanguage } = useUiLanguage()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showManualSearch, setShowManualSearch] = useState(false)
@@ -345,12 +346,12 @@ const App: React.FC = () => {
     sendMessage,
     triggerLocalQueryIntent,
     cancelSearch
-  } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete)
+  } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete, uiLanguage)
 
-  const handleLogin = (user: string, language: 'chinese' | 'english') => {
+  const handleLogin = (user: string) => {
     setSelectedRepo(null)
     setMatchData(null)
-    login(user, language)
+    login(user)
     setShowLoginModal(false)
   }
 
@@ -395,7 +396,7 @@ const App: React.FC = () => {
 
     if (response?.action === 'SEARCH') {
       await handleSearch()
-      setToast('搜索完成，请查看主页')
+      setToast(uiLanguage === 'english' ? 'Search completed, check the home page' : '搜索完成，请查看主页')
     }
   }
 
@@ -455,7 +456,7 @@ const App: React.FC = () => {
               username,
               profile.skills || [],
               profile.preferences || [],
-              profile.language
+              uiLanguage
             )
             resetProfileModified()
             await refreshRepos()
@@ -584,13 +585,21 @@ const App: React.FC = () => {
 
   const handleProfileUpdateFromPanel = async (partial: Partial<UserProfile>) => {
     if (!username || !profile) return
+    if (partial.language !== undefined) {
+      setUiLanguage(partial.language)
+    }
     updateProfile(partial)
     const merged = { ...profile, ...partial }
     const skills = merged.skills ?? profile.skills ?? []
     const prefs = merged.preferences ?? profile.preferences ?? []
-    if (skills.length > 0 || prefs.length > 0) {
+    const langForSync = merged.language ?? uiLanguage
+    const shouldSync =
+      skills.length > 0 ||
+      prefs.length > 0 ||
+      (partial.language !== undefined && partial.language !== profile.language)
+    if (shouldSync) {
       try {
-        await profileAPI.sync(username, skills, prefs, merged.language ?? profile.language)
+        await profileAPI.sync(username, skills, prefs, langForSync)
         refreshRepos()
         resetProfileModified()
       } catch (e) {
@@ -767,6 +776,8 @@ const App: React.FC = () => {
             onUpdate={handleProfileUpdateFromPanel}
             onLogout={handleLogout}
             onLogin={() => setShowLoginModal(true)}
+            uiLanguage={uiLanguage}
+            setUiLanguage={setUiLanguage}
           />
         </div>
       </header>
@@ -1037,6 +1048,7 @@ const App: React.FC = () => {
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onLogin={handleLogin}
+        uiLanguage={uiLanguage}
       />
 
       <AIChatWindow
@@ -1051,7 +1063,7 @@ const App: React.FC = () => {
         onQueryCurrentProfile={triggerLocalQueryIntent}
         onCancelSearch={cancelSearch}
         onAskAIAboutText={handleAskAIAboutSelection}
-        language={profile?.language || 'chinese'}
+        language={uiLanguage}
         username={username}
         onFavorite={handleChatFavorite}
         onUnfavorite={handleChatUnfavorite}

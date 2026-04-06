@@ -4,17 +4,18 @@ import type { UserProfile } from '../../types'
 
 interface ProfilePanelProps {
   profile: UserProfile | null
+  uiLanguage: 'chinese' | 'english'
   onUpdate: (profile: Partial<UserProfile>) => void
   onLogout: () => void
 }
 
-const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout }) => {
+const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, uiLanguage, onUpdate, onLogout }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
   const [newTag, setNewTag] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [tagError, setTagError] = useState<string | null>(null)
-  const lang: 'chinese' | 'english' = profile?.language || 'chinese'
+  const lang: 'chinese' | 'english' = uiLanguage
   
   // 贡献偏好相关状态
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>(profile?.preferences || [])
@@ -200,9 +201,9 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
         </h3>
         <div>
           <button
-            onClick={() => onUpdate({ language: 'chinese' as any })}
+            onClick={() => onUpdate({ language: 'chinese' as const })}
             className={`mr-2 rounded-full border px-2 py-1 text-xs font-medium ${
-              profile?.language === 'chinese'
+              uiLanguage === 'chinese'
                 ? 'border-[var(--emphasis-fill-bg)] bg-[var(--emphasis-fill-bg)] text-[var(--emphasis-fill-text)]'
                 : 'border-border bg-background text-text'
             }`}
@@ -210,9 +211,9 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ profile, onUpdate, onLogout
             中文
           </button>
           <button
-            onClick={() => onUpdate({ language: 'english' as any })}
+            onClick={() => onUpdate({ language: 'english' as const })}
             className={`rounded-full border px-2 py-1 text-xs font-medium ${
-              profile?.language === 'english'
+              uiLanguage === 'english'
                 ? 'border-[var(--emphasis-fill-bg)] bg-[var(--emphasis-fill-bg)] text-[var(--emphasis-fill-text)]'
                 : 'border-border bg-background text-text'
             }`}

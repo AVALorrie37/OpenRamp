@@ -13,6 +13,27 @@ const _userMatchWeightsKey = (username: string) => `user_match_weights_${usernam
 const _manualMatchCacheKey = (username: string, cacheKey: string) => `manual_match_cache_${username}_${cacheKey}${_reposSuffix()}`
 const _manualBackfillQueueKey = (username: string) => `manual_match_backfill_queue_${username}${_reposSuffix()}`
 
+export const UI_LANGUAGE_STORAGE_KEY = 'openramp_ui_language'
+export type UiLanguage = 'chinese' | 'english'
+
+export function readUiLanguageFromStorage(): UiLanguage {
+  try {
+    const v = localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)
+    if (v === 'chinese' || v === 'english') return v
+  } catch {
+    /* ignore */
+  }
+  return 'english'
+}
+
+export function writeUiLanguageToStorage(lang: UiLanguage): void {
+  try {
+    localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, lang)
+  } catch {
+    /* ignore */
+  }
+}
+
 export type StoredMatchWeights = { w_skill: number; w_activity: number; w_demand: number }
 export type StoredMatchBreakdown = { skill: number; activity: number; demand: number }
 export type StoredDynamicWeights = { w_skill: number; w_activity: number; w_demand: number; c_data: number }

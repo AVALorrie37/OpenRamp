@@ -19,23 +19,16 @@ export const useUser = () => {
   const [loading, setLoading] = useState(false)
   const profileModifiedRef = useRef<boolean>(false)
 
-  const loadProfile = async (user: string, language?: 'chinese' | 'english') => {
+  const loadProfile = async (user: string) => {
     setLoading(true)
     try {
       const data = storage.getUserData(user)
       if (data) {
         setProfile(data)
         profileModifiedRef.current = false
-        // 如果传入了language且profile中没有，则更新
-        if (language && !data.language) {
-          const updated = { ...data, language } as UserProfile
-          setProfile(updated)
-          storage.saveUserData(user, updated)
-          profileModifiedRef.current = false
-        }
       } else {
         const apiProfile = await profileAPI.get(user)
-        const profileWithLanguage = { ...apiProfile, language: language || apiProfile.language || 'chinese' }
+        const profileWithLanguage = { ...apiProfile, language: apiProfile.language || 'english' }
         setProfile(profileWithLanguage)
         storage.saveUserData(user, profileWithLanguage)
         profileModifiedRef.current = false
@@ -58,10 +51,10 @@ export const useUser = () => {
     }
   }, [])
 
-  const login = (user: string, language: 'chinese' | 'english' = 'chinese') => {
+  const login = (user: string) => {
     setUsername(user)
     localStorage.setItem('current_user', user)
-    loadProfile(user, language)
+    loadProfile(user)
   }
 
   const logout = () => {

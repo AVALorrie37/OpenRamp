@@ -27,6 +27,23 @@ function searchStageToText(stage: string, data: Record<string, unknown>, lang: s
   }
 }
 
+type UiLang = 'chinese' | 'english'
+
+function staticGreetingFallback(lang: UiLang): string {
+  return lang === 'english'
+    ? 'Welcome to the open source contribution assistant! To help match suitable projects, please briefly introduce your tech stack, experience level, and open source interests.'
+    : '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。'
+}
+
+function isPureWelcomeThread(messages: ChatMessage[]): boolean {
+  return (
+    messages.length === 1 &&
+    messages[0].role === 'assistant' &&
+    !messages[0].action &&
+    !messages[0].isSearching
+  )
+}
+
 function humanizePreference(preference: string, language: 'chinese' | 'english'): string {
   const map = language === 'english'
     ? {
@@ -49,7 +66,14 @@ function humanizePreference(preference: string, language: 'chinese' | 'english')
   return map[key] || preference
 }
 
-export const useAIChat = (user_id: string | null, profile: UserProfile | null = null, isProfileModified?: () => boolean, resetProfileModified?: () => void, onSearchComplete?: (repos: any[]) => void) => {
+export const useAIChat = (
+  user_id: string | null,
+  profile: UserProfile | null = null,
+  isProfileModified?: () => boolean,
+  resetProfileModified?: () => void,
+  onSearchComplete?: (repos: any[]) => void,
+  uiLanguage: UiLang = 'english'
+) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState<string | null>(null)
@@ -61,63 +85,88 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
   const searchStartTimeRef = useRef<number>(0)
   const searchIdRef = useRef<string | null>(null)
   const searchCompleteMetaRef = useRef<{ totalRepos: number; targetCount: number; rounds: number } | null>(null)
+  const greetingCacheRef = useRef<Partial<Record<UiLang, string>>>({})
+  const greetingInFlightRef = useRef<Partial<Record<UiLang, Promise<string>>>>({})
   const agentType = 'agent1'
 
+  const resolveGreetingText = useCallback(
+    async (userId: string, lang: UiLang): Promise<string> => {
+      const cached = greetingCacheRef.current[lang]
+      if (cached !== undefined) return cached
+      const inflight = greetingInFlightRef.current[lang]
+      if (inflight) return inflight
+
+      const p = (async () => {
+        try {
+          const sid = storage.getSessionId(userId)
+          const res = await (chatAPI as any).greeting(userId, lang, sid, agentType)
+          if (res.session_id) {
+            storage.saveSessionId(userId, res.session_id)
+            setSessionId(res.session_id)
+          }
+          const text = res.greeting as string
+          greetingCacheRef.current[lang] = text
+          return text
+        } catch {
+          const fb = staticGreetingFallback(lang)
+          greetingCacheRef.current[lang] = fb
+          return fb
+        } finally {
+          delete greetingInFlightRef.current[lang]
+        }
+      })()
+      greetingInFlightRef.current[lang] = p
+      return p
+    },
+    []
+  )
+
   useEffect(() => {
-    const initChat = async () => {
-      if (!user_id) {
-        setMessages([])
-        setSessionId(undefined)
-        return
-      }
-
-      const savedMessages = storage.getChatMessages(user_id)
-      const savedSessionId = storage.getSessionId(user_id)
-
-      if (savedMessages.length > 0) {
-        setMessages(savedMessages)
-        if (savedSessionId) {
-          setSessionId(savedSessionId)
-        }
-        return
-      }
-
-      try {
-        const lang = profile?.language || 'chinese'
-        const res = await (chatAPI as any).greeting(user_id, lang, savedSessionId, agentType)
-        const welcomeMessage: ChatMessage = {
-          role: 'assistant',
-          content: res.greeting,
-          timestamp: Date.now()
-        }
-        const messagesWithWelcome = [welcomeMessage]
-        setMessages(messagesWithWelcome)
-        storage.saveChatMessages(user_id, messagesWithWelcome)
-        if (res.session_id) {
-          setSessionId(res.session_id)
-          storage.saveSessionId(user_id, res.session_id)
-        }
-      } catch {
-        const fallbackMessage: ChatMessage = {
-          role: 'assistant',
-          content: profile?.language === 'english'
-            ? 'Welcome to the open source contribution assistant! To help match suitable projects, please briefly introduce your tech stack, experience level, and open source interests.'
-            : '欢迎使用开源贡献智能向导！为便于为你匹配合适的项目，请先简单介绍一下你的技术栈、经验水平和感兴趣的开源方向。',
-          timestamp: Date.now()
-        }
-        const messagesWithWelcome = [fallbackMessage]
-        setMessages(messagesWithWelcome)
-        storage.saveChatMessages(user_id, messagesWithWelcome)
-      }
+    if (!user_id) {
+      setMessages([])
+      setSessionId(undefined)
+      greetingCacheRef.current = {}
+      greetingInFlightRef.current = {}
+      return
     }
 
-    initChat()
-  }, [user_id, profile?.language])
+    const savedMessages = storage.getChatMessages(user_id)
+    const savedSessionId = storage.getSessionId(user_id)
+    const hasUser = savedMessages.some((m) => m.role === 'user')
+
+    if (hasUser || (savedMessages.length > 0 && !isPureWelcomeThread(savedMessages))) {
+      setMessages(savedMessages)
+      if (savedSessionId) setSessionId(savedSessionId)
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      const content = await resolveGreetingText(user_id, uiLanguage)
+      if (cancelled) return
+      const latest = storage.getChatMessages(user_id)
+      if (latest.some((m) => m.role === 'user') || (latest.length > 0 && !isPureWelcomeThread(latest))) {
+        return
+      }
+      const welcomeMessage: ChatMessage = {
+        role: 'assistant',
+        content,
+        timestamp: Date.now()
+      }
+      const next = [welcomeMessage]
+      setMessages(next)
+      storage.saveChatMessages(user_id, next)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user_id, uiLanguage, resolveGreetingText])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
     if (profile?.skills && profile.skills.length > 0) {
       try {
-        await profileAPI.sync(user_id, profile.skills, profile.preferences || [], profile.language)
+        await profileAPI.sync(user_id, profile.skills, profile.preferences || [], uiLanguage)
       } catch {}
     }
     const searchId = `${user_id}-${Date.now()}`
@@ -144,7 +193,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
     searchStartTimeRef.current = Date.now()
     searchCompleteMetaRef.current = null
 
-    const lang = profile?.language || 'chinese'
+    const lang = uiLanguage
     const cancelMessage = (sec: number) => lang === 'chinese' ? `搜索已终止，已进行 ${sec} 秒` : `Search cancelled after ${sec} seconds`
 
     try {
@@ -254,7 +303,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       searchAbortControllerRef.current = null
       searchIdRef.current = null
     }
-  }, [onSearchComplete, profile])
+  }, [onSearchComplete, profile, uiLanguage])
 
   const sendMessage = useCallback(async (
     content: string,
@@ -268,7 +317,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
           user_id,
           profile.skills || [],
           profile.preferences || [],
-          profile.language
+          uiLanguage
         )
         resetProfileModified()
       } catch (error) {
@@ -296,7 +345,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
         content,
         sessionId,
         agentType,
-        profile?.language,
+        uiLanguage,
         (stage, data) => {
           if (stage === 'intent_recognizing') setLoadingStage('intent_recognizing')
           else if (stage === 'intent_done') {
@@ -335,7 +384,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       console.error('Chat error:', error)
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: '抱歉，发生了错误。请稍后再试。',
+        content: uiLanguage === 'english' ? 'Sorry, something went wrong. Please try again later.' : '抱歉，发生了错误。请稍后再试。',
         timestamp: Date.now()
       }
       setMessages(prev => {
@@ -348,12 +397,12 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       setLoading(false)
       setLoadingStage(null)
     }
-  }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch])
+  }, [user_id, sessionId, agentType, profile, isProfileModified, resetProfileModified, handleAutoSearch, uiLanguage])
 
   const triggerLocalQueryIntent = useCallback(() => {
     if (!user_id) return
 
-    const language = profile?.language || 'chinese'
+    const language = uiLanguage
     const mockUserInput = language === 'english'
       ? 'What are my current skills and preferences?'
       : '我当前的技能和偏好是什么？'
@@ -384,7 +433,7 @@ export const useAIChat = (user_id: string | null, profile: UserProfile | null = 
       storage.saveChatMessages(user_id, updated)
       return updated
     })
-  }, [user_id, profile])
+  }, [user_id, uiLanguage, profile])
 
   const cancelSearch = useCallback(() => {
     const currentSearchId = searchIdRef.current
