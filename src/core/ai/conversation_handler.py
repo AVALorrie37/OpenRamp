@@ -161,6 +161,7 @@ class ConversationHandler:
                 temperature=0.3
             )
         except Exception:
+            logger.exception("Ollama generate failed (_complete_ask_content_response)")
             if not include_profile_context:
                 ai_response = (
                     '我暂时无法连接 AI 服务，请稍后再试。'
@@ -283,6 +284,7 @@ class ConversationHandler:
                     temperature=0.3
                 )
             except Exception:
+                logger.exception("Ollama generate failed (question with profile context)")
                 cached = self._load_profile_from_cache()
                 if cached:
                     skills = cached.get('skills', [])

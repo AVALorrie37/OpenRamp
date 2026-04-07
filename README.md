@@ -21,34 +21,42 @@ Smooth your ramp to open source. OpenRamp combines **AI conversational profiling
 
 ## Requirements
 
-- Python 3.10+
-- Node.js 18+ and npm
-- A local LLM (we recommend [Ollama](https://ollama.com/)) for chat and profiling
+- **Local development:** Python 3.10+, Node.js 18+, and npm. For real AI (chat and profiling, not mock mode), run **[Ollama](https://ollama.com/)** and pull a model (e.g. `ollama pull gemma2:2b`).
+- **Docker demo:** [Docker](https://docs.docker.com/get-docker/) with Compose — no host Python, Node, or Ollama needed for the containerized path (**Option D**).
 
 ## Environment variables
 
-Use a `.env` file in the project root for the backend; put frontend variables in `frontend/.env` (read by Vite).
+Put backend settings in a **root** `.env` and frontend settings in **`frontend/.env`** (Vite). You can skip both if the defaults below are fine.
 
 ```env
-# AI (Ollama)
+# AI (Ollama) — used by the local backend
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=gemma2:2b
 AI_TIMEOUT=120
 
-# GitHub (optional, higher rate limits)
+# Optional — higher GitHub API rate limits
 GITHUB_TOKEN=your_github_token
 
-# Backend CORS (comma-separated, default *)
+# Optional — CORS origins (comma-separated; default *)
 CORS_ORIGINS=*
 
-# Frontend (optional)
+# Optional — local frontend (Vite)
 VITE_API_BASE=http://localhost:8000
 VITE_USE_MOCK=false
 ```
 
+**Docker only:** Compose reads the root `.env`. The backend container sets `OLLAMA_URL` from **`OPENRAMP_DOCKER_OLLAMA_URL`** (default `http://ollama:11434`), so a host-style `OLLAMA_URL` in `.env` does not break the container. To use Ollama on the host instead of the `ollama` service, set `OPENRAMP_DOCKER_OLLAMA_URL=http://host.docker.internal:11434`. The built frontend in Docker proxies `/api`, so you do **not** need `VITE_API_BASE` there.
+
 ## Quick start
 
-**Option A: one command from the repo root (recommended)**
+**Docker (Option D)** is the shortest path to a full demo on your machine. **Option A** is the usual choice when you are developing with Python and Node installed.
+
+**Option A: one command from the repo root (recommended for local dev)**
+
+**Required**
+
+1. Meet [Requirements](#requirements) for local dev.
+2. From the repo root:
 
 ```bash
 pip install -r requirements.txt
@@ -56,34 +64,77 @@ npm install
 npm run dev
 ```
 
-Starts the backend and frontend together (Python dependencies must already be installed as above). For the full stack including a local `ollama serve`:
+3. Open **http://localhost:5173** (frontend). API: **http://localhost:8000**.
 
-```bash
-npm run dev-all
-```
+**Optional**
+
+- **`npm run dev-all`** — same stack plus **`ollama serve`** in the same terminal (Ollama must be installed and on your `PATH`).
+
+**Troubleshooting**
+
+- **Chat or profiling fails:** Ensure Ollama is running, run `ollama pull` for the same model name as `OLLAMA_MODEL`, and check `OLLAMA_URL` if Ollama is not on the default host/port.
 
 **Option B: frontend only with mock API (no backend)**
+
+**Required**
 
 ```bash
 cd frontend && npm install && cd ..
 npm run mock
 ```
 
-**Option C: run backend and frontend separately**
+No backend or Ollama — handy when you only need the UI against the mock API.
+
+**Option C: backend and frontend in separate terminals**
+
+**Required**
+
+Terminal 1:
 
 ```bash
 pip install -r requirements.txt
 python -m src.api.server
-# or: uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+Terminal 2:
 
 ```bash
 cd frontend && npm install && npm run dev
 ```
 
-- Backend (default): `http://localhost:8000`
-- Frontend (dev): `http://localhost:5173`
-- Production build: `cd frontend && npm run build`, then `npm run preview`
+**Optional**
+
+- Run the backend with reload: `uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload`
+- Production-style frontend: `cd frontend && npm run build`, then `npm run preview`
+
+**URLs:** backend **http://localhost:8000**, frontend **http://localhost:5173**.
+
+**Troubleshooting** — same as Option A for AI features (Ollama + model).
+
+**Option D: Docker Compose (one-click demo)**
+
+**Required**
+
+1. Docker with Compose (e.g. Docker Desktop).
+2. From the repo root: `docker compose up --build`
+3. Open **http://localhost:8080** (UI; `/api` is proxied to the backend).
+4. After containers are up, pull the model once (default `gemma2:2b`; use the same string as `OLLAMA_MODEL` in root `.env` if you change it):
+
+```bash
+docker compose exec ollama ollama pull gemma2:2b
+```
+
+**Optional**
+
+- Root `.env` for `GITHUB_TOKEN`, `OLLAMA_MODEL`, `CORS_ORIGINS`, etc.
+- Ollama on the host instead of the `ollama` service: **`OPENRAMP_DOCKER_OLLAMA_URL`** ([Environment variables](#environment-variables)).
+- Debugging: **http://localhost:8000/health**, Ollama on host port **11434**.
+
+**Troubleshooting**
+
+- **`docker compose up` fails binding 11434:** Another app (often the Ollama desktop client) is using the port — quit it or change the mapping in `docker-compose.yml`.
+- **Chat / “cannot reach AI”:** Pull the model; align `OLLAMA_MODEL` with `docker compose exec ollama ollama list`; check **`docker compose logs backend`**.
+- **Stop:** `docker compose down`. **Remove volumes** (models + saved repo list): `docker compose down -v`.
 
 ## Tech stack
 

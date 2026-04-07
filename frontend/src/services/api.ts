@@ -10,7 +10,8 @@ import {
 } from './mockApi'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)
+  || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 const api = axios.create({
   baseURL: API_BASE,
