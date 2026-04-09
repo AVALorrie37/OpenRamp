@@ -5,7 +5,7 @@ import { useUiLanguage } from './hooks/useUiLanguage'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
 import { searchAPI, manualSearchAPI, profileAPI, userReposAPI } from './services/api'
-import { storage, DEFAULT_MATCH_WEIGHTS } from './utils/storage'
+import { storage, DEFAULT_MATCH_WEIGHTS, clearAccountData } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
 import RepoActivityTabs from './components/Module1_MainCenter/RepoActivityTabs'
@@ -385,6 +385,15 @@ const App: React.FC = () => {
     setMatchData(null)
     setHighlightedRepoIds([])
     setActiveKeywords([])
+    logout()
+  }
+
+  const handleDeleteAccount = () => {
+    setSelectedRepo(null)
+    setMatchData(null)
+    setHighlightedRepoIds([])
+    setActiveKeywords([])
+    if (username) clearAccountData(username)
     logout()
   }
 
@@ -840,6 +849,7 @@ const App: React.FC = () => {
             profile={profile}
             onUpdate={handleProfileUpdateFromPanel}
             onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
             onLogin={() => setShowLoginModal(true)}
             uiLanguage={uiLanguage}
             setUiLanguage={setUiLanguage}

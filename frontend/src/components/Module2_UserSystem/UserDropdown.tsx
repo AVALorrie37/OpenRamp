@@ -8,6 +8,7 @@ interface UserDropdownProps {
   profile: UserProfile | null
   onUpdate: (profile: Partial<UserProfile>) => void
   onLogout: () => void
+  onDeleteAccount?: () => void
   onLogin?: () => void
   uiLanguage: 'chinese' | 'english'
   setUiLanguage: (lang: 'chinese' | 'english') => void
@@ -18,6 +19,7 @@ const UserDropdown: React.FC<UserDropdownProps> = ({
   profile,
   onUpdate,
   onLogout,
+  onDeleteAccount,
   onLogin,
   uiLanguage,
   setUiLanguage
@@ -105,6 +107,15 @@ const UserDropdown: React.FC<UserDropdownProps> = ({
               onLogout()
               setIsOpen(false)
             }}
+            username={username}
+            onDeleteAccount={
+              onDeleteAccount
+                ? () => {
+                    onDeleteAccount()
+                    setIsOpen(false)
+                  }
+                : undefined
+            }
           />
         </div>
       )}

@@ -100,7 +100,11 @@ function _inferUsernamesFromCacheKeys(): string[] {
       if (k.startsWith(reposPrefix)) {
         const rest = k.slice(reposPrefix.length)
         const envSuffix = rest.endsWith('_mock') ? '_mock' : rest.endsWith('_live') ? '_live' : ''
-        const usernamePart = envSuffix ? rest.slice(0, -envSuffix.length) : rest
+        const usernamePart = envSuffix
+          ? rest.slice(0, -envSuffix.length)
+          : rest.endsWith('_favorites')
+            ? rest.slice(0, -'_favorites'.length)
+            : rest
         const n = _normalizeUsername(usernamePart)
         if (n && !out.includes(n)) out.push(n)
         continue
@@ -109,6 +113,25 @@ function _inferUsernamesFromCacheKeys(): string[] {
       const weightsPrefix = 'user_match_weights_'
       if (k.startsWith(weightsPrefix)) {
         const rest = k.slice(weightsPrefix.length)
+        const envSuffix = rest.endsWith('_mock') ? '_mock' : rest.endsWith('_live') ? '_live' : ''
+        const usernamePart = envSuffix ? rest.slice(0, -envSuffix.length) : rest
+        const n = _normalizeUsername(usernamePart)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      const manualCachePrefix = 'manual_match_cache_'
+      if (k.startsWith(manualCachePrefix)) {
+        const rest = k.slice(manualCachePrefix.length)
+        const usernamePart = rest.split('_')[0] || ''
+        const n = _normalizeUsername(usernamePart)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      const manualQueuePrefix = 'manual_match_backfill_queue_'
+      if (k.startsWith(manualQueuePrefix)) {
+        const rest = k.slice(manualQueuePrefix.length)
         const envSuffix = rest.endsWith('_mock') ? '_mock' : rest.endsWith('_live') ? '_live' : ''
         const usernamePart = envSuffix ? rest.slice(0, -envSuffix.length) : rest
         const n = _normalizeUsername(usernamePart)
@@ -133,6 +156,69 @@ export function readRecentUsersFromCache(): string[] {
     if (out.length >= MAX_RECENT_USERS) break
   }
   return out
+}
+
+export function clearAllAccountData(): void {
+  try {
+    localStorage.removeItem('current_user')
+    localStorage.removeItem(RECENT_USERS_KEY)
+
+    const prefixes = [
+      'user_',
+      'chat_messages_',
+      'session_id_',
+      'user_repos_',
+      'user_match_weights_',
+      'manual_match_cache_',
+      'manual_match_backfill_queue_'
+    ]
+
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k) keys.push(k)
+    }
+
+    for (const k of keys) {
+      if (prefixes.some((p) => k.startsWith(p))) {
+        localStorage.removeItem(k)
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearAccountData(username: string): void {
+  const n = _normalizeUsername(username)
+  if (!n) return
+  try {
+    const current = localStorage.getItem('current_user')
+    if (current === n) localStorage.removeItem('current_user')
+
+    const nextRecent = readRecentUsersFromStorage().filter((u) => u !== n)
+    writeRecentUsersToStorage(nextRecent)
+
+    localStorage.removeItem(`${STORAGE_PREFIX}${n}`)
+    localStorage.removeItem(`${CHAT_MESSAGES_PREFIX}${n}`)
+    localStorage.removeItem(`session_id_${n}`)
+    localStorage.removeItem(_userFavoritesKey(n))
+
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k) keys.push(k)
+    }
+
+    for (const k of keys) {
+      if (k === `user_repos_${n}_mock` || k === `user_repos_${n}_live`) localStorage.removeItem(k)
+      else if (k === `user_match_weights_${n}_mock` || k === `user_match_weights_${n}_live`) localStorage.removeItem(k)
+      else if (k === `manual_match_backfill_queue_${n}_mock` || k === `manual_match_backfill_queue_${n}_live`) localStorage.removeItem(k)
+      else if (k.startsWith(`manual_match_cache_${n}_`)) localStorage.removeItem(k)
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function readUiLanguageFromStorage(): UiLanguage {
