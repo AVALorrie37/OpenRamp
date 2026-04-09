@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Modal from '../shared/Modal'
+import { readRecentUsersFromCache } from '../../utils/storage'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -10,6 +11,12 @@ interface LoginModalProps {
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, uiLanguage }) => {
   const [username, setUsername] = useState('')
+  const [recentUsers, setRecentUsers] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setRecentUsers(readRecentUsersFromCache())
+  }, [isOpen])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,14 +34,32 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, uiLan
           <label className="mb-2 block text-base font-medium text-text">
             {uiLanguage === 'english' ? 'Username' : '用户名'}
           </label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={uiLanguage === 'english' ? 'Enter username' : '输入用户名'}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-base outline-none transition focus:border-primary"
-            autoFocus
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={uiLanguage === 'english' ? 'Enter username' : '输入用户名'}
+              className="w-full flex-1 rounded-md border border-border bg-surface px-3 py-2 text-base outline-none transition focus:border-primary"
+              autoFocus
+            />
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) setUsername(e.target.value)
+              }}
+              className="w-[140px] rounded-md border border-border bg-surface px-2 py-2 text-base outline-none transition focus:border-primary"
+              aria-label={uiLanguage === 'english' ? 'Recent accounts' : '最近账户'}
+              disabled={recentUsers.length === 0}
+            >
+              <option value="">{uiLanguage === 'english' ? 'Recent' : '最近'}</option>
+              {recentUsers.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <button
           type="submit"

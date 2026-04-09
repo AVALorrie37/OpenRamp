@@ -16,6 +16,125 @@ const _manualBackfillQueueKey = (username: string) => `manual_match_backfill_que
 export const UI_LANGUAGE_STORAGE_KEY = 'openramp_ui_language'
 export type UiLanguage = 'chinese' | 'english'
 
+const RECENT_USERS_KEY = 'openramp_recent_users'
+const MAX_RECENT_USERS = 10
+
+function _normalizeUsername(u: string): string | null {
+  const v = u.trim()
+  return v.length > 0 ? v : null
+}
+
+export function readRecentUsersFromStorage(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_USERS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    const out: string[] = []
+    for (const item of parsed) {
+      if (typeof item !== 'string') continue
+      const n = _normalizeUsername(item)
+      if (!n) continue
+      if (!out.includes(n)) out.push(n)
+      if (out.length >= MAX_RECENT_USERS) break
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+export function writeRecentUsersToStorage(users: string[]): void {
+  try {
+    const out: string[] = []
+    for (const u of users) {
+      if (typeof u !== 'string') continue
+      const n = _normalizeUsername(u)
+      if (!n) continue
+      if (!out.includes(n)) out.push(n)
+      if (out.length >= MAX_RECENT_USERS) break
+    }
+    localStorage.setItem(RECENT_USERS_KEY, JSON.stringify(out))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function upsertRecentUser(username: string): void {
+  const n = _normalizeUsername(username)
+  if (!n) return
+  const existing = readRecentUsersFromStorage()
+  const next = [n, ...existing.filter((u) => u !== n)].slice(0, MAX_RECENT_USERS)
+  writeRecentUsersToStorage(next)
+}
+
+function _inferUsernamesFromCacheKeys(): string[] {
+  const out: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k) continue
+
+      if (k.startsWith('user_') && !k.startsWith('user_repos_') && !k.startsWith('user_match_weights_')) {
+        const maybe = k.slice('user_'.length)
+        const n = _normalizeUsername(maybe)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      if (k.startsWith('chat_messages_')) {
+        const maybe = k.slice('chat_messages_'.length)
+        const n = _normalizeUsername(maybe)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      if (k.startsWith('session_id_')) {
+        const maybe = k.slice('session_id_'.length)
+        const n = _normalizeUsername(maybe)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      const reposPrefix = 'user_repos_'
+      if (k.startsWith(reposPrefix)) {
+        const rest = k.slice(reposPrefix.length)
+        const envSuffix = rest.endsWith('_mock') ? '_mock' : rest.endsWith('_live') ? '_live' : ''
+        const usernamePart = envSuffix ? rest.slice(0, -envSuffix.length) : rest
+        const n = _normalizeUsername(usernamePart)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+
+      const weightsPrefix = 'user_match_weights_'
+      if (k.startsWith(weightsPrefix)) {
+        const rest = k.slice(weightsPrefix.length)
+        const envSuffix = rest.endsWith('_mock') ? '_mock' : rest.endsWith('_live') ? '_live' : ''
+        const usernamePart = envSuffix ? rest.slice(0, -envSuffix.length) : rest
+        const n = _normalizeUsername(usernamePart)
+        if (n && !out.includes(n)) out.push(n)
+        continue
+      }
+    }
+  } catch {
+    return out
+  }
+  return out
+}
+
+export function readRecentUsersFromCache(): string[] {
+  const stored = readRecentUsersFromStorage()
+  const inferred = _inferUsernamesFromCacheKeys()
+  const out: string[] = []
+  for (const u of [...stored, ...inferred]) {
+    const n = _normalizeUsername(u)
+    if (!n) continue
+    if (!out.includes(n)) out.push(n)
+    if (out.length >= MAX_RECENT_USERS) break
+  }
+  return out
+}
+
 export function readUiLanguageFromStorage(): UiLanguage {
   try {
     const v = localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)

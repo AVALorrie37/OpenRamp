@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { storage } from '../utils/storage'
+import { storage, upsertRecentUser } from '../utils/storage'
 import { profileAPI } from '../services/api'
 import type { UserProfile } from '../types'
 
@@ -54,6 +54,7 @@ export const useUser = () => {
   const login = (user: string) => {
     setUsername(user)
     localStorage.setItem('current_user', user)
+    upsertRecentUser(user)
     loadProfile(user)
   }
 
