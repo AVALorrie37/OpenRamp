@@ -13,4 +13,4 @@ COPY top_300_metrics ./top_300_metrics
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uv=$(echo \"${LOG_LEVEL:-INFO}\" | tr '[:upper:]' '[:lower:]'); case \"$uv\" in warn) uv=warning ;; esac; exec uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --log-level \"$uv\""]

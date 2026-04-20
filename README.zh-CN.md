@@ -25,25 +25,15 @@ Smooth your ramp to open source. OpenRamp 通过 **AI 对话画像 + 多维度�
 
 ## 环境变量
 
-后端写在**项目根目录**的 `.env`，前端写在 **`frontend/.env`**（Vite 读取）。若与下方默认值一致，两个文件都可以不写。
+非必须；有默认值。需要时：
 
-```env
-# AI（Ollama）—— 本机后端使用
-OLLAMA_URL=http://localhost:11434
-AI_TIMEOUT=120
-
-# 可选 —— 提高 GitHub API 限额
-GITHUB_TOKEN=your_github_token
-
-# 可选 —— CORS 来源（逗号分隔；默认 *）
-CORS_ORIGINS=*
-
-# 可选 —— 本机前端（Vite）
-VITE_API_BASE=http://localhost:8000
-VITE_USE_MOCK=false
+```bash
+cp .env.example .env
 ```
 
-**仅 Docker：** Compose 会读取根目录 `.env`。后端容器里的 `OLLAMA_URL` 来自 **`OPENRAMP_DOCKER_OLLAMA_URL`**（默认 `http://ollama:11434`），因此 `.env` 里写成 `http://localhost:11434` 也不会把容器弄坏。若 Ollama 跑在宿主机而非 compose 里的 `ollama` 服务，请设置 `OPENRAMP_DOCKER_OLLAMA_URL=http://host.docker.internal:11434`。镜像内的前端会反向代理 `/api`，**不需要**再配 `VITE_API_BASE`。
+说明见 [.env.example](.env.example)。**根目录 `.env`**：Ollama 地址/超时；可选 `OLLAMA_MODEL`（仅当请求未带 `model` 时作后端默认；网页端一般从已安装模型列表自动选）；`GITHUB_TOKEN`、`CORS_ORIGINS`。**`frontend/.env`**：按需设 `VITE_API_BASE`、`VITE_USE_MOCK`。
+
+**Docker：** Compose 读根目录 `.env`；后端连 Ollama 用 **`OPENRAMP_DOCKER_OLLAMA_URL`**（默认 `http://ollama:11434`，宿主机 Ollama 用 `http://host.docker.internal:11434`）。镜像内**不要**配 `VITE_API_BASE`（`/api` 已代理）。
 
 ## 快速开始
 
@@ -102,7 +92,7 @@ cd frontend && npm install && npm run dev
 
 **可选**
 
-- 后端带热重载：`uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload`
+- 后端带热重载（与根目录 `.env` 的 `LOG_LEVEL` 一致，小写）：`uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload --log-level info`
 - 前端生产构建预览：`cd frontend && npm run build`，再执行 `npm run preview`
 
 **地址：** 后端 **http://localhost:8000**，前端 **http://localhost:5173**。

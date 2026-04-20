@@ -26,25 +26,15 @@ Smooth your ramp to open source. OpenRamp combines **AI conversational profiling
 
 ## Environment variables
 
-Put backend settings in a **root** `.env` and frontend settings in **`frontend/.env`** (Vite). You can skip both if the defaults below are fine.
+Nothing is required; defaults are fine. Optional overrides:
 
-```env
-# AI (Ollama) — used by the local backend
-OLLAMA_URL=http://localhost:11434
-AI_TIMEOUT=120
-
-# Optional — higher GitHub API rate limits
-GITHUB_TOKEN=your_github_token
-
-# Optional — CORS origins (comma-separated; default *)
-CORS_ORIGINS=*
-
-# Optional — local frontend (Vite)
-VITE_API_BASE=http://localhost:8000
-VITE_USE_MOCK=false
+```bash
+cp .env.example .env
 ```
 
-**Docker only:** Compose reads the root `.env`. The backend container sets `OLLAMA_URL` from **`OPENRAMP_DOCKER_OLLAMA_URL`** (default `http://ollama:11434`), so a host-style `OLLAMA_URL` in `.env` does not break the container. To use Ollama on the host instead of the `ollama` service, set `OPENRAMP_DOCKER_OLLAMA_URL=http://host.docker.internal:11434`. The built frontend in Docker proxies `/api`, so you do **not** need `VITE_API_BASE` there.
+Details: [.env.example](.env.example). **Root `.env`**: Ollama URL/timeouts, optional `OLLAMA_MODEL` (backend default when no `model` in the request; the web UI normally picks from the installed model list), `GITHUB_TOKEN`, `CORS_ORIGINS`. **`frontend/.env`**: `VITE_API_BASE`, `VITE_USE_MOCK` if needed.
+
+**Docker:** Compose reads root `.env`. Backend reaches Ollama via **`OPENRAMP_DOCKER_OLLAMA_URL`** (default `http://ollama:11434`; use `http://host.docker.internal:11434` for host Ollama). No `VITE_API_BASE` in Docker (UI proxies `/api`).
 
 ## Quick start
 
@@ -103,7 +93,7 @@ cd frontend && npm install && npm run dev
 
 **Optional**
 
-- Run the backend with reload: `uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload`
+- Run the backend with reload (use the same level as `LOG_LEVEL` in `.env`, lowercase): `uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload --log-level info`
 - Production-style frontend: `cd frontend && npm run build`, then `npm run preview`
 
 **URLs:** backend **http://localhost:8000**, frontend **http://localhost:5173**.

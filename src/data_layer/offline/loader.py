@@ -22,7 +22,7 @@ class OfflineRepoLoader:
         """
         self.base_path = Path(base_path)
         if not self.base_path.exists():
-            logger.warning(f"离线数据目录不存在: {self.base_path}")
+            logger.debug(f"离线数据目录不存在: {self.base_path}")
 
     def _load_json_file(self, file_path: Path) -> Optional[Any]:
         """加载 JSON 文件，失败时返回 None 并记录警告"""

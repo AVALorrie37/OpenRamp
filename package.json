@@ -2,8 +2,8 @@
     "name": "openramp",
     "version": "1.0.0",
     "scripts": {
-        "dev-all": "cross-env VITE_USE_MOCK=false concurrently -n \"Ollama,Backend,Frontend\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\"",
-        "dev": "cross-env VITE_USE_MOCK=false concurrently -n \"Backend,Frontend\" -c \"bgBlue.bold,bgGreen.bold\" \"npm run backend\" \"npm run frontend:dev\"",
+        "dev-all": "cross-env VITE_USE_MOCK=false concurrently -n \"Ollama,Backend,Frontend,OpenRamp\" -c \"bgYellow.bold,bgBlue.bold,bgGreen.bold,bgMagenta.bold\" \"npm run ollama\" \"npm run backend\" \"npm run frontend:dev\" \"wait-on -t 120000 tcp:5173 && node scripts/dev-banner.cjs\"",
+        "dev": "cross-env VITE_USE_MOCK=false concurrently -n \"Backend,Frontend,OpenRamp\" -c \"bgBlue.bold,bgGreen.bold,bgMagenta.bold\" \"npm run backend\" \"npm run frontend:dev\" \"wait-on -t 120000 tcp:5173 && node scripts/dev-banner.cjs\"",
         "mock": "cross-env VITE_USE_MOCK=true npm --prefix frontend run dev",
         "backend": "cross-env PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python -m src.api.server",
         "frontend:dev": "npm --prefix frontend run dev",
@@ -11,7 +11,8 @@
     },
     "devDependencies": {
         "concurrently": "^8.2.0",
-        "cross-env": "^7.0.3"
+        "cross-env": "^7.0.3",
+        "wait-on": "^8.0.1"
     },
     "dependencies": {
         "katex": "^0.16.38"

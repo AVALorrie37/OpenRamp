@@ -62,7 +62,24 @@ project_root = current_file.parent.parent.parent
 env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path)
 
-logging.basicConfig(level=logging.INFO)
+
+def _log_level_from_env() -> tuple[int, str]:
+    """(logging 级别, uvicorn log_level 小写字符串)。"""
+    raw = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    if raw == "WARN":
+        raw = "WARNING"
+    table = {
+        "DEBUG": (logging.DEBUG, "debug"),
+        "INFO": (logging.INFO, "info"),
+        "WARNING": (logging.WARNING, "warning"),
+        "ERROR": (logging.ERROR, "error"),
+        "CRITICAL": (logging.CRITICAL, "critical"),
+    }
+    return table.get(raw, (logging.INFO, "info"))
+
+
+_py_log_level, _uvicorn_log_level = _log_level_from_env()
+logging.basicConfig(level=_py_log_level)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OpenDigger API Server", version="1.0.0")
@@ -137,7 +154,7 @@ def load_offline_repos() -> List[dict]:
     base_path = loader.base_path
 
     if not base_path.exists():
-        logger.warning(f"离线数据目录不存在: {base_path}")
+        logger.debug(f"离线数据目录不存在: {base_path}")
         _offline_cache = []
         return _offline_cache
 
@@ -1970,5 +1987,10 @@ async def bulk_enrich_repos(request: BulkEnrichRequest = Body(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level=_uvicorn_log_level,
+    )
 

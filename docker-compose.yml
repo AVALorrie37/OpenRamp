@@ -18,6 +18,7 @@ services:
       AI_TIMEOUT: ${AI_TIMEOUT:-120}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
     volumes:
