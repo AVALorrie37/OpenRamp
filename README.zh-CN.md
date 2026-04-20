@@ -30,7 +30,6 @@ Smooth your ramp to open source. OpenRamp 通过 **AI 对话画像 + 多维度�
 ```env
 # AI（Ollama）—— 本机后端使用
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=gemma2:2b
 AI_TIMEOUT=120
 
 # 可选 —— 提高 GitHub API 限额
@@ -71,7 +70,7 @@ npm run dev
 
 **遇到问题**
 
-- **对话或画像报错：** 确认 Ollama 已启动；用 `ollama pull` 拉取与 `OLLAMA_MODEL` 同名的模型；若地址不是默认主机/端口，检查 `OLLAMA_URL`。
+- **对话或画像报错：** 确认 Ollama 已启动；用 `ollama pull` 拉取你要用的模型（默认 `gemma2:2b`；可用 `OLLAMA_MODEL` 覆盖）；若地址不是默认主机/端口，检查 `OLLAMA_URL`。
 
 **方式 B：仅前端 + Mock（不接后端）**
 
@@ -117,7 +116,7 @@ cd frontend && npm install && npm run dev
 1. 已安装 Docker 与 Compose（如 Docker Desktop）。
 2. 在仓库根目录：`docker compose up --build`
 3. 浏览器打开 **http://localhost:8080**（页面走 Nginx，`/api` 会转到后端）。
-4. 容器就绪后，首次拉取模型（默认 `gemma2:2b`；若改了根目录 `.env` 里的 `OLLAMA_MODEL`，名称要一致）：
+4. 容器就绪后，首次拉取模型（默认 `gemma2:2b`；可在根目录 `.env` 用 `OLLAMA_MODEL` 覆盖）：
 
 ```bash
 docker compose exec ollama ollama pull gemma2:2b
@@ -125,14 +124,14 @@ docker compose exec ollama ollama pull gemma2:2b
 
 **可选**
 
-- 根目录 `.env` 配置 `GITHUB_TOKEN`、`OLLAMA_MODEL`、`CORS_ORIGINS` 等。
+- 根目录 `.env` 配置 `GITHUB_TOKEN`、`OLLAMA_MODEL`（可选；默认 `gemma2:2b`）、`CORS_ORIGINS` 等。
 - Ollama 跑在宿主机、不用 compose 里的 `ollama` 服务：见 **`OPENRAMP_DOCKER_OLLAMA_URL`**（[环境变量](#环境变量)）。
 - 调试：健康检查 **http://localhost:8000/health**，宿主机访问 Ollama 端口 **11434**。
 
 **遇到问题**
 
 - **`docker compose up` 绑定 11434 失败：** 端口被占用（常见是桌面版 Ollama）—— 退出占用程序，或改 `docker-compose.yml` 里的端口映射。
-- **对话 / 提示无法连接 AI：** 先拉取模型；用 `docker compose exec ollama ollama list` 核对与 `OLLAMA_MODEL` 一致；查看 **`docker compose logs backend`**。
+- **对话 / 提示无法连接 AI：** 先拉取模型；用 `docker compose exec ollama ollama list` 确认模型存在（默认 `gemma2:2b`；可用 `OLLAMA_MODEL` 覆盖）；查看 **`docker compose logs backend`**。
 - **停止：** `docker compose down`。**删除数据卷**（模型与已保存仓库列表等）：`docker compose down -v`。
 
 ## 技术栈

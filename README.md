@@ -31,7 +31,6 @@ Put backend settings in a **root** `.env` and frontend settings in **`frontend/.
 ```env
 # AI (Ollama) — used by the local backend
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=gemma2:2b
 AI_TIMEOUT=120
 
 # Optional — higher GitHub API rate limits
@@ -72,7 +71,7 @@ npm run dev
 
 **Troubleshooting**
 
-- **Chat or profiling fails:** Ensure Ollama is running, run `ollama pull` for the same model name as `OLLAMA_MODEL`, and check `OLLAMA_URL` if Ollama is not on the default host/port.
+- **Chat or profiling fails:** Ensure Ollama is running, run `ollama pull` for the model you want to use (default `gemma2:2b`; set `OLLAMA_MODEL` to override), and check `OLLAMA_URL` if Ollama is not on the default host/port.
 
 **Option B: frontend only with mock API (no backend)**
 
@@ -118,7 +117,7 @@ cd frontend && npm install && npm run dev
 1. Docker with Compose (e.g. Docker Desktop).
 2. From the repo root: `docker compose up --build`
 3. Open **http://localhost:8080** (UI; `/api` is proxied to the backend).
-4. After containers are up, pull the model once (default `gemma2:2b`; use the same string as `OLLAMA_MODEL` in root `.env` if you change it):
+4. After containers are up, pull the model once (default `gemma2:2b`; set `OLLAMA_MODEL` in root `.env` to override):
 
 ```bash
 docker compose exec ollama ollama pull gemma2:2b
@@ -126,14 +125,14 @@ docker compose exec ollama ollama pull gemma2:2b
 
 **Optional**
 
-- Root `.env` for `GITHUB_TOKEN`, `OLLAMA_MODEL`, `CORS_ORIGINS`, etc.
+- Root `.env` for `GITHUB_TOKEN`, `OLLAMA_MODEL` (optional; default `gemma2:2b`), `CORS_ORIGINS`, etc.
 - Ollama on the host instead of the `ollama` service: **`OPENRAMP_DOCKER_OLLAMA_URL`** ([Environment variables](#environment-variables)).
 - Debugging: **http://localhost:8000/health**, Ollama on host port **11434**.
 
 **Troubleshooting**
 
 - **`docker compose up` fails binding 11434:** Another app (often the Ollama desktop client) is using the port — quit it or change the mapping in `docker-compose.yml`.
-- **Chat / “cannot reach AI”:** Pull the model; align `OLLAMA_MODEL` with `docker compose exec ollama ollama list`; check **`docker compose logs backend`**.
+- **Chat / “cannot reach AI”:** Pull the model; confirm the model exists in `docker compose exec ollama ollama list` (default `gemma2:2b`; set `OLLAMA_MODEL` to override); check **`docker compose logs backend`**.
 - **Stop:** `docker compose down`. **Remove volumes** (models + saved repo list): `docker compose down -v`.
 
 ## Tech stack
