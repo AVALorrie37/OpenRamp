@@ -31,12 +31,17 @@ class BaseAIProvider(ABC):
 class OllamaProvider(BaseAIProvider):
     """Ollama本地部署实现"""
     
-    def __init__(self):
-        self.model = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+    def __init__(self, model: Optional[str] = None):
+        self.model = (model or os.getenv("OLLAMA_MODEL", "gemma2:2b")).strip()
         self.base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
         self.timeout = int(os.getenv("AI_TIMEOUT", "120"))  # 增加默认超时
         
         logger.info(f"OllamaProvider initialized: model={self.model}, url={self.base_url}, timeout={self.timeout}")
+
+    def set_model(self, model: Optional[str]) -> None:
+        m = (model or "").strip()
+        if m:
+            self.model = m
     
     def generate(
         self,

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowDown, Copy, Send, Square, X } from 'lucide-react'
+import { ArrowDown, ChevronDown, Copy, RefreshCw, Send, Square, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ChatMessage from './ChatMessage'
 import SuggestionButtons from './SuggestionButtons'
@@ -24,6 +24,12 @@ interface AIChatWindowProps {
   username?: string | null
   onFavorite?: (repo: any) => void
   onUnfavorite?: (repoId: string) => void
+  availableModels?: string[]
+  modelSizeMap?: Record<string, string | null | undefined>
+  selectedModel?: string
+  onModelChange?: (model: string) => void
+  onRefreshModels?: () => void
+  modelsNotRunning?: boolean
 }
 
 function stageLabel(stage: string | null | undefined, language: 'chinese' | 'english'): string {
@@ -44,7 +50,7 @@ function stageLabel(stage: string | null | undefined, language: 'chinese' | 'eng
 
 type Rect = { left: number; top: number; width: number; height: number }
 
-const MIN_W = 360
+const MIN_W = 560
 const MIN_H = 360
 const EDGE_HANDLE = 8
 const CORNER_HANDLE = 14
@@ -119,15 +125,24 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   language = 'chinese',
   username = null,
   onFavorite,
-  onUnfavorite
+  onUnfavorite,
+  availableModels = [],
+  modelSizeMap = {},
+  selectedModel,
+  onModelChange,
+  onRefreshModels,
+  modelsNotRunning = false
 }) => {
   const [input, setInput] = useState('')
   const [askAiBubble, setAskAiBubble] = useState<{ text: string; top: number; left: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
+  const windowRef = useRef<HTMLDivElement>(null)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
+  const [modelDropdownMaxH, setModelDropdownMaxH] = useState<number>(240)
   const [rect, setRect] = useState<Rect>(() => {
     if (typeof window === 'undefined') return { left: 0, top: 0, width: 500, height: 600 }
     const stored = readStoredRect()
@@ -200,6 +215,14 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = '0px'
+    const next = Math.max(40, el.scrollHeight)
+    el.style.height = `${next}px`
+  }, [input])
 
   useLayoutEffect(() => {
     if (!isOpen || typeof window === 'undefined') return
@@ -468,6 +491,44 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
     onClose()
   }, [onClose, rect])
 
+  const chooseModel = useCallback((m: string) => {
+    onModelChange?.(m)
+    setModelDropdownOpen(false)
+  }, [onModelChange])
+
+  const openModelDropdown = useCallback(() => {
+    const footerEl = footerRef.current
+    const winEl = windowRef.current
+    if (footerEl && winEl) {
+      const f = footerEl.getBoundingClientRect()
+      const w = winEl.getBoundingClientRect()
+      const availableAbove = Math.max(120, Math.floor(f.top - w.top - 12))
+      setModelDropdownMaxH(Math.min(320, availableAbove))
+    } else {
+      setModelDropdownMaxH(240)
+    }
+    setModelDropdownOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!modelDropdownOpen) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null
+      if (!t) return
+      if (t.closest('[data-model-dropdown-root]')) return
+      setModelDropdownOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModelDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [modelDropdownOpen])
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -509,6 +570,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
             className="fixed z-[1001] flex flex-col rounded-lg bg-surface shadow-modal"
             style={windowStyle}
             onClick={(e) => e.stopPropagation()}
+            ref={windowRef}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -623,12 +685,106 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                 </button>
               )}
               <form onSubmit={handleSubmit} className="relative">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-center justify-start gap-2" data-model-dropdown-root>
+                    <div className="relative min-w-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (loading) return
+                          if (modelDropdownOpen) setModelDropdownOpen(false)
+                          else openModelDropdown()
+                        }}
+                        className="inline-flex w-fit max-w-[min(100%,32rem)] items-center justify-between gap-2 rounded-md border border-[var(--chat-input-border)] bg-primaryLight px-3 py-2 text-base text-text outline-none hover:brightness-[0.99] disabled:opacity-60"
+                        aria-label={language === 'english' ? 'Select model' : '选择模型'}
+                        disabled={loading}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-left">
+                          {(modelsNotRunning
+                            ? '请启动ollama服务'
+                            : availableModels.length === 0
+                              ? (language === 'english' ? 'No models' : '暂无模型')
+                              : (selectedModel || availableModels[0] || '')
+                          )}
+                        </span>
+                        <span className="shrink-0 text-text/60">
+                          <ChevronDown size={18} />
+                        </span>
+                      </button>
+
+                      {modelDropdownOpen && (
+                        <div
+                          className="absolute left-0 bottom-[calc(100%+6px)] z-[1002] w-[min(100vw,32rem)] overflow-auto rounded-md border border-border bg-surface shadow-md"
+                          style={{ maxHeight: `${Math.max(120, modelDropdownMaxH)}px` }}
+                        >
+                          <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+                            <div className="text-sm font-medium text-text">
+                              {language === 'english' ? 'Select model:' : '选择模型：'}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onRefreshModels?.()
+                              }}
+                              className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-2 py-1.5 text-text transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={loading}
+                              aria-label={language === 'english' ? 'Refresh models' : '刷新模型列表'}
+                            >
+                              <RefreshCw size={16} />
+                            </button>
+                          </div>
+
+                          {modelsNotRunning ? (
+                            <div className="px-3 py-3 text-sm text-text/70">
+                              请启动ollama服务并刷新列表
+                            </div>
+                          ) : (
+                            availableModels.map((name) => {
+                              const isSelected = (selectedModel || '').trim() === name
+                              const size = (modelSizeMap[name] || '').trim()
+                              return (
+                                <button
+                                  key={name}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    chooseModel(name)
+                                  }}
+                                  className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-base transition hover:brightness-[0.98] ${
+                                    isSelected ? 'bg-primaryLight' : 'bg-surface'
+                                  }`}
+                                >
+                                  <span className="min-w-0 flex-1 truncate text-left text-text">
+                                    {name}
+                                  </span>
+                                  <span className="w-[6.5rem] shrink-0 text-right text-text/70">
+                                    {size}
+                                  </span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="relative mb-3">
-                  <input
+                  <textarea
                     ref={inputRef}
-                    type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void handleSubmit(e as unknown as React.FormEvent)
+                      }
+                    }}
                     placeholder={language === 'english' ? 'Type a message...' : '输入消息...'}
                     disabled={loading}
                     className={`w-full rounded-md border bg-[var(--chat-input-bg)] px-3 py-2 pr-11 text-base text-[var(--chat-input-text)] outline-none ${
@@ -636,6 +792,8 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                         ? 'border-[var(--chat-input-border-active)] animate-pulse'
                         : 'border-[var(--chat-input-border)]'
                     }`}
+                    rows={1}
+                    style={{ resize: 'none', overflow: 'hidden' }}
                   />
                   <button
                     type="submit"

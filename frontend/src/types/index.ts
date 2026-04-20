@@ -63,6 +63,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  model?: string
   action?: string
   notice?: boolean
   isSearching?: boolean
@@ -90,6 +91,7 @@ export interface ChatResponse {
   confirmed: boolean
   profile_updated?: boolean
   session_id?: string
+  model?: string
   error?: string
   auto_search?: boolean
   profile_gap?: ProfileGapKind

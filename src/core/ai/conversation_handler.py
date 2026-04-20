@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class ConversationHandler:
     """Agent1：交互协调员"""
     
-    def __init__(self, user_id: str = None, user_language: str = 'chinese'):
-        self.provider = OllamaProvider()
+    def __init__(self, user_id: str = None, user_language: str = 'chinese', model: Optional[str] = None):
+        self.provider = OllamaProvider(model=model)
         self.prompt_manager = PromptManager()
         self.profile_parser = ProfileParser()
         self.user_id = user_id
@@ -534,6 +534,9 @@ class ConversationHandler:
         """设置用户语言偏好"""
         if language in ['chinese', 'english']:
             self.user_language = language
+
+    def set_model(self, model: Optional[str]) -> None:
+        self.provider.set_model(model)
     
     def _inject_language_instruction(self, system_prompt: str, language: str) -> str:
         """在系统提示词中注入语言指令"""

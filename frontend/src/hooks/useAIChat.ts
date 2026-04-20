@@ -313,7 +313,7 @@ export const useAIChat = (
 
   const sendMessage = useCallback(async (
     content: string,
-    opts?: { skipIntent?: boolean }
+    opts?: { skipIntent?: boolean; model?: string }
   ): Promise<ChatResponse | null> => {
     if (!user_id || !content.trim()) return null
 
@@ -331,10 +331,13 @@ export const useAIChat = (
       }
     }
 
+    const model = (opts?.model || '').trim() || undefined
+
     const userMessage: ChatMessage = {
       role: 'user',
       content,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      model
     }
     setMessages(prev => {
       const newMessages = [...prev, userMessage]
@@ -352,6 +355,7 @@ export const useAIChat = (
         sessionId,
         agentType,
         uiLanguage,
+        model,
         (stage, data) => {
           if (stage === 'intent_recognizing') setLoadingStage('intent_recognizing')
           else if (stage === 'search_intent_mining') setLoadingStage('search_intent_mining')
@@ -374,7 +378,8 @@ export const useAIChat = (
         role: 'assistant',
         content: response.reply,
         timestamp: Date.now(),
-        action: response.action
+        action: response.action,
+        model: (response.model || model || '').trim() || undefined
       }
       if (response.action === 'COLLECT_PROFILE_FOR_SEARCH') {
         const gap = parseProfileGap(response.profile_gap)

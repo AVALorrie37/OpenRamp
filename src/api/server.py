@@ -493,6 +493,7 @@ class ChatRequest(BaseModel):
     language: Optional[str] = None
     agent_type: str = 'agent1'
     skip_intent: bool = False
+    model: Optional[str] = None
 
 
 class GreetingRequest(BaseModel):
@@ -697,6 +698,80 @@ def get_http_client() -> httpx.AsyncClient:
     return _http_client
 
 
+def _format_bytes(n: Any) -> Optional[str]:
+    try:
+        v = float(n)
+    except Exception:
+        return None
+    if not (v >= 0):
+        return None
+    units = ["B", "KB", "MB", "GB", "TB"]
+    i = 0
+    while v >= 1024.0 and i < len(units) - 1:
+        v /= 1024.0
+        i += 1
+    if i == 0:
+        return f"{int(v)}{units[i]}"
+    return f"{v:.1f}{units[i]}"
+
+
+@app.get("/api/ollama/models")
+async def ollama_models():
+    """
+    Proxy Ollama model list for the frontend.
+    Returns: { "models": [{ "name": "llama3:8b", "size_bytes": 0, "size": "0B" }, ...] }
+    """
+    base_url = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+    url = f"{base_url}/api/tags"
+    try:
+        client = get_http_client()
+        resp = await client.get(url)
+        resp.raise_for_status()
+        data = resp.json() or {}
+        rows: List[Dict[str, Any]] = []
+        for m in (data.get("models") or []):
+            if isinstance(m, dict):
+                name = m.get("name")
+                if isinstance(name, str) and name.strip():
+                    size_bytes = m.get("size")
+                    size_str = _format_bytes(size_bytes)
+                    modified_at = m.get("modified_at")
+                    rows.append(
+                        {
+                            "name": name.strip(),
+                            "size_bytes": int(size_bytes) if isinstance(size_bytes, (int, float)) else None,
+                            "size": size_str,
+                            "modified_at": modified_at,
+                        }
+                    )
+        # Prefer "latest pulled" (newest modified_at) first when available.
+        def _sort_key(x: Dict[str, Any]):
+            return str(x.get("modified_at") or "")
+        rows.sort(key=_sort_key, reverse=True)
+
+        seen = set()
+        out = []
+        for r in rows:
+            n = r.get("name")
+            if not isinstance(n, str) or not n.strip():
+                continue
+            if n in seen:
+                continue
+            seen.add(n)
+            out.append({"name": n, "size_bytes": r.get("size_bytes"), "size": r.get("size")})
+        return {"models": out}
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.NetworkError):
+        raise HTTPException(status_code=503, detail="OLLAMA_NOT_RUNNING")
+    except httpx.HTTPStatusError as e:
+        status = int(getattr(e.response, "status_code", 500) or 500)
+        if status >= 500:
+            raise HTTPException(status_code=503, detail="OLLAMA_NOT_RUNNING")
+        raise HTTPException(status_code=status, detail="OLLAMA_LIST_FAILED")
+    except Exception as e:
+        logger.error("OLLAMA_LIST_UNEXPECTED_ERROR: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="OLLAMA_LIST_UNEXPECTED_ERROR")
+
+
 def _github_activity_cache_key(kind: str, repo_id: str, date_key: str) -> str:
     return f"{kind}:{repo_id}:{date_key}"
 
@@ -710,6 +785,8 @@ async def chat(request: ChatRequest = Body(...)):
             request.language, 
             request.session_id
         )
+        if request.model:
+            handler.set_model(request.model)
         result = handler.process_user_input(request.message, skip_intent=request.skip_intent)
         
         if request.agent_type != 'agent1':
@@ -746,6 +823,7 @@ async def chat(request: ChatRequest = Body(...)):
             "confirmed": confirmed,
             "profile_updated": profile_updated,
             "session_id": session_id,
+            "model": (request.model or os.getenv("OLLAMA_MODEL", "")).strip() or None,
             "mode": "online",
             "source": "ollama_online",
             "auto_search": auto_search,
@@ -819,6 +897,8 @@ async def chat_stream(request: ChatRequest = Body(...)):
                 request.language,
                 request.session_id
             )
+            if request.model:
+                handler.set_model(request.model)
 
             def on_stage(name: str, data: Dict[str, Any]):
                 sync_q.put({"type": "stage", "stage": name, "data": data})
@@ -852,6 +932,7 @@ async def chat_stream(request: ChatRequest = Body(...)):
                         payload = _chat_result_to_response(result, session_id, request.agent_type)
                     else:
                         payload = _chat_result_to_response(result, session_id, 'agent1')
+                    payload["model"] = (request.model or os.getenv("OLLAMA_MODEL", "")).strip() or None
                     payload["stage"] = "reply"
                     yield f"data: {json.dumps(payload)}\n\n"
                     break

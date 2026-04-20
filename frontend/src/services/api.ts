@@ -103,6 +103,16 @@ export const activityAPI = {
 
 type ChatGreetingResponse = { greeting: string; session_id: string; language: string }
 
+export const ollamaAPI = USE_MOCK
+  ? {
+      listModels: async (): Promise<{ models: ({ name: string; size?: string | null; size_bytes?: number | null } | string)[] }> => ({ models: [] })
+    }
+  : {
+      listModels: async (): Promise<{ models: ({ name: string; size?: string | null; size_bytes?: number | null } | string)[] }> => {
+        return unwrap(api.get('/api/ollama/models'))
+      }
+    }
+
 export const chatAPI: typeof mockChatAPI | {
   send: (
     user_id: string,
@@ -110,6 +120,7 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type?: string,
     language?: string,
+    model?: string,
     onStage?: (stage: string, data: Record<string, unknown>) => void,
     skipIntent?: boolean
   ) => Promise<ChatResponse>
@@ -126,6 +137,7 @@ export const chatAPI: typeof mockChatAPI | {
     session_id?: string,
     agent_type: string = 'agent1',
     language?: string,
+    model?: string,
     onStage?: (stage: string, data: Record<string, unknown>) => void,
     skipIntent?: boolean
   ): Promise<ChatResponse> => {
@@ -135,6 +147,7 @@ export const chatAPI: typeof mockChatAPI | {
       session_id,
       agent_type,
       language,
+      model,
       skip_intent: !!skipIntent
     }
     const res = await fetch(`${API_BASE}/api/chat/stream`, {

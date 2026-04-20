@@ -4,7 +4,7 @@ import { useUser } from './hooks/useUser'
 import { useUiLanguage } from './hooks/useUiLanguage'
 import { useRepos } from './hooks/useRepos'
 import { useAIChat } from './hooks/useAIChat'
-import { searchAPI, manualSearchAPI, profileAPI, userReposAPI } from './services/api'
+import { searchAPI, manualSearchAPI, profileAPI, userReposAPI, ollamaAPI } from './services/api'
 import { storage, DEFAULT_MATCH_WEIGHTS, clearAccountData } from './utils/storage'
 
 import RepoList from './components/Module1_MainCenter/RepoList'
@@ -43,6 +43,10 @@ const App: React.FC = () => {
   const [updatingRepoIds, setUpdatingRepoIds] = useState<string[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const prevIsLoggedInRef = useRef<boolean>(isLoggedIn)
+  const [availableModels, setAvailableModels] = useState<{ name: string; size?: string | null }[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>('')
+  const [modelsNotRunning, setModelsNotRunning] = useState(false)
+  const modelsFetchingRef = useRef(false)
 
   useEffect(() => {
     if (username) {
@@ -52,6 +56,70 @@ const App: React.FC = () => {
       setWeights(DEFAULT_MATCH_WEIGHTS)
     }
   }, [username])
+
+  const getLastUsedModelFromHistory = useCallback((user: string | null): string | undefined => {
+    if (!user) return undefined
+    try {
+      const msgs = storage.getChatMessages(user)
+      if (!Array.isArray(msgs)) return undefined
+      for (let i = msgs.length - 1; i >= 0; i -= 1) {
+        const m = msgs[i] as any
+        const model = (m?.model || '').trim()
+        if (model) return model
+      }
+    } catch {}
+    return undefined
+  }, [])
+
+  const refreshOllamaModels = useCallback(async () => {
+    if (modelsFetchingRef.current) return
+    modelsFetchingRef.current = true
+    try {
+      const res = await ollamaAPI.listModels()
+      const models = Array.isArray((res as any)?.models)
+        ? (res as any).models
+            .map((m: any) => {
+              if (typeof m === 'string') return { name: m.trim(), size: null as string | null }
+              return { name: String(m?.name || '').trim(), size: (m?.size ?? null) as any }
+            })
+            .filter((m: any) => typeof m?.name === 'string' && m.name.trim())
+        : []
+      setModelsNotRunning(false)
+      setAvailableModels(models)
+      setSelectedModel((prev) => {
+        const lastUsed = getLastUsedModelFromHistory(username)
+        if (lastUsed && models.some((m: { name: string }) => m.name === lastUsed)) return lastUsed
+        const p = (prev || '').trim()
+        if (p && models.some((m: { name: string }) => m.name === p)) return p
+        return (models[0]?.name || '').trim()
+      })
+    } catch (e: any) {
+      const msg = (e?.message || '').trim()
+      if (msg === 'OLLAMA_NOT_RUNNING') {
+        setModelsNotRunning(true)
+        setAvailableModels([])
+        setSelectedModel((prev) => (prev || '').trim())
+      } else {
+        setModelsNotRunning(true)
+        setAvailableModels([])
+      }
+    } finally {
+      modelsFetchingRef.current = false
+    }
+  }, [getLastUsedModelFromHistory, username])
+
+  useEffect(() => {
+    void refreshOllamaModels()
+  }, [refreshOllamaModels])
+
+  useEffect(() => {
+    if (!username) return
+    setSelectedModel((prev) => {
+      const lastUsed = getLastUsedModelFromHistory(username)
+      if (lastUsed && availableModels.some((m) => m.name === lastUsed)) return lastUsed
+      return prev
+    })
+  }, [availableModels, getLastUsedModelFromHistory, username])
 
   useEffect(() => {
     const prev = prevIsLoggedInRef.current
@@ -656,7 +724,7 @@ const App: React.FC = () => {
   }
 
   const handleSendMessage = async (message: string, opts?: { skipIntent?: boolean }) => {
-    const response = await sendMessage(message, opts)
+    const response = await sendMessage(message, { ...opts, model: selectedModel })
     if (response) {
       await handleAIChatResponse(response)
     }
@@ -1126,6 +1194,15 @@ const App: React.FC = () => {
         username={username}
         onFavorite={handleChatFavorite}
         onUnfavorite={handleChatUnfavorite}
+        availableModels={availableModels.map((m) => m.name)}
+        modelSizeMap={availableModels.reduce<Record<string, string | null | undefined>>((acc, m) => {
+          acc[m.name] = m.size
+          return acc
+        }, {})}
+        selectedModel={selectedModel}
+        onModelChange={(m) => setSelectedModel(m)}
+        onRefreshModels={refreshOllamaModels}
+        modelsNotRunning={modelsNotRunning}
       />
 
       <ManualSearchModal
