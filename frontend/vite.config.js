@@ -1,10 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-export default defineConfig(({ mode }) => {
+/** GitHub project Pages base, e.g. /OpenRamp/ — set only in CI; local default is '/' */
+function pagesBaseFromEnv() {
+    const raw = (process.env.VITE_PAGES_BASE || '').trim();
+    if (!raw)
+        return '/';
+    const lead = raw.startsWith('/') ? raw : `/${raw}`;
+    return lead.endsWith('/') ? lead : `${lead}/`;
+}
+export default defineConfig(() => {
     // 动态判断是否启用 Mock 模式
     const isMock = process.env.VITE_USE_MOCK === 'true';
     return {
+        base: pagesBaseFromEnv(),
         plugins: [react()],
         resolve: {
             alias: {

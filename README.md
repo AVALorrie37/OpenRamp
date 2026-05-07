@@ -125,6 +125,10 @@ docker compose exec ollama ollama pull gemma2:2b
 - **Chat / “cannot reach AI”:** Pull the model; confirm the model exists in `docker compose exec ollama ollama list` (default `gemma2:2b`; set `OLLAMA_MODEL` to override); check **`docker compose logs backend`**.
 - **Stop:** `docker compose down`. **Remove volumes** (models + saved repo list): `docker compose down -v`.
 
+## GitHub Pages (static mock demo)
+
+Pushes to **`main`** that touch `frontend/**` run [`.github/workflows/deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml): the workflow sets **`VITE_USE_MOCK=true`**, **`VITE_DEMO_SEED=true`**, and **`VITE_PAGES_BASE=/<repository-name>/`** only for that build, so **local defaults are unchanged**. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** once. The site URL is `https://<user>.github.io/<repo>/`.
+
 ## Tech stack
 
 - **Frontend**: React 18, Vite, TypeScript, Tailwind CSS, Axios, Chart.js / react-chartjs-2, Recharts, d3-cloud, Framer Motion, Lucide React
