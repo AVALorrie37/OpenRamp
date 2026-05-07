@@ -2,6 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { chatAPI, profileAPI, searchAPI } from '../services/api'
 import { storage } from '../utils/storage'
 import type { ChatMessage, ChatResponse, UserProfile, ProfileGapKind } from '../types'
+import {
+  peekNextMockComposePrefill,
+  resetMockChatStep,
+  getMockChatStep
+} from '../mock/demoChatScript'
+
+const USE_MOCK_FRONTEND = import.meta.env.VITE_USE_MOCK === 'true'
 
 function parseProfileGap(g: unknown): ProfileGapKind | undefined {
   if (g === 'skills' || g === 'contribution_styles' || g === 'both') return g
@@ -87,6 +94,7 @@ export const useAIChat = (
   const [searchProgressSeconds, setSearchProgressSeconds] = useState<number | null>(null)
   const [searchStage, setSearchStage] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | undefined>()
+  const [mockComposePrefill, setMockComposePrefill] = useState<string | null>(null)
   const searchAbortControllerRef = useRef<AbortController | null>(null)
   const searchStartTimeRef = useRef<number>(0)
   const searchIdRef = useRef<string | null>(null)
@@ -133,6 +141,7 @@ export const useAIChat = (
       setSessionId(undefined)
       greetingCacheRef.current = {}
       greetingInFlightRef.current = {}
+      setMockComposePrefill(null)
       return
     }
 
@@ -168,6 +177,14 @@ export const useAIChat = (
       cancelled = true
     }
   }, [user_id, uiLanguage, resolveGreetingText])
+
+  useEffect(() => {
+    if (!USE_MOCK_FRONTEND || !user_id) {
+      setMockComposePrefill(null)
+      return
+    }
+    setMockComposePrefill(peekNextMockComposePrefill(user_id, uiLanguage))
+  }, [user_id, uiLanguage, messages.length, loading])
 
   const handleAutoSearch = useCallback(async (user_id: string) => {
     if (profile?.skills && profile.skills.length > 0) {
@@ -529,10 +546,14 @@ export const useAIChat = (
       searchAbortControllerRef.current = null
     }
     if (user_id) {
+      if (USE_MOCK_FRONTEND) resetMockChatStep(user_id)
       storage.clearChatMessages(user_id)
       storage.clearSessionId(user_id)
     }
   }, [user_id])
+
+  const mockComposePrefillKey =
+    USE_MOCK_FRONTEND && user_id ? `${getMockChatStep(user_id)}:${messages.length}` : '0'
 
   return {
     messages,
@@ -545,6 +566,8 @@ export const useAIChat = (
     triggerLocalQueryIntent,
     clearMessages,
     cancelSearch,
-    confirmCollectProfileDraft
+    confirmCollectProfileDraft,
+    mockComposePrefill: USE_MOCK_FRONTEND ? mockComposePrefill : null,
+    mockComposePrefillKey
   }
 }

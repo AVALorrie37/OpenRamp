@@ -449,11 +449,29 @@ const ManualSearchModal: React.FC<ManualSearchModalProps> = ({ isOpen, username,
                         avatar_url: item.owner?.avatar_url
                       },
                       match_score: item.match_score,
-                      breakdown: item.breakdown || item.match_breakdown
+                      breakdown: item.breakdown || item.match_breakdown,
+                      dynamic_weights: item.dynamic_weights
                     }))
                     setResultSource('multi_round')
-                    setResults(repos.map(applyCachedMatch))
-                    setTotalCount(repos.length)
+                    const uname = getCurrentUser()
+                    let nextRows = repos.map(applyCachedMatch)
+                    if (uname) {
+                      nextRows = await Promise.all(
+                        nextRows.map(async (repo) => {
+                          const m = await calculateAndCacheRepo(repo.repo_id)
+                          if (!m) return repo
+                          return {
+                            ...repo,
+                            match_score: m.match_score,
+                            breakdown: m.breakdown,
+                            dynamic_weights: m.dynamic_weights,
+                            matchLoading: false
+                          }
+                        })
+                      )
+                    }
+                    setResults(nextRows)
+                    setTotalCount(nextRows.length)
                   } catch (e: any) {
                     setError(e?.message || 'Multi-round search error')
                   } finally {

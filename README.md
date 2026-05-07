@@ -32,7 +32,7 @@ Nothing is required; defaults are fine. Optional overrides:
 cp .env.example .env
 ```
 
-Details: [.env.example](.env.example). **Root `.env`**: Ollama URL/timeouts, optional `OLLAMA_MODEL` (backend default when no `model` in the request; the web UI normally picks from the installed model list), `GITHUB_TOKEN`, `CORS_ORIGINS`. **`frontend/.env`**: `VITE_API_BASE`, `VITE_USE_MOCK` if needed.
+Details: [.env.example](.env.example). **Root `.env`**: Ollama URL/timeouts, optional `OLLAMA_MODEL` (backend default when no `model` in the request; the web UI normally picks from the installed model list), `GITHUB_TOKEN`, `CORS_ORIGINS`. **`frontend/.env`**: `VITE_API_BASE`, `VITE_USE_MOCK`, optional `VITE_DEMO_SEED=true` (mock-only auto-login as `demo` for static demos).
 
 **Docker:** Compose reads root `.env`. Backend reaches Ollama via **`OPENRAMP_DOCKER_OLLAMA_URL`** (default `http://ollama:11434`; use `http://host.docker.internal:11434` for host Ollama). No `VITE_API_BASE` in Docker (UI proxies `/api`).
 

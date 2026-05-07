@@ -30,6 +30,9 @@ interface AIChatWindowProps {
   onModelChange?: (model: string) => void
   onRefreshModels?: () => void
   modelsNotRunning?: boolean
+  /** Mock demo: next scripted user line to send unchanged */
+  composePrefill?: string | null
+  composePrefillKey?: string | number
 }
 
 function stageLabel(stage: string | null | undefined, language: 'chinese' | 'english'): string {
@@ -131,7 +134,9 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   selectedModel,
   onModelChange,
   onRefreshModels,
-  modelsNotRunning = false
+  modelsNotRunning = false,
+  composePrefill = null,
+  composePrefillKey = 0
 }) => {
   const [input, setInput] = useState('')
   const [askAiBubble, setAskAiBubble] = useState<{ text: string; top: number; left: number } | null>(null)
@@ -215,6 +220,11 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen || composePrefill == null || composePrefill === '') return
+    setInput(composePrefill)
+  }, [isOpen, composePrefill, composePrefillKey])
 
   useLayoutEffect(() => {
     const el = inputRef.current
@@ -629,7 +639,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
                   return (
                     <div key={`search-${index}`}>
                       <SearchBubble onCancel={onCancelSearch} language={language} progressSeconds={searchProgressSeconds} searchStage={searchStage} />
-                      {(msg.searchResults && msg.searchResults.length >= 3) && (
+                      {(msg.searchResults && msg.searchResults.length > 0) && (
                         <ChatMessage
                           messageIndex={index}
                           message={{ ...msg, isSearching: false }}

@@ -1,12 +1,15 @@
 
 import axios, { AxiosError } from 'axios'
 import type { ReposResponse, ChatResponse, UserProfile, MatchResult } from '../types'
-import { 
-  mockReposAPI, 
-  mockChatAPI, 
-  mockProfileAPI, 
-  mockMatchAPI, 
-  mockSearchAPI 
+import {
+  mockReposAPI,
+  mockChatAPI,
+  mockProfileAPI,
+  mockMatchAPI,
+  mockSearchAPI,
+  mockUserReposAPI,
+  mockManualSearchAPI,
+  mockActivityAPI
 } from './mockApi'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -49,63 +52,71 @@ export const reposAPI = USE_MOCK
       }
     }
 
-export const userReposAPI = {
-  list: async (user_id: string): Promise<ReposResponse> => {
-    return unwrap(api.get('/api/user_repos', { params: { user_id } }))
-  },
-  upsert: async (user_id: string, repo: any): Promise<{ status: string; repo: any }> => {
-    return unwrap(api.post('/api/user_repos/upsert', { user_id, repo }))
-  },
-  delete: async (user_id: string, repo_id: string): Promise<{ status: string }> => {
-    return unwrap(api.post('/api/user_repos/delete', { user_id, repo_id }))
-  },
-  applyWeights: async (
-    user_id: string,
-    weights: { w_skill: number; w_activity: number; w_demand: number },
-    budget: number = 5,
-    ttl_hours: number = 24,
-    force_repo_id?: string
-  ): Promise<any> => {
-    return unwrap(api.post('/api/user_repos/apply_weights', { user_id, weights, budget, ttl_hours, force_repo_id }))
-  }
-}
+export const userReposAPI = USE_MOCK
+  ? mockUserReposAPI
+  : {
+      list: async (user_id: string): Promise<ReposResponse> => {
+        return unwrap(api.get('/api/user_repos', { params: { user_id } }))
+      },
+      upsert: async (user_id: string, repo: any): Promise<{ status: string; repo: any }> => {
+        return unwrap(api.post('/api/user_repos/upsert', { user_id, repo }))
+      },
+      delete: async (user_id: string, repo_id: string): Promise<{ status: string }> => {
+        return unwrap(api.post('/api/user_repos/delete', { user_id, repo_id }))
+      },
+      applyWeights: async (
+        user_id: string,
+        weights: { w_skill: number; w_activity: number; w_demand: number },
+        budget: number = 5,
+        ttl_hours: number = 24,
+        force_repo_id?: string
+      ): Promise<any> => {
+        return unwrap(api.post('/api/user_repos/apply_weights', { user_id, weights, budget, ttl_hours, force_repo_id }))
+      }
+    }
 
-export const manualSearchAPI = {
-  searchGithub: async (query: string, per_page: number = 20, page: number = 1) => {
-    return unwrap(
-      api.get('/api/github/search_repos', {
-        params: { q: query, per_page, page }
-      })
-    )
-  },
-  bulkEnrich: async (repos: { repo_id: string; full_name: string }[]) => {
-    return unwrap(api.post<ReposResponse>('/api/repos/bulk_enrich', { repos }))
-  },
-  autoMultiRoundSearch: async (keywords: string[], limit: number = 20, user_id?: string) => {
-    return unwrap(api.post('/api/search/keywords', { keywords, limit, user_id }))
-  }
-}
+export const manualSearchAPI = USE_MOCK
+  ? mockManualSearchAPI
+  : {
+      searchGithub: async (query: string, per_page: number = 20, page: number = 1) => {
+        return unwrap(
+          api.get('/api/github/search_repos', {
+            params: { q: query, per_page, page }
+          })
+        )
+      },
+      bulkEnrich: async (repos: { repo_id: string; full_name: string }[]) => {
+        return unwrap(api.post<ReposResponse>('/api/repos/bulk_enrich', { repos }))
+      },
+      autoMultiRoundSearch: async (keywords: string[], limit: number = 20, user_id?: string) => {
+        return unwrap(api.post('/api/search/keywords', { keywords, limit, user_id }))
+      }
+    }
 
-export const activityAPI = {
-  getCommitTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
-    return unwrap(api.get('/api/github/commit_trend', { params: { repo_id } }))
-  },
-  getIssueTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
-    return unwrap(api.get('/api/github/issue_trend', { params: { repo_id } }))
-  },
-  getCommitTrendCachedFallback: async (repo_id: string): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
-    return unwrap(api.get('/api/github/commit_trend/cached_fallback', { params: { repo_id } }))
-  },
-  getIssueTrendCachedFallback: async (repo_id: string, days: number = 30): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
-    return unwrap(api.get('/api/github/issue_trend/cached_fallback', { params: { repo_id, days } }))
-  }
-}
+export const activityAPI = USE_MOCK
+  ? mockActivityAPI
+  : {
+      getCommitTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
+        return unwrap(api.get('/api/github/commit_trend', { params: { repo_id } }))
+      },
+      getIssueTrend: async (repo_id: string): Promise<{ points: { date: string; count: number }[] }> => {
+        return unwrap(api.get('/api/github/issue_trend', { params: { repo_id } }))
+      },
+      getCommitTrendCachedFallback: async (repo_id: string): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
+        return unwrap(api.get('/api/github/commit_trend/cached_fallback', { params: { repo_id } }))
+      },
+      getIssueTrendCachedFallback: async (repo_id: string, days: number = 30): Promise<{ points: { date: string; count: number }[]; cache_date: string }> => {
+        return unwrap(api.get('/api/github/issue_trend/cached_fallback', { params: { repo_id, days } }))
+      }
+    }
 
 type ChatGreetingResponse = { greeting: string; session_id: string; language: string }
 
 export const ollamaAPI = USE_MOCK
   ? {
-      listModels: async (): Promise<{ models: ({ name: string; size?: string | null; size_bytes?: number | null } | string)[] }> => ({ models: [] })
+      listModels: async (): Promise<{ models: ({ name: string; size?: string | null; size_bytes?: number | null } | string)[] }> => ({
+        models: [{ name: 'demo-model', size: 'mock', size_bytes: null }]
+      })
     }
   : {
       listModels: async (): Promise<{ models: ({ name: string; size?: string | null; size_bytes?: number | null } | string)[] }> => {

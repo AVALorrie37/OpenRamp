@@ -20,6 +20,7 @@ import Toast from './components/shared/Toast'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
 import type { RepoResponse, MatchResult, UserProfile } from './types'
+import { resetMockChatStep } from './mock/demoChatScript'
 
 type HomeColSizes = { left: number; middle: number; right: number }
 const HOME_COLS_STORAGE_KEY = 'openramp_home_cols_v1'
@@ -29,6 +30,8 @@ const THIRD_COL_IDEAL_VH = 70
 const HOME_LEFT_MIN_WIDTH_PX = 340
 const HOME_MIDDLE_MIN_WIDTH_PX = 360
 const HOME_RIGHT_MIN_WIDTH_PX = 350
+
+const USE_MOCK_BUILD = import.meta.env.VITE_USE_MOCK === 'true'
 
 const App: React.FC = () => {
   const { username, sessionReady, profile, login, logout, updateProfile, isLoggedIn, isProfileModified, resetProfileModified } = useUser()
@@ -47,6 +50,20 @@ const App: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [modelsNotRunning, setModelsNotRunning] = useState(false)
   const modelsFetchingRef = useRef(false)
+  const demoSeedAttemptedRef = useRef(false)
+
+  useEffect(() => {
+    if (import.meta.env.VITE_DEMO_SEED !== 'true' || !USE_MOCK_BUILD) return
+    if (demoSeedAttemptedRef.current) return
+    demoSeedAttemptedRef.current = true
+    try {
+      if (!localStorage.getItem('current_user')) {
+        login('demo')
+      }
+    } catch {
+      demoSeedAttemptedRef.current = false
+    }
+  }, [login])
 
   useEffect(() => {
     if (username) {
@@ -438,7 +455,9 @@ const App: React.FC = () => {
     sendMessage,
     triggerLocalQueryIntent,
     cancelSearch,
-    confirmCollectProfileDraft
+    confirmCollectProfileDraft,
+    mockComposePrefill,
+    mockComposePrefillKey
   } = useAIChat(username, profile, isProfileModified, resetProfileModified, handleSearchComplete, uiLanguage, updateProfile)
 
   const handleLogin = (user: string) => {
@@ -453,6 +472,7 @@ const App: React.FC = () => {
     setMatchData(null)
     setHighlightedRepoIds([])
     setActiveKeywords([])
+    if (USE_MOCK_BUILD && username) resetMockChatStep(username)
     logout()
   }
 
@@ -461,6 +481,7 @@ const App: React.FC = () => {
     setMatchData(null)
     setHighlightedRepoIds([])
     setActiveKeywords([])
+    if (USE_MOCK_BUILD && username) resetMockChatStep(username)
     if (username) clearAccountData(username)
     logout()
   }
@@ -1203,6 +1224,8 @@ const App: React.FC = () => {
         onModelChange={(m) => setSelectedModel(m)}
         onRefreshModels={refreshOllamaModels}
         modelsNotRunning={modelsNotRunning}
+        composePrefill={mockComposePrefill}
+        composePrefillKey={mockComposePrefillKey}
       />
 
       <ManualSearchModal
@@ -1225,6 +1248,21 @@ const App: React.FC = () => {
         <div className="fixed left-1/2 top-1/2 z-[10000] -translate-x-1/2 -translate-y-1/2">
           <LoadingSpinner />
         </div>
+      )}
+
+      {USE_MOCK_BUILD && (
+        <footer className="shrink-0 border-t border-border/60 bg-surface/90 px-3 py-1.5 text-center text-[11px] leading-snug text-text/55">
+          {uiLanguage === 'english' ? (
+            <>
+              Demo mode: simulated data and scripted AI steps. Custom prompts need a full local or deployed stack
+              (see README).
+            </>
+          ) : (
+            <>
+              演示模式：数据与 AI 为模拟脚本；自定义 AI 对话需本地或完整部署运行（见 README）。
+            </>
+          )}
+        </footer>
       )}
     </div>
   )
