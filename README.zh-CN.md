@@ -1,6 +1,8 @@
 # OpenRamp
-
 [English](README.md) · **简体中文**
+
+**在线体验界面：** [https://avalorrie37.github.io/OpenRamp/](https://avalorrie37.github.io/OpenRamp/) — 该 GitHub Pages 站点为 **Mock 数据**，仅用于展示 **前端交互效果**；**不包含**真实后端、Ollama 或 GitHub/OpenDigger 等实时数据。**完整功能**请按下文步骤在 **本地部署**（后端、前端及可选 Ollama）。
+
 
 Smooth your ramp to open source. OpenRamp 通过 **AI 对话画像 + 多维度数据评分**，帮你在海量仓库里找到更适合自己的开源项目。
 

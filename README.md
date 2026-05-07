@@ -1,6 +1,8 @@
 # OpenRamp
-
 **English** · [简体中文](README.zh-CN.md)
+
+**Live UI:** [https://avalorrie37.github.io/OpenRamp/](https://avalorrie37.github.io/OpenRamp/) — this GitHub Pages build uses **mock data** to demonstrate **frontend interactions only**. There is **no** real backend, Ollama, or live GitHub/OpenDigger integration. **For the full product**, install and run the stack locally as described in the sections below (backend, frontend, and optional Ollama).
+
 
 Smooth your ramp to open source. OpenRamp combines **AI conversational profiling with multi-dimensional scoring** so you can find open-source projects that fit you better among a huge pool of repositories.
 
